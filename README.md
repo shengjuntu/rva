@@ -1,19 +1,27 @@
-# RunDesk Video App · v0.23.0
+# RunDesk Video App · v0.23.1
 
-提供正文和素材，点击“交给 RunDesk 制作”，让 Codex 自主完成分镜、选材、图像与视频生成、TTS、动画和成片检查。Video App 提供制作 MCP 工具、素材与作品版本、多轨审阅；RunDesk 负责 Agent 运行、Skills/MCP 配置和轨迹调试。主要动画与合成后端为 HyperFrames。
+提供正文和本地素材，开始制作，查看成片，再通过对话调整。Codex 自主完成分镜、选材、图像与视频生成、TTS、HyperFrames 动画、检查和重做；Video App 提供制作 MCP、素材/作品版本和成片展示，RunDesk 负责 Agent 运行、Skills/MCP 配置和轨迹调试。
 
 正文是内容依据，画面服务文字。一个意思可以使用多个镜头，一个画面也可以覆盖多句；没有段落镜头模板。剪辑文档只记录时间、素材引用、字幕和声音安排，动画内部允许 Codex 编写 HTML、CSS、JavaScript 和 GSAP。
 
 ## 日常使用
 
-1. 新建项目，粘贴或导入主播正文和制作要求，添加图片、视频、音频或素材目录。
-2. 点“交给 RunDesk 制作”。保存输入、连接已有专用会话并提交制作任务。Codex 读取可用工具后自行安排工作，不在普通选材、分镜、配音和渲染之间反复等待确认。
-3. 查看“素材准备和对齐、剪辑、精修”阶段产物。阶段是可检查的记录，允许反复补充，不限制 Agent 必须按固定顺序执行。
-4. 在多轨审阅中联动查看文稿、画面、配音、字幕和音乐，通过对话提出局部修改；完整播放和人审后再记录终稿。
+1. 从项目列表新建或打开项目，粘贴/导入主播正文，补充制作要求，选择本地目录或文件导入素材。
+2. 点“开始制作”，将保存的输入交给 RunDesk/Codex 制作完整初稿。页面只显示简要状态。
+3. 查看实际成片与历史版本，在对话中说“第二节重做”“换掉开头画面”等修改要求。Codex 检查结果、修改并重新制作，保留无关内容与历史结果。
+4. 下载或导出选定的真实成片。
 
-首次运行仍需配置 RunDesk 地址/权限、Codex 认证、渲染依赖和需要的生成服务。日常一键制作不会自动安装模型、改变其他应用配置或发布视频。复杂工具参数、模型交互和异常定位在 RunDesk 调试。
+本版界面围绕输入、成片和对话；多轨时间线、原文或片段的可视定位、动画源码检查留待后续。用户不用操作手动 TTS、渲染、DSL、对齐或详细制作控制台，后台制作工具继续供 Codex 调用。详细过程、工具参数、模型交互和异常定位在 RunDesk 查看。
 
-## 制作工具
+素材准备和对齐、剪辑、精修是后台产物的分类，不是必须依次点击或确认的路线。Codex 可以根据实际结果补素材、改动画和重做。普通制作步骤不重复确认，最终人审仍针对具体完整输出。
+
+独立设置页保留必要的 IndexTTS/配音配置；其他服务按真实配置状态和现有部署方式说明，模型、Skills/MCP 与运行环境由 RunDesk 管理。首次运行需完成地址、权限、认证和依赖配置；日常制作不重置已有设置或工作区。
+
+Skill 中通常三轮的自动检查建议用于控制无效反复，不是程序硬编码的重做上限，也不表示程序能自动判定新闻语义正确或已经听过/看过全片。实际检查范围应据实记录。
+
+## 后台制作能力
+
+以下为 Codex 可调用的服务能力，不表示主页面提供对应的手动编辑面板。
 
 | 能力 | 实现与边界 |
 | --- | --- |
@@ -23,11 +31,11 @@
 | 文字素材关联 | 精确原文引用、多对多素材关系、视频选段、选择理由和未覆盖原文；候选检索为词项基线 |
 | 图像/视频生成 | 自定义 http_binary_v1 适配器；支持的目标时长、画幅、参考图按已配置服务使用，不是任意厂商 API 直连 |
 | HyperFrames | 保存原创 HTML/CSS/JavaScript 动画工程及时间线，校验后由统一渲染任务保存独立快照和实际视频 |
-| 多轨审阅 | 根据同一工程/输出的时间线显示画面、配音、字幕和音乐；选择与试听是审阅，不等于直接编辑工程 |
+| 审阅与定位数据 | 后台保留 review-timeline、精确文字定位和检查记录供 Codex 使用；本版不展示多轨或可视引用选择 |
 | 版本与检查 | 修订冲突检测、真实渲染抽帧、检查记录、历史输出和终稿字节复核 |
 | 旧工程 | native DSL/FFmpeg、video_use EDL 和旧镜头工程兼容保留，选择后只使用一种工程作为渲染依据 |
 
-新制作优先 HyperFrames。旧项目不静默转换；切换后端不会删除另一种工程。需要简单、无浏览器的合成时可以继续使用 native DSL；已有 video_use 工程继续沿用原共享目录与归档流程。video_use 不再是主制作路径。
+新制作优先 HyperFrames。旧项目保留原稿、素材、工程、后端与历史输出；后台 native DSL 和 video_use 能力继续兼容，不在日常页面暴露手动 DSL/渲染操作。video_use 已有共享目录与归档流程继续有效，不是新制作的必需依赖。
 
 ## 启动与部署
 
@@ -43,7 +51,7 @@ bash scripts/build.sh
 
 Go 主程序使用标准库及嵌入网页。HyperFrames 渲染另外需要 Node.js、Chromium、HyperFrames 0.8.87、GSAP 3.15.0、FFmpeg/FFprobe 和字体；IndexTTS 模型独立部署，图像/视频生成服务按需配置。native DSL 渲染无需 Node/Chromium。
 
-Docker 部署见 [DOCKER](docs/DOCKER.md)。在旧 docker/.env 显式更新 VIDEO_IMAGE=rundesk-video-app:0.23.0 后构建并启动：
+Docker 部署见 [DOCKER](docs/DOCKER.md)。在旧 docker/.env 显式更新 VIDEO_IMAGE=rundesk-video-app:0.23.1 后构建并启动：
 
 ```bash
 bash scripts/docker.sh init
@@ -57,8 +65,10 @@ App 渲染容器与 RunDesk Codex 工具容器分别更新。配套 RunDesk 0.49
 
 ## 本版文档与验证
 
-- [自主导演与 HyperFrames](docs/HYPERFRAMES-0.23.md)、[升级](docs/UPGRADING.md)
-- [本版验证记录](docs/validation-0.23.json)，含真实短动画、音频与终稿版本检查
+- [v0.23.1 验证记录](docs/validation-0.23.1.json)：极简界面、对话草稿、回执恢复、历史导出与后台工具兼容
+- [自主导演与 HyperFrames 技术说明](docs/HYPERFRAMES-0.23.md)：保留 v0.23.0 设计与后台契约；本版界面以本页为准
+- [升级](docs/UPGRADING.md)
+- [v0.23.0 工程与渲染验证](docs/validation-0.23.json)：历史记录，含真实短动画、音频与终稿版本检查；不替代本版界面验收
 - [制作 Skill](integrations/video-project/SKILL.md)、[指令设计](integrations/video-project/WORKFLOW-DESIGN.md)
 - [架构](docs/ARCHITECTURE.md)、[阶段计划](docs/ROADMAP.md)
 - [IndexTTS](docs/INDEXTTS.md)、[生成适配](docs/GENERATION-0.15.md)、[新闻交接](docs/NEWS-HANDOFF.md)

@@ -1,0 +1,38 @@
+{
+  "baseline": "rundesk-video-app-v0.23.0-hyperframes-autonomy.zip",
+  "added": [
+    "docs/dom-validation-0.23.1.json",
+    "docs/tests-0.23.1.jsonl",
+    "docs/validation-0.23.1.json",
+    "rundesk_autonomy_test.go",
+    "tests/backend-compatibility.cjs",
+    "tests/minimal-receipts.test.cjs",
+    "tests/minimal-workbench.test.cjs",
+    "web/settings.html",
+    "web/settings.js"
+  ],
+  "modified": [
+    "CHANGELOG.md",
+    "README.md",
+    "bin/SHA256SUMS",
+    "bin/video-app",
+    "bin/video-app-windows-amd64.exe",
+    "docker/compose.yaml",
+    "docs/ARCHITECTURE.md",
+    "docs/ROADMAP.md",
+    "docs/UPGRADING.md",
+    "main.go",
+    "rundesk_client.go",
+    "tests/dom-production.cjs",
+    "web/app.js",
+    "web/index.html",
+    "web/style.css"
+  ],
+  "deleted": [
+    "tests/review-workbench.test.cjs",
+    "tests/speech-submit.test.cjs",
+    "tests/submission-namespaces.test.cjs",
+    "web/review.js",
+    "web/speech-submit.js"
+  ]
+}

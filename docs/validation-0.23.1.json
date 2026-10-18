@@ -1,0 +1,111 @@
+{
+  "version": "0.23.1",
+  "checkedAt": "2026-10-18",
+  "scope": "Simple input, autonomous draft, conversation revision and result export; remove manual production and timeline UI, retain production tools.",
+  "goRace": {
+    "passed": 400,
+    "topLevelPassed": 173,
+    "failures": [],
+    "skipped": [
+      "TestRootRuntimeProbeProgramWithActualAppMCP",
+      "TestTextRefsRealAdapterArchiveAndLocator",
+      "TestHyperFramesRealAnimationAudioRender",
+      "TestProductionExchangeRealAdapterArchiveLateResultAndFinalProof",
+      "TestProductionExchangeNewerEditAuthoritySurvivesOlderLateIngest",
+      "TestSpeechSnapshotGenerationAndAdoption"
+    ],
+    "log": "tests-0.23.1.jsonl"
+  },
+  "goVet": true,
+  "nodeTestsPassed": 7,
+  "httpDom": {
+    "passed": true,
+    "checks": 24,
+    "report": "dom-validation-0.23.1.json",
+    "scope": "Actual embedded frontend from the final 0.23.1 Go binary; JSDOM with real HTTP API and a fixture RunDesk, no actual Codex/model."
+  },
+  "dispatchContract": {
+    "realHTTPFixtureTested": true,
+    "backends": [
+      "hyperframes",
+      "native",
+      "video_use"
+    ],
+    "autonomousToolOrderAndRevisions": true,
+    "stagesAreArtifactsNotMandatorySequence": true,
+    "frozenPendingBodyAndIdempotencyKeyPreservedOnUpgrade": true,
+    "test": "TestRunDeskDispatchUsesAutonomousBackendSpecificInstructions / TestRunDeskAutonomyUpgradeDoesNotRewriteFrozenPendingBody"
+  },
+  "ui": {
+    "retained": [
+      "Project list, new project, rename and switch",
+      "Narration and optional production requirements",
+      "Local files, folders and news-package import",
+      "One-click draft production and simple status",
+      "Completed video history, playback, download and explicit human final confirmation",
+      "Persistent project-scoped conversation drafts and safe retry",
+      "Separate essential service settings"
+    ],
+    "removed": [
+      "Manual TTS, adoption and audio editing",
+      "Manual render and range render controls",
+      "Manual DSL, patches, text-media alignment and backend switches",
+      "Detailed phase artifact console, trace logs and tool parameters",
+      "Multitrack timeline, visual quote/clip selection and source inspector"
+    ],
+    "future": "A lightweight multitrack display may be added later; backend review-timeline/locator MCP remains available."
+  },
+  "boundariesVerified": [
+    "Drafts survive upload, reload and project switches",
+    "Old poll cannot overwrite a newer saved revision",
+    "Unknown receipts and authentication failures retain original request identity",
+    "Late acknowledgement cannot clear another request receipt",
+    "Malformed receipt permits result viewing and blocks unsafe fresh dispatch",
+    "Server-side pending recovery retains skills and expected turn",
+    "Local stop fences new submissions and cancels only captured job IDs",
+    "Completed historical output and export use the selected render",
+    "Settings late response preserves newer unsaved model/key input"
+  ],
+  "companion": {
+    "rundesk": "0.49.5",
+    "videoBuild": "1.4.0",
+    "kun": "0.17.0",
+    "mcpToolCount": 52,
+    "rundeskChangedThisRelease": false
+  },
+  "builds": {
+    "linuxAmd64": "compiled and actual version executed",
+    "windowsAmd64": "cross-compiled only",
+    "sha256": {
+      "video-app": "ac9f94e25627ceeb67ef779587bebbbfb79151cef47b2c0760ac2083da0a5249",
+      "video-app-windows-amd64.exe": "2398d29f013e50342ba3a08c2d21bebc14d165b6f31a022cd4a2d709d7c52436"
+    }
+  },
+  "notRepeated": [
+    "Renderer implementation unchanged; actual HyperFrames animation/audio and final lifecycle evidence remains in validation-0.23.json",
+    "RunDesk source unchanged; its 0.49.5 validation remains authoritative"
+  ],
+  "notTested": [
+    "Real Codex autonomous news-video production and model vision",
+    "Real IndexTTS/image-generation/video-generation services",
+    "Docker build and user-server deployment",
+    "Native Windows execution"
+  ],
+  "limits": [
+    "Semantic and audio/visual quality review is performed by the Agent with the tools it can actually use, not automatically proved by task completion",
+    "Three review passes is Skill guidance, not a hardcoded controller limit",
+    "Production jobs do not yet record cross-client run ownership; local stop is fenced and snapshots its cancellation targets"
+  ],
+  "graphicalBrowser": {
+    "inspected": true,
+    "browser": "Chrome Headless Shell 155",
+    "scope": [
+      "Simplified project/input/output/conversation workspace",
+      "Separate service settings page",
+      "Actual locally generated 2-second native FFmpeg video used in the result player"
+    ],
+    "screenshotsDelivered": false,
+    "modelTested": false,
+    "indexTTSTested": false
+  }
+}

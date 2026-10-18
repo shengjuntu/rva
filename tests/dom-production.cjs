@@ -1,185 +1,334 @@
-const {JSDOM}=require('jsdom');
-const {File}=require('node:buffer');
-const {spawn}=require('child_process');const fs=require('fs'),vm=require('vm');
-const root=require('path').resolve(__dirname,'..'), testData=fs.mkdtempSync(require('path').join(require('os').tmpdir(),'video-dom-')), base='http://127.0.0.1:3321',token='dom-test-token-not-secret';
-(async()=>{
- const proc=spawn(root+'/bin/video-app',['--data',testData,'--listen','127.0.0.1:3321'],{env:{...process.env,VIDEO_APP_TOKEN:token}});
- let dom;try{
-  await new Promise((resolve,reject)=>{proc.stderr.on('data',b=>{if(b.toString().includes(base))resolve()});proc.on('error',reject);proc.on('exit',c=>reject(Error('server exit '+c)));setTimeout(()=>reject(Error('server startup timeout')),10000)});
-  const realFetch=(path,opts={})=>fetch(new URL(path,base),{...opts,headers:{...opts.headers,Authorization:'Bearer '+token}});
-  const p=await (await realFetch('/api/projects',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'DOM制作测试'})})).json();
-  if(p.workflow?.editingBackend!=='hyperframes')throw Error('new projects must default to HyperFrames');
-  // The existing legacy DSL scenarios explicitly select the retained native backend.
-  const nativeSwitch=await realFetch('/api/projects/'+p.id+'/workflow',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:p.revision,workflow:{...p.workflow,editingBackend:'native'}})});
-  if(nativeSwitch.status!==200)throw Error('could not select legacy native backend for regression checks');
-  dom=new JSDOM(fs.readFileSync(root+'/web/index.html','utf8'),{url:base,runScripts:'outside-only'});const w=dom.window;
-  w.fetch=realFetch;w.HTMLMediaElement.prototype.pause=function(){};w.HTMLMediaElement.prototype.load=function(){};w.HTMLDialogElement.prototype.showModal=function(){};w.HTMLDialogElement.prototype.close=function(){};
-  w.confirm=()=>true;w.AbortController=AbortController;w.FormData=FormData;
-  const ctx=dom.getInternalVMContext();vm.runInContext(fs.readFileSync(root+'/web/speech-submit.js','utf8'),ctx);vm.runInContext(fs.readFileSync(root+'/web/review.js','utf8'),ctx);vm.runInContext(fs.readFileSync(root+'/web/app.js','utf8').replace('boot().catch((e) => {','globalThis.initialBoot = boot(); initialBoot.catch((e) => {'),ctx); await vm.runInContext('initialBoot',ctx);
-  const toolVersion=vm.runInContext('TOOL_VERSION',ctx);
-  if(vm.runInContext("editingBackendLabel('hyperframes_authored')",ctx)!=='HyperFrames')throw Error('authored HyperFrames render labeled as native');
-  await vm.runInContext('openProject('+JSON.stringify(p.id)+')',ctx);
-  const text=w.document.querySelector('#production-text');text.value='第一条事实。第二条说明！';text.dispatchEvent(new w.Event('input'));await vm.runInContext('save()',ctx);
-  if(w.document.querySelectorAll('#alignment-table tr').length!==3)throw Error('table not generated');
-  if(!w.document.querySelector('#shot-text').readOnly)throw Error('text not protected');
-  const fd=new FormData();fd.append('file',new Blob([fs.readFileSync(root+'/docs/preview.png')],{type:'image/png'}),'新闻图.png');
-  const up=await (await realFetch('/api/projects/'+p.id+'/assets',{method:'POST',body:fd})).json();
-  await vm.runInContext('openProject('+JSON.stringify(p.id)+')',ctx);
-  const select=w.document.querySelector('#alignment-table select');select.value=up.assets[0].id;select.dispatchEvent(new w.Event('change'));await vm.runInContext('save()',ctx);
-  text.value='新增导语。第一条事实。第二条说明！';text.dispatchEvent(new w.Event('input'));await vm.runInContext('save()',ctx);
-  const selects=w.document.querySelectorAll('#alignment-table select');if(selects.length!==3 || selects[1].value!==up.assets[0].id)throw Error('media mapping lost');
-  const current=await(await realFetch('/api/projects/'+p.id)).json();if(current.production.text!==text.value)throw Error('text not persisted');
-  const preview=await(await realFetch('/api/mcp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'video_asset_inspect',arguments:{projectId:p.id,assetId:up.assets[0].id}}})})).json();
-  if(!preview.result?.content?.some(x=>x.type==='image'))throw Error('MCP preview missing');
-  await vm.runInContext('loadCapabilities(false)',ctx);
-  if(w.document.querySelectorAll('#capability-list .capability-row').length<8)throw Error('capability panel incomplete');
-  if(!w.document.querySelector('#capability-list').textContent.includes('未配置'))throw Error('unimplemented generators hidden');
-  const imported={name:'generated-note.txt',data:Buffer.from('素材导入契约测试').toString('base64'),requestId:'b'.repeat(24)};
-  const imports=[];for(let i=0;i<2;i++)imports.push(await(await realFetch('/api/projects/'+p.id+'/assets/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(imported)})).json());
-  if(imports[0].asset.id!==imports[1].asset.id||imports[0].revision!==imports[1].revision)throw Error('import receipt duplicated');
-  const unsupported=await realFetch('/api/projects/'+p.id+'/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'image_generation',revision:imports[1].revision,requestId:'c'.repeat(24)})});
-  if(unsupported.status!==409)throw Error('unsupported generation created a job');
-  await vm.runInContext('loadProductionJobs(true)',ctx);
-  if(!w.document.querySelector('#production-jobs').textContent.includes('还没有'))throw Error('unexpected placeholder job');
-  await vm.runInContext('openProject('+JSON.stringify(p.id)+')',ctx);
-  w.document.querySelector('#edit-example').click();
-  if(!w.document.querySelector('#edit-json').value.includes('opening_title'))throw Error('DSL example missing');
-  await vm.runInContext('saveEditDSL()',ctx);
-  if(!w.document.querySelector('#edit-mode').textContent.includes('DSL'))throw Error('saved DSL not active');
-  const editSaved=await(await realFetch('/api/projects/'+p.id+'/edit')).json();if(!editSaved.active||editSaved.ir.clips.length!==2)throw Error('DSL HTTP compilation failed');
-  if(w.document.querySelectorAll('#edit-timeline .edit-block').length!==2)throw Error('timeline not rendered');
-  await vm.runInContext('switchEditing(false)',ctx);
-  const retained=await(await realFetch('/api/projects/'+p.id+'/edit')).json();if(retained.active||!retained.dsl)throw Error('switch deleted DSL');
-  const patchProject=await(await realFetch('/api/projects/'+p.id)).json();
-  const patchBody={revision:patchProject.revision,changes:[{id:'opening_title',op:'update',fields:{text:'Changed title'}}]};
-  const patchPreview=await(await realFetch('/api/projects/'+p.id+'/edit/patch/preview',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(patchBody)})).json();
-  if(!patchPreview.affectedClipIds?.includes('opening_title')||patchPreview.saved)throw Error('patch preview failed');
-  const patchApplied=await(await realFetch('/api/projects/'+p.id+'/edit/patch/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(patchBody)})).json();
-  const undone=await realFetch('/api/projects/'+p.id+'/edit/undo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:patchApplied.revision})});if(undone.status!==200)throw Error('undo failed');
-  const afterUndo=await(await realFetch('/api/projects/'+p.id)).json();
-  const redone=await realFetch('/api/projects/'+p.id+'/edit/redo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:afterUndo.revision})});if(redone.status!==200)throw Error('redo failed');
-  const redoResult=await redone.json();
-  const revert=await realFetch('/api/projects/'+p.id+'/edit/undo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:redoResult.revision})});if(revert.status!==200)throw Error('second undo failed');
-  if(!w.document.querySelector('#patch-redo'))throw Error('redo button missing');
-  await vm.runInContext('openProject('+JSON.stringify(p.id)+')',ctx);
-  const narration=w.document.querySelector('#narration-text');
-  const beforeAdopt=await(await realFetch('/api/projects/'+p.id)).json();
-  if(w.document.querySelector('#narration-use-existing').hidden)throw Error('saved canonical news text not discoverable');
-  w.document.querySelector('#narration-use-existing').click();
-  const afterAdopt=await(await realFetch('/api/projects/'+p.id)).json();
-  if(narration.value!==beforeAdopt.production.text||afterAdopt.revision!==beforeAdopt.revision||afterAdopt.narrationText)throw Error('using existing text silently persisted or changed source');
-  narration.value='独立口播正文。';narration.dispatchEvent(new w.Event('input'));
-  await vm.runInContext('drawProject()',ctx);if(narration.value!=='独立口播正文。')throw Error('unsaved narration lost');
-  w.document.querySelector('#narration-save').click();await new Promise(r=>setTimeout(r,100));
-  w.document.querySelector('#workflow-instructions').value='保持原意';w.document.querySelector('#workflow-instructions').dispatchEvent(new w.Event('input'));
-  await vm.runInContext('saveWorkflow()',ctx);
-  const workflowSaved=await(await realFetch('/api/projects/'+p.id)).json();if(workflowSaved.workflow.instructions!=='保持原意')throw Error('workflow not persisted');
-  const actualReview=await(await realFetch('/api/projects/'+p.id+'/review-timeline')).json();
-  await vm.runInContext('drawReviewTimeline('+JSON.stringify(actualReview)+')',ctx);
-  if(w.document.querySelectorAll('#review-timeline .review-lane').length<4||!w.document.querySelector('#review-text').textContent.includes(workflowSaved.narrationText))throw Error('actual HTTP review did not render saved text and four tracks');
-  const backend=w.document.querySelector('#workflow-backend');if(backend.value!=='native')throw Error('default editing backend missing');
-  backend.value='hyperframes';backend.dispatchEvent(new w.Event('change'));await vm.runInContext('saveWorkflow()',ctx);
-  if(!w.document.querySelector('#edit-mode').textContent.includes('HyperFrames')||!w.document.querySelector('#edit-json').closest('details').hidden||w.document.querySelector('#final-tools').hidden)throw Error('HyperFrames mode did not expose independent project review');
-  if(w.document.querySelector('#advanced-workspace').contains(w.document.querySelector('#review-workbench')))throw Error('readonly review buried in advanced controls');
-  backend.value='video_use';backend.dispatchEvent(new w.Event('change'));await vm.runInContext('drawProject()',ctx);
-  if(backend.value!=='video_use')throw Error('unsaved backend selection lost');
-  await vm.runInContext('saveWorkflow()',ctx);
-  const backendSaved=await(await realFetch('/api/projects/'+p.id)).json();if(backendSaved.workflow.editingBackend!=='video_use')throw Error('editing backend not persisted');
-  if(!w.document.querySelector('#edit-mode').textContent.includes('video-use')||!w.document.querySelector('#edit-json').closest('details').hidden||w.document.querySelector('#final-tools').hidden||w.document.querySelector('#final-designate').disabled)throw Error('external editing mode still requires native DSL or hides final tools');
-  backend.value='native';backend.dispatchEvent(new w.Event('change'));await vm.runInContext('saveWorkflow()',ctx);
-  if(w.document.querySelector('#edit-json').closest('details').hidden)throw Error('native editing controls not restored');
-  const currentWorkflow=await(await realFetch('/api/projects/'+p.id)).json();
-  const instruction=await(await realFetch('/api/projects/'+p.id+'/draft/instruction',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:currentWorkflow.revision})})).json();if(!instruction.text?.includes('保持原意'))throw Error('draft instruction missing');
-  if(w.document.querySelector('#draft-start').disabled)throw Error('one-click production requires manual connection');
-  const advanced=w.document.querySelector('#advanced-workspace');if(advanced.open)throw Error('manual workspace expanded by default');
-  for(const selector of ['#edit-panel','#speech-section','#render','#production-panel','#workflow-save','#workflow-backend'])if(!advanced.contains(w.document.querySelector(selector)))throw Error('manual operation leaked into primary workbench: '+selector);
-  if(advanced.contains(narration)||advanced.contains(w.document.querySelector('#draft-start')))throw Error('primary text production buried in advanced tools');
-  await vm.runInContext(`globalThis.boardFixture={projectId:project.id,versionStatus:'adjustment',alignment:{alignment:{units:[]},state:'blocked',coverage:{totalUnits:3,selectedUnits:2,missingUnits:1}},stages:[{id:'preparation',title:'素材准备和对齐',state:'blocked',summary:'仍有素材缺口',items:[]},{id:'editing',title:'剪辑',state:'empty',summary:'尚未渲染',items:[{id:'unsafe',title:'unsafe',kind:'video',url:'javascript:alert(1)'}]},{id:'refinement',title:'精修',state:'empty',items:[]}],artifacts:[{id:'script',title:'正文',state:'ready',text:'<img src=x onerror=alert(1)>'},{id:'media',title:'素材',state:'blocked',items:[{id:'unsafe',title:'unsafe',kind:'image',url:'javascript:alert(1)'},{id:'outside',kind:'image',url:'https://example.org/image.png'}]},{id:'render',title:'初稿视频',state:'empty',items:[]},{id:'review',title:'检查记录',state:'empty',items:[]},{id:'final',title:'终稿',state:'empty',items:[]}]};drawProductionBoard(boardFixture)`,ctx);
-  if(w.document.querySelectorAll('#production-board > .stage-card').length!==3||w.document.querySelector('#production-board img')||w.document.querySelector('#production-board video'))throw Error('three stage cards unsafe or missing');
-  if(w.document.querySelector('#production-version-status').textContent!=='调整')throw Error('version status confused with production phase');
-  if(!w.document.querySelector('[data-stage="editing"]').textContent.includes('待制作'))throw Error('empty phase falsely marked complete');
-  if(!w.document.querySelector('[data-stage="preparation"]').textContent.includes('2 / 3 处已选素材'))throw Error('alignment coverage not shown');
-  const phaseDetails=w.document.querySelector('[data-stage="preparation"] > details');if(phaseDetails.open)throw Error('phase details expanded by default');
-  phaseDetails.open=true;await vm.runInContext("boardFixture.stages[0].summary='正在更新';drawProductionBoard(boardFixture)",ctx);
-  if(!w.document.querySelector('[data-stage="preparation"] > details').open)throw Error('phase detail expansion lost during refresh');
-  const phaseNumbers=[...w.document.querySelectorAll('#production-board .phase-number')].map(n=>n.textContent).join(',');if(phaseNumbers!=='1,2,3')throw Error('phase order not displayed');
-  if(!w.document.querySelector('[data-stage="preparation"]').textContent.includes('<img src=x onerror=alert(1)>'))throw Error('authored text not preserved as text');
-  for(const selector of ['#runtime-diagnostics','#quote-locator'])if(!advanced.contains(w.document.querySelector(selector)))throw Error('diagnostic or locator leaked into primary workbench');
-  await vm.runInContext('diagnoseProduction()',ctx);
-  if(!w.document.querySelector('#diagnostics-status').textContent.includes('模型实际看图尚未验证')||!w.document.querySelectorAll('#diagnostics-results .diagnostic-row').length)throw Error('real diagnosis missing or vision implied');
-  await vm.runInContext(`drawRuntimeDiagnostics({projectId:project.id,ready:false,modelVisionVerified:false,rows:[{id:'transport',title:'图片传递',state:'passed',summary:'只验证传输'},{id:'missing',title:'<img src=x onerror=alert(1)>',state:'blocked',summary:'https://example.org/unsafe',remedy:'<script>unsafe</script>'},{id:'unknown',title:'未知',state:'invented',summary:'不可认定通过'}]})`,ctx);
-  const diagnosis=w.document.querySelector('#diagnostics-results');
-  if(diagnosis.querySelector('img,script,a')||diagnosis.querySelectorAll('[data-state="passed"]').length!==1||!diagnosis.textContent.includes('处理方式：<script>unsafe</script>')||!diagnosis.textContent.includes('未检查'))throw Error('diagnostic HTML unsafe or unknown state passed');
-  const locatorInputs=[];let locatorSends=0;
-  w.fetch=async(url,opts={})=>{
-   if(String(url).endsWith('/edit/locate')){const body=JSON.parse(opts.body);locatorInputs.push(body);const current=await(await realFetch('/api/projects/'+p.id)).json();return new Response(JSON.stringify({projectId:p.id,revision:current.revision,backend:'native',sourceHash:'a'.repeat(64),current:true,query:{quote:body.quote,occurrence:body.occurrence||1,startRune:0,endRune:2},matches:[{clipId:'<img src=x onerror=alert(1)>',trackId:'visuals',start:1.25,end:3.5,assetId:up.assets[0].id,textRefs:[{startRune:0,endRune:2,quote:body.quote}],matchedRefs:[{quote:body.quote}]}],unmappedClipIds:['unmapped-old']}),{status:200,headers:{'Content-Type':'application/json'}});}
-   if(String(url).endsWith('/messages'))locatorSends++;
-   return realFetch(url,opts);
-  };
-  w.document.querySelector('#locate-quote').value='<img src=x onerror=alert(1)>';
-  w.document.querySelector('#locate-occurrence').value='2';
-  await vm.runInContext('locateClips()',ctx);
-  const locator=w.document.querySelector('#locate-results');
-  if(locator.querySelector('img,script,a')||!locator.textContent.includes('unmapped-old')||!locator.textContent.includes('1.250–3.500')||locatorInputs[0].occurrence!==2)throw Error('locator lost references, exact query, or safe text');
-  w.document.querySelector('#prompt').value='尚未发送的调整';
-  await locator.querySelector('button').onclick();
-  if(!w.document.querySelector('#prompt').value.startsWith('尚未发送的调整\n\n')||!w.document.querySelector('#prompt').value.includes('<img src=x onerror=alert(1)>')||locatorSends)throw Error('locator overwrote draft or sent instruction');
-  const locatedDraft=w.document.querySelector('#prompt').value;
-  await vm.runInContext('drawLocatedClips({...locatorResult,revision:project.revision-1,current:false,renderId:"historical-render"})',ctx);
-  await w.document.querySelector('#locate-results button').onclick();
-  if(w.document.querySelector('#prompt').value!==locatedDraft||!w.document.querySelector('#locate-status').textContent.includes('历史记录'))throw Error('stale locator editable without refresh or hidden history');
-  w.fetch=async(url,opts={})=>String(url).endsWith('/edit/locate')?new Response(JSON.stringify({projectId:'other-project',revision:1,matches:[]}),{status:200,headers:{'Content-Type':'application/json'}}):realFetch(url,opts);
-  let wrongProject=false;try{await vm.runInContext('locateClips()',ctx)}catch(e){wrongProject=true;}
-  if(!wrongProject||w.document.querySelector('#locate-results').children.length||w.document.querySelector('#prompt').value!==locatedDraft)throw Error('cross-project locator result accepted');
-  w.document.querySelector('#prompt').value='';w.fetch=realFetch;
-  await vm.runInContext(`globalThis.savedRenders=project.renders;project.renders=[{id:'native-full',state:'completed',engine:'ffmpeg_edit',revision:1,duration:3},{id:'external-full',state:'completed',engine:'video_use',revision:2,duration:3},{id:'external-range',state:'completed',engine:'video_use',revision:2,duration:1,range:{start:0,end:1}},{id:'not-ready',state:'running',engine:'video_use',revision:2}];drawRenders()`,ctx);
-  const finalSelect=w.document.querySelector('#final-render-id');if(finalSelect.options.length!==3||![...finalSelect.options].some(o=>o.value==='external-full'&&o.textContent.includes('video-use')))throw Error('external full render missing from final selection');
-  finalSelect.value='external-full';w.document.querySelector('#final-reviewed').checked=true;finalSelect.dispatchEvent(new w.Event('change'));
-  if(w.document.querySelector('#final-reviewed').checked)throw Error('changing final candidate retained previous review');
-  await vm.runInContext('drawFinalRenderOptions()',ctx);if(finalSelect.value!=='external-full')throw Error('selected external final lost on refresh');
-  await vm.runInContext('project.renders=savedRenders;drawRenders()',ctx);
-  w.document.querySelector('#prompt').value='尚未发送的修改';
-  let blocked=false;try{await vm.runInContext('startProduction()',ctx)}catch(e){blocked=true}
-  if(!blocked||w.document.querySelector('#prompt').value!=='尚未发送的修改')throw Error('one-click lost unsent correction');
-  w.document.querySelector('#prompt').value='';
-  narration.value='第一条自由正文。素材必须服从这段文字。';narration.dispatchEvent(new w.Event('input'));
-  const requirements=w.document.querySelector('#workflow-instructions');requirements.value='保留正文，先做初稿';requirements.dispatchEvent(new w.Event('input'));
-  const beforePrimaryUpload=await(await realFetch('/api/projects/'+p.id)).json();
-  Object.defineProperty(w.document.querySelector('#folder-files'),'files',{configurable:true,value:[new File([fs.readFileSync(root+'/docs/preview.png')],'primary-flow.png',{type:'image/png'})]});
-  await w.document.querySelector('#folder-files').onchange();
-  const afterPrimaryUpload=await(await realFetch('/api/projects/'+p.id)).json();
-  if(afterPrimaryUpload.assets.length!==beforePrimaryUpload.assets.length+1||narration.value!=='第一条自由正文。素材必须服从这段文字。'||requirements.value!=='保留正文，先做初稿')throw Error('material upload lost primary text draft');
-  let connections=0;const messages=[];
-  w.fetch=async(path,opts={})=>{
-   if(String(path).match(/\/connect(?:\?|$)/)){
-    connections++;const current=await(await realFetch('/api/projects/'+p.id)).json();
-    return new Response(JSON.stringify({...current,sessionId:'test-session',workspaceId:'test-workspace',toolsVersion:toolVersion}),{status:200,headers:{'Content-Type':'application/json'}});
-   }
-   if(String(path).endsWith('/messages')){
-    messages.push(JSON.parse(opts.body));
-    if(messages.length===1)throw new TypeError('simulated connection reset after submission');
-    return new Response('{}',{status:200,headers:{'Content-Type':'application/json'}});
-   }
-   return realFetch(path,opts);
-  };
-  let uncertain=false;try{await vm.runInContext('startProduction()',ctx)}catch(e){uncertain=true}
-  const automaticSaved=await(await realFetch('/api/projects/'+p.id)).json();
-  if(!uncertain||connections!==1||messages.length!==1||automaticSaved.narrationText!==narration.value||automaticSaved.workflow.instructions!==requirements.value)throw Error('one-click save and connect failed');
-  if(!messages[0].text.includes('保留正文，先做初稿'))throw Error('saved requirements missing from production instruction');
-  w.document.querySelector('#prompt').value='保留的下一条调整';
-  await vm.runInContext('startProduction()',ctx);
-  if(messages.length!==2||JSON.stringify(messages[0])!==JSON.stringify(messages[1])||connections!==1)throw Error('uncertain production was resubmitted as a new task');
-  if(w.document.querySelector('#prompt').value!=='保留的下一条调整')throw Error('receipt recovery erased unsent correction');
-  await vm.runInContext("project.sessionId='test-session';project.toolsVersion="+JSON.stringify(toolVersion),ctx);
-  narration.value='修订后的权威正文。';narration.dispatchEvent(new w.Event('input'));
-  requirements.value='修改配色但保留事实';requirements.dispatchEvent(new w.Event('input'));
-  await vm.runInContext('submitMessage({preventDefault(){}})',ctx);
-  const correctionSaved=await(await realFetch('/api/projects/'+p.id)).json();
-  if(correctionSaved.narrationText!=='修订后的权威正文。'||correctionSaved.workflow.instructions!=='修改配色但保留事实')throw Error('correction sent without saving primary inputs');
-  if(messages.length!==3||messages[2].text!=='保留的下一条调整')throw Error('correction request not delivered');
-  w.fetch=realFetch;
-  const checks=['HyperFrames authored render engine keeps its display label','actual HTTP review supplies saved text and four readonly tracks','new projects default to HyperFrames','explicit native selection retains legacy DSL regressions','HyperFrames mode preserves final controls and hides native DSL','readonly review stays in the primary workbench','three production phases with independent version status','alignment coverage and expandable artifact groups','details stay open during refresh','backend selection saves and remains in advanced tools','external editing mode preserves final tools and restores native controls on switch','completed external and native final candidates exclude range and running outputs','changing final candidate resets review while refresh preserves selection','one-click saves narration and requirements and connects automatically','upload materials after editing text without losing drafts or causing false revision conflict','uncertain production resumes original receipt','unsent correction survives receipt recovery','sending correction saves current authored text and requirements','manual tools collapsed by default','stage cards display actual states with safe text and media URLs','load embedded UI','save narration text','build paragraph alignment table','protect canonical text','assign actual uploaded image','preserve mapping after new lead','persist text','return actual MCP image content','capability status panel','actual HTTP import deduplication','unsupported generation rejection','unified task panel','create and save editing DSL','activate DSL render mode','show compiled multi-track timeline','switch back without deleting DSL','diagnostics and locator remain inside closed advanced tools','real diagnostics HTTP response contains individual checks','model visual understanding explicitly remains unverified','diagnostic summaries and remedies render as safe plain text','unknown diagnostic state is never marked passed','locator sends exact quote and explicit repeated occurrence','locator references render as safe plain text','unmapped legacy clips remain visibly unassigned','locator shows exact clip times and saved original references','selected locator prompt appends without overwriting unsent draft','locator never submits a message automatically','stale locator preserves draft and displays historical context','cross-project locator result is rejected'];
-  fs.writeFileSync(root+'/docs/dom-validation-0.23.json',JSON.stringify({passed:true,environment:'JSDOM + real Go HTTP API, not a graphical browser',checkCount:checks.length,checks},null,2));
-  console.log('DOM + HTTP workflow passed');
- }finally{dom?.window.close();proc.kill('SIGTERM')}
-})().catch(e=>{console.error(e);process.exitCode=1});
+'use strict';
+
+const assert = require('node:assert/strict');
+const {JSDOM} = require('jsdom');
+const {File} = require('node:buffer');
+const {spawn} = require('node:child_process');
+const fs = require('node:fs'), vm = require('node:vm'), path = require('node:path'), os = require('node:os');
+const backendCompatibility = require('./backend-compatibility.cjs');
+const root = path.resolve(__dirname, '..');
+const port = process.env.VIDEO_TEST_PORT || '3321';
+const base = 'http://127.0.0.1:' + port, token = 'dom-test-token-not-secret';
+const data = fs.mkdtempSync(path.join(os.tmpdir(), 'video-minimal-dom-'));
+const binary = process.env.VIDEO_TEST_BIN || path.join(root, 'bin/video-app');
+const checks = [];
+const removed = ['advanced-workspace','speech-section','speech-start','speech-adopt','speech-check','render','range-render','edit-panel','edit-json','edit-save','edit-example','edit-patch','patch-apply','patch-undo','alignment-table','production-panel','workflow-backend','workflow-save','skill-narration','skill-editing','skill-review','runtime-diagnostics','locate-clips','locate-results','review-timeline','review-zoom','review-selection','review-select-text','hyperframes-project','hyperframes-files','tts-settings','connect','refresh-tools','new-session'];
+
+(async () => {
+  const proc = spawn(binary, ['--data', data, '--listen', '127.0.0.1:' + port], {env: {...process.env, VIDEO_APP_TOKEN: token}});
+  const realFetch = (route, options = {}) => fetch(new URL(route, base), {...options, headers: {...options.headers, Authorization: 'Bearer ' + token}});
+  let ui;
+  try {
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(Error('server startup timeout')), 10000);
+      proc.stderr.on('data', raw => { if (raw.toString().includes(base)) { clearTimeout(timer); resolve(); } });
+      proc.on('error', error => { clearTimeout(timer); reject(error); });
+      proc.on('exit', code => { clearTimeout(timer); reject(Error('server exited ' + code)); });
+    });
+    const health = await (await realFetch('/api/health')).json();
+    assert.equal(health.version, '0.23.1', 'run this regression against the newly built release binary');
+
+    const transport = {connected: new Set(), messages: [], events: new Map(), orders: [], loseNext: true, connectCount: 0, uploadGate: null};
+    async function uiFetch(route, options = {}) {
+      const url = new URL(route, base), method = options.method || 'GET';
+      transport.orders.push(method + ' ' + url.pathname);
+      const match = url.pathname.match(/^\/api\/projects\/([a-f0-9]{24})(.*)$/);
+      if (match) {
+        const pid = match[1], tail = match[2];
+        if (tail === '/assets' && method === 'POST' && transport.uploadGate) {
+          const gate = transport.uploadGate; transport.uploadGate = null;
+          await gate;
+        }
+        if (tail === '/connect') {
+          transport.connected.add(pid); transport.connectCount++;
+          const saved = await (await realFetch('/api/projects/' + pid)).json();
+          return json({...saved, sessionId: 'test-session-' + pid, workspaceId: 'test-workspace', toolsVersion: '0.23.1'});
+        }
+        if (tail === '/agent') return json({status: 'idle', appRunId: 'fixture-run'});
+        if (tail === '/events') return json((transport.events.get(pid) || []).filter(event => event.id > Number(url.searchParams.get('after') || 0)));
+        if (tail === '/approvals') return json([]);
+        if (tail === '/messages') {
+          const body = JSON.parse(options.body); transport.messages.push(body);
+          const events = transport.events.get(pid) || [];
+          if (!events.some(event => event.requestId === body.requestId)) {
+            const first = events.length + 1;
+            events.push({id: first, requestId: body.requestId, method: 'run/input', data: {input: {text: body.text}}}, {id: first + 1, requestId: body.requestId, direction: 'in', method: 'item/completed', data: {params: {turnId: body.requestId, item: {id: 'answer', type: 'agentMessage', text: '已收到修改，制作完成后会提供成片。'}}}}, {id: first + 2, requestId: body.requestId, direction: 'in', method: 'item/completed', data: {params: {turnId: body.requestId, item: {id: 'technical', type: 'mcpToolCall', arguments: 'raw-debug-arguments-should-not-appear'}}}});
+            transport.events.set(pid, events);
+          }
+          if (transport.loseNext) { transport.loseNext = false; throw new TypeError('simulated response lost after admission'); }
+          return json({requestId: body.requestId, state: 'accepted'});
+        }
+        if (tail === '' && method === 'GET' && transport.connected.has(pid)) {
+          const saved = await (await realFetch(route, options)).json();
+          return json({...saved, sessionId: 'test-session-' + pid, workspaceId: 'test-workspace', toolsVersion: '0.23.1'});
+        }
+      }
+      return realFetch(route, options);
+    }
+    function json(value) { return new Response(JSON.stringify(value), {status: 200, headers: {'Content-Type': 'application/json'}}); }
+    const storageSnapshot = window => Object.fromEntries(Array.from({length: window.localStorage.length}, (_, i) => window.localStorage.key(i)).map(key => [key, window.localStorage.getItem(key)]));
+    async function loadUI(storage = {}) {
+      const html = await (await realFetch('/')).text();
+      const dom = new JSDOM(html, {url: base, runScripts: 'outside-only'}), w = dom.window, ctx = dom.getInternalVMContext();
+      for (const [key, value] of Object.entries(storage)) w.localStorage.setItem(key, value);
+      w.fetch = uiFetch; w.FormData = FormData; w.AbortController = AbortController; w.confirm = () => true;
+      w.HTMLMediaElement.prototype.pause = function () {}; w.HTMLMediaElement.prototype.load = function () {};
+      w.HTMLDialogElement.prototype.showModal = function () { this.open = true; }; w.HTMLDialogElement.prototype.close = function () { this.open = false; };
+      w.setInterval = () => 0;
+      for (const script of [...w.document.querySelectorAll('script[src]')]) {
+        const source = await (await realFetch(script.getAttribute('src'))).text();
+        if (script.getAttribute('src') === '/app.js') {
+          assert.ok(/boot\(\)\.catch\(/.test(source), 'workbench boot must execute in the regression');
+          vm.runInContext(source.replace(/boot\(\)\.catch\(/, 'globalThis.initialBoot = boot(); initialBoot.catch('), ctx);
+          await vm.runInContext('initialBoot', ctx);
+        } else vm.runInContext(source, ctx);
+      }
+      return {dom, w, ctx, run: code => vm.runInContext(code, ctx), $: selector => w.document.querySelector(selector)};
+    }
+    function input(selector, value) { ui.$(selector).value = value; ui.$(selector).dispatchEvent(new ui.w.Event('input')); }
+    function files(selector, values) { Object.defineProperty(ui.$(selector), 'files', {configurable: true, value: values}); }
+    async function project(pid) { return (await realFetch('/api/projects/' + pid)).json(); }
+
+    ui = await loadUI();
+    const pid = ui.run('project.id');
+    assert.match(pid, /^[a-f0-9]{24}$/);
+    assert.equal((await (await realFetch('/api/projects')).json()).length, 1);
+    assert.equal(ui.$('#new-dialog').open, false);
+    checks.push('first launch automatically creates one usable empty project without a configuration dialog');
+    for (const id of removed) assert.equal(ui.w.document.getElementById(id), null, id + ' must be removed, not folded or hidden');
+    assert.equal(ui.w.document.querySelector('script[src="/review.js"]'), null);
+    assert.equal(ui.w.document.querySelectorAll('#app input[type=range]').length, 0);
+    assert.equal(new URL(ui.$('#settings-link').href).pathname, '/settings.html');
+    assert.equal(ui.$('#tts-url'), null);
+    checks.push('manual TTS, render, DSL, alignment, multitrack, source-code and diagnostics controls are absent from the DOM');
+    checks.push('configuration is reachable through a separate settings page');
+
+    const image = fs.readFileSync(path.join(root, 'docs/preview.png'));
+    files('#folder-files', [new File(['从材料目录导入的正文。'], 'script.md', {type: 'text/plain'}), new File([image], 'news.png', {type: 'image/png'})]);
+    await ui.$('#folder-files').onchange();
+    assert.equal(ui.$('#narration-text').value, '从材料目录导入的正文。');
+    assert.equal((await project(pid)).narrationText || '', '');
+    assert.equal((await project(pid)).assets.length, 2);
+    checks.push('a material directory with exactly one TXT or Markdown adopts it as an unsaved script only when narration is empty');
+
+    input('#narration-text', '第一条自由正文。素材必须服从这段文字。');
+    input('#workflow-instructions', '保持原文，先做初稿');
+    input('#prompt', '尚未发送的调整草稿');
+    files('#upload', [new File(['不应覆盖已有正文。'], 'do-not-replace.txt', {type: 'text/plain'})]);
+    await ui.$('#upload').onchange();
+    assert.equal(ui.$('#narration-text').value, '第一条自由正文。素材必须服从这段文字。');
+    let releaseUpload;
+    transport.uploadGate = new Promise(resolve => { releaseUpload = resolve; });
+    files('#folder-files', [new File(['不得覆盖正文甲。'], 'a.txt', {type: 'text/plain'}), new File(['不得覆盖正文乙。'], 'b.md', {type: 'text/plain'}), new File([image], 'another.png', {type: 'image/png'})]);
+    const uploading = ui.$('#folder-files').onchange();
+    await new Promise(resolve => setTimeout(resolve, 0));
+    assert.equal(ui.$('#draft-start').disabled, true, 'start must be unavailable while upload updates revisions');
+    releaseUpload(); await uploading;
+    assert.equal(ui.$('#narration-text').value, '第一条自由正文。素材必须服从这段文字。');
+    assert.equal(ui.$('#workflow-instructions').value, '保持原文，先做初稿');
+    assert.equal(ui.$('#prompt').value, '尚未发送的调整草稿');
+    assert.equal((await project(pid)).assets.length, 6);
+    await ui.run('drawProject()');
+    assert.equal(ui.$('#narration-text').value, '第一条自由正文。素材必须服从这段文字。');
+    checks.push('material upload disables start and preserves narration, requirements and unsent conversation while advancing revisions');
+    checks.push('multiple script files and existing narration never trigger an arbitrary replacement');
+
+    const otherResponse = await realFetch('/api/projects', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({name: '另一个草稿项目'})});
+    const other = await otherResponse.json();
+    await ui.run('openProject(' + JSON.stringify(other.id) + ')');
+    assert.equal(ui.$('#prompt').value, '');
+    files('#folder-files', [new File(['候选正文甲。'], 'candidate-a.txt', {type: 'text/plain'}), new File(['候选正文乙。'], 'candidate-b.md', {type: 'text/plain'})]);
+    await ui.$('#folder-files').onchange();
+    assert.equal(ui.$('#narration-text').value, '', 'multiple scripts must not guess an authoring source');
+    assert.equal((await project(other.id)).assets.length, 2);
+    const choices = [...ui.w.document.querySelectorAll('#assets button')].filter(button => button.textContent === '作为正文');
+    assert.equal(choices.length, 2);
+    await choices[1].onclick();
+    assert.equal(ui.$('#narration-text').value, '候选正文乙。');
+    assert.equal((await project(other.id)).narrationText || '', '', 'explicit selection is a draft until production/save');
+    input('#prompt', '另一个项目的独立草稿');
+    await ui.run('openProject(' + JSON.stringify(pid) + ')');
+    assert.equal(ui.$('#prompt').value, '尚未发送的调整草稿');
+    const savedDraft = storageSnapshot(ui.w);
+    assert.ok(savedDraft['video-draft-v1:' + pid]);
+    ui.dom.window.close(); ui = await loadUI(savedDraft);
+    await ui.run('openProject(' + JSON.stringify(pid) + ')');
+    assert.equal(ui.$('#prompt').value, '尚未发送的调整草稿');
+    assert.equal(ui.$('#narration-text').value, '第一条自由正文。素材必须服从这段文字。');
+    assert.equal(ui.$('#workflow-instructions').value, '保持原文，先做初稿');
+    assert.equal(ui.$('#prompt').value, '尚未发送的调整草稿');
+    assert.equal(transport.messages.length, 0);
+    checks.push('unsent conversation, narration and requirements survive project switches and reload with project isolation');
+
+    transport.orders = [];
+    await assert.rejects(ui.run('startProduction()'), /response lost/);
+    const admitted = await project(pid);
+    assert.equal(admitted.narrationText, '第一条自由正文。素材必须服从这段文字。');
+    assert.equal(admitted.workflow.instructions, '保持原文，先做初稿');
+    assert.equal(transport.messages.length, 1);
+    assert.match(transport.messages[0].requestId, /^[a-f0-9]{24}$/);
+    assert.ok(transport.messages[0].text.includes('保持原文，先做初稿'));
+    assert.ok(!transport.messages[0].text.includes('尚未发送的调整草稿'));
+    assert.equal(ui.$('#prompt').value, '尚未发送的调整草稿');
+    const saveAt = transport.orders.indexOf('PUT /api/projects/' + pid + '/narration');
+    const workflowAt = transport.orders.indexOf('PUT /api/projects/' + pid + '/workflow');
+    const instructionAt = transport.orders.indexOf('POST /api/projects/' + pid + '/draft/instruction');
+    const sendAt = transport.orders.indexOf('POST /api/projects/' + pid + '/messages');
+    assert.ok(saveAt >= 0 && workflowAt > saveAt && instructionAt > workflowAt && sendAt > instructionAt, transport.orders.join('\n'));
+    assert.equal(transport.connectCount, 1);
+    assert.match(ui.$('#send-state').textContent, /确认|保留/);
+    assert.deepEqual(JSON.parse(ui.w.localStorage.getItem('video-message:' + pid)), transport.messages[0]);
+    checks.push('one click saves the latest narration and requirements before instruction, automatic connection and dispatch');
+    checks.push('one-click production preserves unsent conversation drafts and does not send them as production instructions');
+    checks.push('a lost dispatch response keeps the exact request in durable local storage');
+
+    input('#prompt', '保留的下一条调整');
+    const uncertainStorage = storageSnapshot(ui.w);
+    ui.dom.window.close(); ui = await loadUI(uncertainStorage);
+    await ui.run('openProject(' + JSON.stringify(pid) + ')');
+    assert.equal(ui.$('#prompt').value, '保留的下一条调整');
+    await ui.run('startProduction()');
+    assert.equal(transport.messages.length, 2);
+    assert.deepEqual(transport.messages[1], transport.messages[0]);
+    assert.equal(transport.connectCount, 1);
+    assert.equal(ui.$('#prompt').value, '保留的下一条调整');
+    assert.equal(ui.w.localStorage.getItem('video-message:' + pid), null);
+    await ui.run('poll()');
+    assert.match(ui.$('#conversation').textContent, /已收到修改/);
+    const replayStorage = storageSnapshot(ui.w);
+    ui.dom.window.close(); ui = await loadUI(replayStorage);
+    await ui.run('openProject(' + JSON.stringify(pid) + ')'); await ui.run('poll()');
+    assert.match(ui.$('#conversation').textContent, /已收到修改/);
+    assert.match(ui.$('#conversation').textContent, /生成初稿/);
+    assert.ok(!ui.$('#conversation').textContent.includes('raw-debug-arguments-should-not-appear'));
+    assert.equal(ui.$('#conversation pre, #conversation details'), null);
+    assert.equal(ui.$('#prompt').value, '保留的下一条调整');
+    checks.push('reload retries the original request ID, text and skills without erasing a newer correction');
+    checks.push('formal conversation is replayed from RunDesk events after reopening instead of fabricated locally');
+
+    input('#narration-text', '修订后的权威正文。'); input('#workflow-instructions', '修改配色但保留事实');
+    await ui.run('submitMessage({preventDefault(){}})');
+    const corrected = await project(pid);
+    assert.equal(corrected.narrationText, '修订后的权威正文。');
+    assert.equal(corrected.workflow.instructions, '修改配色但保留事实');
+    assert.equal(transport.messages.length, 3);
+    assert.equal(transport.messages[2].text, '保留的下一条调整');
+    assert.notEqual(transport.messages[2].requestId, transport.messages[0].requestId);
+    checks.push('conversation corrections save current authoring drafts before sending a fresh idempotent request');
+    const beforeQuota = transport.messages.length;
+    input('#prompt', '存储故障时不得发送这条消息');
+    const setItem = ui.w.Storage.prototype.setItem;
+    ui.w.Storage.prototype.setItem = function () { throw Error('fixture storage quota exceeded'); };
+    try { await assert.rejects(ui.run('submitMessage({preventDefault(){}})'), /quota/); }
+    finally { ui.w.Storage.prototype.setItem = setItem; }
+    assert.equal(transport.messages.length, beforeQuota);
+    assert.equal(ui.run('pendingMessage(project.id)'), null);
+    checks.push('failure to persist a request receipt prevents dispatch rather than creating an unrecoverable submission');
+
+    const staleProject = {...await project(pid), sessionId: 'test-session-' + pid, toolsVersion: '0.23.1'};
+    let releaseOldGet, oldGetStarted;
+    const getStarted = new Promise(resolve => { oldGetStarted = resolve; });
+    const oldGet = new Promise(resolve => { releaseOldGet = resolve; });
+    let holdGet = true;
+    ui.w.fetch = async (route, options = {}) => {
+      if (holdGet && (options.method || 'GET') === 'GET' && new URL(route, base).pathname === '/api/projects/' + pid) {
+        holdGet = false; oldGetStarted(); await oldGet; return json(staleProject);
+      }
+      return uiFetch(route, options);
+    };
+    const oldPoll = ui.run('poll()'); await getStarted;
+    input('#narration-text', '保存成功后不应被旧轮询覆盖的正文。');
+    await ui.run('saveNarration()');
+    const latest = await project(pid);
+    assert.ok(latest.revision > staleProject.revision);
+    releaseOldGet(); await oldPoll;
+    assert.equal(ui.run('project.revision'), latest.revision);
+    assert.equal(ui.$('#narration-text').value, latest.narrationText);
+    ui.w.fetch = uiFetch;
+    checks.push('a delayed older HTTP poll cannot roll back a newly saved narration or project revision');
+
+    await ui.run(`globalThis.realRenders=project.renders;project.renders=[{id:'${'d'.repeat(24)}',revision:1,state:'completed',engine:'hyperframes_authored',duration:3},{id:'${'e'.repeat(24)}',revision:2,state:'completed',engine:'video_use',duration:2,range:{start:10,end:12}},{id:'${'f'.repeat(24)}',revision:3,state:'running',engine:'hyperframes_authored'}];drawOutputs()`);
+    const options = [...ui.$('#output-version').options];
+    assert.ok(options.some(option => option.value === 'd'.repeat(24)));
+    assert.ok(options.some(option => option.value === 'e'.repeat(24) && /局部/.test(option.textContent)));
+    assert.ok(!options.some(option => option.value === 'f'.repeat(24)));
+    ui.$('#output-version').value = 'd'.repeat(24); ui.$('#output-version').dispatchEvent(new ui.w.Event('change'));
+    assert.equal(new URL(ui.$('#output-download').href).pathname, '/api/projects/' + pid + '/renders/' + 'd'.repeat(24) + '/final.mp4');
+    assert.equal(ui.$('#output-player').hidden, false);
+    await ui.run('drawOutputs()');
+    assert.equal(ui.$('#output-version').value, 'd'.repeat(24));
+    ui.$('#output-version').value = 'e'.repeat(24); ui.$('#output-version').dispatchEvent(new ui.w.Event('change'));
+    assert.equal(ui.$('#output-final').hidden, true, 'a range preview cannot become final');
+    assert.match(ui.$('#output-status').textContent, /局部预览/);
+    await ui.run('resetOutputs();drawOutputs()');
+    assert.ok(ui.$('#output-player').getAttribute('src'), 'reopening the same output restores its playback source');
+    await ui.run('project.renders=realRenders;drawOutputs()');
+    checks.push('completed render-history fixtures expose owned MP4 playback and export, preserve selection and label partial previews');
+
+    const settingsHTML = await (await realFetch('/settings.html')).text();
+    const settings = new JSDOM(settingsHTML, {url: base + '/settings.html', runScripts: 'outside-only'});
+    try {
+      const settingCalls = [];
+      settings.window.fetch = (route, options = {}) => { settingCalls.push((options.method || 'GET') + ' ' + route); return realFetch(route, options); };
+      const settingContext = settings.getInternalVMContext();
+      const script = await (await realFetch('/settings.js')).text();
+      assert.ok(/bootSettings\(\)\.catch\(/.test(script));
+      vm.runInContext(script.replace(/bootSettings\(\)\.catch\(/, 'globalThis.settingsBoot = bootSettings(); settingsBoot.catch('), settingContext);
+      await vm.runInContext('settingsBoot', settingContext);
+      const $ = selector => settings.window.document.querySelector(selector);
+      assert.equal($('#settings-app').hidden, false);
+      for (const selector of ['#environment-summary', '#generation-status']) assert.equal($(selector).querySelector('input,select,textarea'), null);
+      for (const [field, value] of Object.entries({backend: 'indextts', url: 'http://127.0.0.1:8092/v1/audio/speech', model: 'fixture-IndexTTS', voice: 'news_zh', language: 'zh', timeout: '180', key: 'fixture-tts-api-key'})) $('#tts-' + field).value = value;
+      $('#tts-form').dispatchEvent(new settings.window.Event('input', {bubbles: true}));
+      await $('#tts-form').onsubmit({preventDefault() {}});
+      const savedSettings = await (await realFetch('/api/speech/settings')).json();
+      assert.equal(savedSettings.backend, 'indextts');
+      assert.equal(savedSettings.url, 'http://127.0.0.1:8092/v1/audio/speech');
+      assert.equal(savedSettings.model, 'fixture-IndexTTS');
+      assert.equal(savedSettings.voice, 'news_zh');
+      assert.equal(savedSettings.hasApiKey, true);
+      assert.ok(!JSON.stringify(savedSettings).includes('fixture-tts-api-key'));
+      assert.equal($('#tts-key').value, '');
+      assert.equal(settingCalls.filter(call => call === 'PUT /api/speech/settings').length, 1);
+      assert.ok(!settingCalls.some(call => /POST .*\/(jobs|speech|render)(?:$|\?)/.test(call)));
+
+      const settingsFetch = settings.window.fetch;
+      let releaseSavedResponse, settingsCommitted;
+      const committed = new Promise(resolve => { settingsCommitted = resolve; });
+      const responseGate = new Promise(resolve => { releaseSavedResponse = resolve; });
+      settings.window.fetch = async (route, options = {}) => {
+        const response = await settingsFetch(route, options);
+        if (route === '/api/speech/settings' && options.method === 'PUT') {
+          settingsCommitted(); await responseGate;
+        }
+        return response;
+      };
+      $('#tts-model').value = 'fixture-model-submitted-before-new-input';
+      $('#tts-key').value = 'fixture-key-submitted-before-new-input';
+      $('#tts-form').dispatchEvent(new settings.window.Event('input', {bubbles: true}));
+      const delayedSave = $('#tts-form').onsubmit({preventDefault() {}});
+      await committed;
+      assert.equal($('#tts-save').disabled, true);
+      assert.equal((await (await realFetch('/api/speech/settings')).json()).model, 'fixture-model-submitted-before-new-input');
+      $('#tts-model').value = 'new-unsaved-model-during-save';
+      $('#tts-key').value = 'new-unsaved-key-during-save';
+      $('#tts-form').dispatchEvent(new settings.window.Event('input', {bubbles: true}));
+      releaseSavedResponse(); await delayedSave;
+      assert.equal($('#tts-model').value, 'new-unsaved-model-during-save');
+      assert.equal($('#tts-key').value, 'new-unsaved-key-during-save');
+      assert.equal(vm.runInContext('settingsDirty', settingContext), true);
+      assert.match($('#tts-settings-state').textContent, /新修改.*待提交/);
+      assert.equal((await (await realFetch('/api/speech/settings')).json()).model, 'fixture-model-submitted-before-new-input');
+      settings.window.fetch = settingsFetch;
+      checks.push('a delayed successful settings save preserves model and key input entered after submission and leaves the new draft unsaved');
+    } finally { settings.window.close(); }
+    checks.push('the independent settings page persists IndexTTS defaults through HTTP, masks saved keys and keeps connection/generation configuration readonly');
+
+    checks.push(...await backendCompatibility(realFetch, root));
+    const report = {passed: true, version: health.version, environment: 'JSDOM + actual Go HTTP API; RunDesk connection, message receipts and replay use explicit fixtures', checkCount: checks.length, checks, limitations: ['No graphical-browser appearance check.', 'No live Codex/Kun execution or new video rendering in this DOM test.', 'Render-history playback/export selection uses completed metadata fixtures; media integrity is covered by Go tests.']};
+    fs.writeFileSync(path.join(root, 'docs/dom-validation-0.23.1.json'), JSON.stringify(report, null, 2) + '\n');
+    console.log('Minimal workbench DOM + HTTP passed (' + checks.length + ' checks)');
+  } finally {
+    ui?.dom.window.close(); proc.kill('SIGTERM');
+  }
+})().catch(error => { console.error(error); process.exitCode = 1; });

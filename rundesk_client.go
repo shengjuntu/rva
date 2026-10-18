@@ -264,11 +264,14 @@ func (a *App) recoverAgent(ctx context.Context, p Project, allowSend bool) (any,
 		return nil, nil
 	}
 	suffix := "/turns"
-	productionRoute := "素材通过 assetId 引用；调用 video_render_start 在 App 中渲染当前原生剪辑。"
-	if workflowFor(p).EditingBackend == "video_use" {
-		productionRoute = "采用 video_use：完成配音和文字素材对齐后调用 video_production_run_prepare，按返回的相对路径读取共享目录快照，在 work/edl.json 编排，运行适配器并调用 video_production_run_ingest 归档。以该 EDL 为剪辑依据；不要另写原生 DSL 或调用 video_render_start。"
+	productionRoute := "当前后端 native：素材通过 assetId 引用；读取当前原生工程，按实际支持的 DSL/模板能力修改，通过 video_job_start(type=render) 或 video_render_start 渲染，不假设支持自由动画。"
+	switch workflowFor(p).EditingBackend {
+	case "hyperframes":
+		productionRoute = "当前后端 hyperframes：使用 video_hyperframes_get/update/check 自由编写、保存并检查 HTML/CSS/JavaScript/GSAP 工程，绑定真实素材；通过 video_job_start(type=render) 或 video_render_start 渲染该 HyperFrames 工程。这不是原生 DSL/模板流程，不需要 video_use 或共享目录。"
+	case "video_use":
+		productionRoute = "当前后端 video_use：需要冻结已准备的配音和文字素材关联时调用 video_production_run_prepare，按返回的相对路径读取共享目录快照，在 work/edl.json 编排，运行适配器并调用 video_production_run_ingest 归档。以该 EDL 为剪辑依据；不要另写原生 DSL 或调用 video_render_start。"
 	}
-	body := map[string]any{"text": fmt.Sprintf("[Video App projectId=%s requestId=%s] 按素材准备和对齐、剪辑、精修三个阶段执行，通过业务工具保存产物。先读取项目当前 revision。%s\n用户要求：\n%s", p.ID, pending.ID, productionRoute, pending.Text), "files": []string{}, "skills": []any{}}
+	body := map[string]any{"text": fmt.Sprintf("[Video App projectId=%s requestId=%s] 先读取项目当前 revision、已有工程和产物；自主选择必要工具与执行顺序。素材准备和对齐、剪辑、精修是产物记录和审阅视图，可以交错、重复或局部返回，不是固定步骤或审批。执行后检查实际结果；发现可修复问题就修订并重做，不把工具成功当作质量合格，真实阻塞和未执行的检查须说明。局部修改只处理受影响部分，保留无关且已满意的内容，不要求重走全部流程。通过业务工具保存真实产物与检查记录。%s\n用户要求：\n%s", p.ID, pending.ID, productionRoute, pending.Text), "files": []string{}, "skills": []any{}}
 	if !a.cfg.ManagedByRunDesk && a.cfg.SkillPath != "" {
 		body["skills"] = []map[string]string{{"name": "video-project", "path": a.cfg.SkillPath}}
 	}

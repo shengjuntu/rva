@@ -1,0 +1,37 @@
+{
+  "passed": true,
+  "version": "0.23.1",
+  "environment": "JSDOM + actual Go HTTP API; RunDesk connection, message receipts and replay use explicit fixtures",
+  "checkCount": 24,
+  "checks": [
+    "first launch automatically creates one usable empty project without a configuration dialog",
+    "manual TTS, render, DSL, alignment, multitrack, source-code and diagnostics controls are absent from the DOM",
+    "configuration is reachable through a separate settings page",
+    "a material directory with exactly one TXT or Markdown adopts it as an unsaved script only when narration is empty",
+    "material upload disables start and preserves narration, requirements and unsent conversation while advancing revisions",
+    "multiple script files and existing narration never trigger an arbitrary replacement",
+    "unsent conversation, narration and requirements survive project switches and reload with project isolation",
+    "one click saves the latest narration and requirements before instruction, automatic connection and dispatch",
+    "one-click production preserves unsent conversation drafts and does not send them as production instructions",
+    "a lost dispatch response keeps the exact request in durable local storage",
+    "reload retries the original request ID, text and skills without erasing a newer correction",
+    "formal conversation is replayed from RunDesk events after reopening instead of fabricated locally",
+    "conversation corrections save current authoring drafts before sending a fresh idempotent request",
+    "failure to persist a request receipt prevents dispatch rather than creating an unrecoverable submission",
+    "a delayed older HTTP poll cannot roll back a newly saved narration or project revision",
+    "completed render-history fixtures expose owned MP4 playback and export, preserve selection and label partial previews",
+    "a delayed successful settings save preserves model and key input entered after submission and leaves the new draft unsaved",
+    "the independent settings page persists IndexTTS defaults through HTTP, masks saved keys and keeps connection/generation configuration readonly",
+    "new projects default to HyperFrames",
+    "legacy text projection preserves mapped assets after a new lead and rejects direct canonical-text mutation",
+    "actual HTTP MCP returns image content and preserves HyperFrames, native DSL and speech tool registration",
+    "actual HTTP import retries reuse receipts, reused request IDs with changed content conflict and unconfigured generation creates no job",
+    "native DSL save, compilation, mode switch, non-mutating patch preview, apply, undo and redo remain available over HTTP",
+    "backend exact-text locator and diagnostics retain explicit evidence boundaries without manual UI"
+  ],
+  "limitations": [
+    "No graphical-browser appearance check.",
+    "No live Codex/Kun execution or new video rendering in this DOM test.",
+    "Render-history playback/export selection uses completed metadata fixtures; media integrity is covered by Go tests."
+  ]
+}
