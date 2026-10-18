@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -19,19 +20,48 @@ import (
 )
 
 type GenerationJob struct {
-	ID          string `json:"id"`
-	Type        string `json:"type"`
-	RequestID   string `json:"requestId"`
-	RequestHash string `json:"requestHash"`
-	Revision    int    `json:"revision"`
-	State       string `json:"state"`
-	Created     string `json:"created"`
-	Prompt      string `json:"prompt"`
-	Model       string `json:"model"`
-	AssetID     string `json:"assetId,omitempty"`
-	SHA256      string `json:"sha256,omitempty"`
-	Size        int64  `json:"size,omitempty"`
-	Error       string `json:"error,omitempty"`
+	ID          string                `json:"id"`
+	Type        string                `json:"type"`
+	RequestID   string                `json:"requestId"`
+	RequestHash string                `json:"requestHash"`
+	Revision    int                   `json:"revision"`
+	State       string                `json:"state"`
+	Created     string                `json:"created"`
+	Prompt      string                `json:"prompt"`
+	Model       string                `json:"model"`
+	AssetID     string                `json:"assetId,omitempty"`
+	SHA256      string                `json:"sha256,omitempty"`
+	Size        int64                 `json:"size,omitempty"`
+	Error       string                `json:"error,omitempty"`
+	Duration    *float64              `json:"duration,omitempty"`
+	AspectRatio string                `json:"aspectRatio,omitempty"`
+	References  []GenerationReference `json:"references,omitempty"`
+}
+
+// References retain evidence of exactly which bytes were sent to the adapter.
+// Image payloads and provider credentials are never persisted in project JSON.
+type GenerationReference struct {
+	AssetID string `json:"assetId"`
+	MIME    string `json:"mimeType"`
+	SHA256  string `json:"sha256"`
+	Size    int64  `json:"size"`
+}
+type GeneratedAssetInfo struct {
+	JobID       string                `json:"jobId"`
+	RequestID   string                `json:"requestId"`
+	Type        string                `json:"type"`
+	Provider    string                `json:"provider"`
+	Model       string                `json:"model"`
+	Prompt      string                `json:"prompt"`
+	Duration    *float64              `json:"duration,omitempty"`
+	AspectRatio string                `json:"aspectRatio,omitempty"`
+	References  []GenerationReference `json:"references,omitempty"`
+	Created     string                `json:"created"`
+}
+
+type generationReferenceImage struct {
+	GenerationReference
+	Data string `json:"data"`
 }
 type GenerationTarget struct{ URL, Model, Key string }
 
@@ -88,10 +118,26 @@ func (a *App) startGeneration(w http.ResponseWriter, r *http.Request, in JobStar
 		return
 	}
 	if in.Options.Range != nil || in.Options.Source != "" || in.Options.Backend != "" || in.Options.Voice != "" || in.Options.Language != "" || in.Options.Speed != 0 || in.Options.Rate != 0 || in.Options.Kind != "" || strings.TrimSpace(in.Options.Prompt) == "" || len(in.Options.Prompt) > 16000 || strings.ContainsRune(in.Options.Prompt, 0) {
-		fail(w, 400, errors.New("生成任务仅接受非空 prompt，最多16000字节"))
+		fail(w, 400, errors.New("生成任务接受prompt、duration、aspectRatio、referenceAssetIds；prompt最多16000字节"))
 		return
 	}
-	j := GenerationJob{ID: uid(), Type: in.Type, RequestID: in.RequestID, RequestHash: hash, Revision: p.Revision, State: "running", Created: time.Now().UTC().Format(time.RFC3339Nano), Prompt: in.Options.Prompt, Model: target.Model}
+	if in.Options.Duration != nil && (in.Type != "video_generation" || !finite(*in.Options.Duration) || *in.Options.Duration <= 0 || *in.Options.Duration > 60) {
+		fail(w, 400, errors.New("duration仅用于视频生成，必须大于0且不超过60秒；这是请求目标，实际时长以产物为准"))
+		return
+	}
+	if in.Options.AspectRatio != "" && in.Options.AspectRatio != "16:9" && in.Options.AspectRatio != "9:16" && in.Options.AspectRatio != "1:1" && in.Options.AspectRatio != "4:3" && in.Options.AspectRatio != "3:4" {
+		fail(w, 400, errors.New("aspectRatio支持16:9、9:16、1:1、4:3、3:4"))
+		return
+	}
+	refs, e := a.generationReferences(*p, in.Options.ReferenceAssetIDs)
+	if e != nil {
+		fail(w, 400, e)
+		return
+	}
+	j := GenerationJob{ID: uid(), Type: in.Type, RequestID: in.RequestID, RequestHash: hash, Revision: p.Revision, State: "running", Created: time.Now().UTC().Format(time.RFC3339Nano), Prompt: in.Options.Prompt, Model: target.Model, Duration: in.Options.Duration, AspectRatio: in.Options.AspectRatio}
+	for _, ref := range refs {
+		j.References = append(j.References, ref.GenerationReference)
+	}
 	q := clone(p)
 	q.Generation = append(q.Generation, j)
 	if e = a.save(&q); e != nil {
@@ -102,18 +148,18 @@ func (a *App) startGeneration(w http.ResponseWriter, r *http.Request, in JobStar
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	a.generationJobs[j.ID] = cancel
 	a.wg.Add(1)
-	go func() { defer a.wg.Done(); defer cancel(); a.runGeneration(ctx, q.ID, j, target) }()
+	go func() { defer a.wg.Done(); defer cancel(); a.runGeneration(ctx, q.ID, j, target, refs) }()
 	writeJSON(w, 202, generationView(q.ID, j))
 }
-func (a *App) runGeneration(ctx context.Context, pid string, j GenerationJob, target GenerationTarget) {
-	data, e := fetchGenerated(ctx, j, target)
+func (a *App) runGeneration(ctx context.Context, pid string, j GenerationJob, target GenerationTarget, references []generationReferenceImage) {
+	data, e := fetchGenerated(ctx, j, target, references)
 	var asset Asset
 	dest := ""
 	if e == nil {
 		ext, mime, err := validateGenerated(ctx, a, pid, j, data)
 		e = err
 		if e == nil {
-			asset = Asset{ID: j.ID, File: j.ID + ext, Name: "生成素材" + ext, MIME: mime, Size: int64(len(data))}
+			asset = Asset{ID: j.ID, File: j.ID + ext, Name: "生成素材" + ext, MIME: mime, Size: int64(len(data)), Generated: &GeneratedAssetInfo{JobID: j.ID, RequestID: j.RequestID, Type: j.Type, Provider: "http_binary_v1", Model: j.Model, Prompt: j.Prompt, Duration: j.Duration, AspectRatio: j.AspectRatio, References: j.References, Created: j.Created}}
 			dest = filepath.Join(a.dir(pid), "workspace", "assets", asset.File)
 			e = os.WriteFile(dest, data, 0600)
 		}
@@ -163,8 +209,18 @@ func (a *App) runGeneration(ctx context.Context, pid string, j GenerationJob, ta
 		return
 	}
 }
-func fetchGenerated(ctx context.Context, j GenerationJob, target GenerationTarget) ([]byte, error) {
-	raw, _ := json.Marshal(map[string]any{"schema": "video.generation-request.v1", "requestId": j.RequestID, "type": j.Type, "model": target.Model, "prompt": j.Prompt})
+func fetchGenerated(ctx context.Context, j GenerationJob, target GenerationTarget, references []generationReferenceImage) ([]byte, error) {
+	payload := map[string]any{"schema": "video.generation-request.v1", "requestId": j.RequestID, "type": j.Type, "model": target.Model, "prompt": j.Prompt}
+	if j.Duration != nil {
+		payload["duration"] = *j.Duration
+	}
+	if j.AspectRatio != "" {
+		payload["aspectRatio"] = j.AspectRatio
+	}
+	if len(references) > 0 {
+		payload["referenceImages"] = references
+	}
+	raw, _ := json.Marshal(payload)
 	r, e := http.NewRequestWithContext(ctx, "POST", target.URL, bytes.NewReader(raw))
 	if e != nil {
 		return nil, errors.New("生成请求配置无效")
@@ -192,6 +248,73 @@ func fetchGenerated(ctx context.Context, j GenerationJob, target GenerationTarge
 		return nil, errors.New("生成产物为空、过大或读取失败")
 	}
 	return data, nil
+}
+
+func (a *App) generationReferences(p Project, ids []string) ([]generationReferenceImage, error) {
+	if len(ids) > 4 {
+		return nil, errors.New("最多允许4张参考图片")
+	}
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	root, err := os.OpenRoot(filepath.Join(a.dir(p.ID), "workspace", "assets"))
+	if err != nil {
+		return nil, errors.New("无法读取参考素材目录")
+	}
+	defer root.Close()
+	var refs []generationReferenceImage
+	seen := map[string]bool{}
+	var total int64
+	for _, id := range ids {
+		if !identifier.MatchString(id) || seen[id] {
+			return nil, errors.New("参考素材ID无效或重复")
+		}
+		seen[id] = true
+		var found *Asset
+		for i := range p.Assets {
+			if p.Assets[i].ID == id {
+				found = &p.Assets[i]
+				break
+			}
+		}
+		if found == nil || (found.MIME != "image/png" && found.MIME != "image/jpeg") || found.File == "." || filepath.Base(found.File) != found.File {
+			return nil, errors.New("参考素材必须是当前项目中的PNG/JPEG图片")
+		}
+		f, e := root.Open(found.File)
+		if e != nil {
+			return nil, errors.New("参考图片不可读取")
+		}
+		info, e := f.Stat()
+		if e != nil || !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > 8<<20 {
+			f.Close()
+			return nil, errors.New("参考图片必须为普通文件且不超过8MiB")
+		}
+		data, e := io.ReadAll(io.LimitReader(f, (8<<20)+1))
+		f.Close()
+		if e != nil || len(data) == 0 || len(data) > 8<<20 {
+			return nil, errors.New("参考图片读取失败或超过8MiB")
+		}
+		total += int64(len(data))
+		if total > 16<<20 {
+			return nil, errors.New("参考图片总大小不得超过16MiB")
+		}
+		config, format, e := image.DecodeConfig(bytes.NewReader(data))
+		if e != nil || (format != "png" && format != "jpeg") || config.Width < 1 || config.Height < 1 || config.Width > 8192 || config.Height > 8192 || int64(config.Width)*int64(config.Height) > 32000000 {
+			return nil, errors.New("参考图片无效或像素过大")
+		}
+		mime := "image/png"
+		if format == "jpeg" {
+			mime = "image/jpeg"
+		}
+		if found.MIME != mime {
+			return nil, errors.New("参考图片实际格式与素材记录不一致")
+		}
+		if _, _, e := image.Decode(bytes.NewReader(data)); e != nil {
+			return nil, errors.New("参考图片解码失败")
+		}
+		refs = append(refs, generationReferenceImage{GenerationReference: GenerationReference{AssetID: id, MIME: mime, SHA256: hashBytes(data), Size: int64(len(data))}, Data: base64.StdEncoding.EncodeToString(data)})
+	}
+	return refs, nil
 }
 func validateGenerated(ctx context.Context, a *App, pid string, j GenerationJob, data []byte) (string, string, error) {
 	if j.Type == "image_generation" {
@@ -221,7 +344,7 @@ func validateGenerated(ctx context.Context, a *App, pid string, j GenerationJob,
 	if e != nil {
 		return "", "", errors.New("无法写入验证视频")
 	}
-	duration, e := editMediaDuration(ctx, name, "v:0")
+	duration, e := inspectionMediaDuration(ctx, name, "mov")
 	if e != nil || duration <= 0 || duration > 600 {
 		return "", "", errors.New("生成视频无有效视频流或超过600秒")
 	}

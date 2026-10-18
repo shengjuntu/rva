@@ -1,5 +1,5 @@
 "use strict";
-const TOOL_VERSION = "0.20.0";
+const TOOL_VERSION = "0.21.0";
 const $ = (s) => document.querySelector(s),
   el = (tag, text, cls) => {
     const n = document.createElement(tag);
@@ -365,7 +365,8 @@ const states = {
 };
 function drawRenders() {
   try {renderSubmission.reconcile(project.id,project.renders)}catch(e){toast(e.message)}
-  const key = JSON.stringify(project.renders);
+  drawFinalRenderOptions();
+  const key = JSON.stringify([project.renders,project.final?.renderId,project.production?.finalRenderId]);
   if (key === renderKey) return;
   renderKey = key;
   const box = $("#renders");
@@ -405,6 +406,14 @@ function drawRenders() {
       const dl = el("a", "下载 MP4");
       dl.href = base + "final.mp4?download";
       links.append(dl);
+      if(!r.range){
+        const choose=el('button','选为待确认终稿');choose.onclick=()=>{
+          $('#final-render-id').value=r.id;$('#final-reviewed').checked=false;
+          $('#advanced-workspace').open=true;$('#final-tools').open=true;
+          $('#final-status').textContent='已选择 '+r.id+'；完整检查画面、配音与字幕后可保存终稿。';
+          $('#final-render-id').focus();
+        };links.append(choose);
+      }
       if (r.hasSubtitles) {
         const sub = el('a','字幕 SRT'); sub.href = base + 'subtitles.srt?download'; links.append(sub);
       }
@@ -430,6 +439,16 @@ function drawRenders() {
     row.append(info, links);
     box.append(row);
   }
+}
+function drawFinalRenderOptions(){
+ const select=$('#final-render-id'),selected=select.value;select.replaceChildren();
+ const empty=el('option','请选择已完成的完整成片');empty.value='';select.append(empty);
+ for(const render of [...(project.renders||[])].reverse()){
+  if(render.state!=='completed'||render.range)continue;
+  const backend=render.engine==='video_use'?'video-use':'内置剪辑';
+  const option=el('option',`修订 ${render.revision} · ${render.duration} 秒 · ${backend} · ${render.id}`);option.value=render.id;select.append(option);
+ }
+ select.value=[...select.options].some(option=>option.value===selected)?selected:'';
 }
 function eventRow(key, type) {
   let row = rows.get(key);
@@ -794,6 +813,7 @@ $("#render").onclick = action(async () => {
   const pid=project.id,gen=epoch;startingRender=true;$('#render').disabled=true;
   try {
     const pending=renderSubmission.read(pid);
+    if(!pending&&project.workflow?.editingBackend==='video_use')throw Error('video-use 制作请交给 RunDesk，可在右侧对话要求重新渲染');
     if(!pending) {await save();if(editDSLDirty)await saveEditDSL()}
     if(gen!==epoch)return;
     const body=pending||{type:"render",revision:project.revision,requestId:id(),options:{kind:"draft"}};
@@ -1516,7 +1536,7 @@ $('#folder-files').onchange=action(async()=>{
   $('#folder-files').value='';toast('目录素材已导入');
 });
 
-const capabilityLabels={media:'素材',tts:'配音',image_generation:'图片生成',video_generation:'视频生成',text_media_alignment:'描述匹配（基线）',editing:'编辑',rendering:'渲染'};
+const capabilityLabels={media:'素材',tts:'配音',image_generation:'图片生成',video_generation:'视频生成',text_media_alignment:'文字与素材关联',editing:'编辑',rendering:'渲染',video_use_exchange:'video-use 工作区'};
 async function loadCapabilities(probe=false) {
   $('#capability-status').textContent=probe?'正在检查服务…':'正在读取能力…';
   try {
@@ -1563,15 +1583,20 @@ $('#refresh-capabilities').onclick=action(()=>loadCapabilities(true));
 $('#refresh-jobs').onclick=action(()=>loadProductionJobs(true));
 
 function drawEditingMode(){
- const active=!!project?.editActive;
- $('#edit-mode').textContent=active?'剪辑 DSL 模式':'旧镜头模式';
- const canvas=project?.editDsl?.canvas||{};$('#preview-format').textContent=active?`${canvas.width||1080} × ${canvas.height||1920} · ${canvas.fps||30} fps`:'9:16 · 1080 × 1920 · 30 fps';
- $('#production-panel').hidden=active;
- $('#visual-details').hidden=active;
- $('#subtitle-section').hidden=active;
- $('#sound-section').parentElement.hidden=active;
+ const external=project?.workflow?.editingBackend==='video_use',active=!!project?.editActive&&!external;
+ $('#edit-mode').textContent=external?'video-use EDL 工程':active?'剪辑 DSL 模式':'旧镜头模式';
+ $('#edit-engine-intro').textContent=external?'video-use 的剪辑工程由 RunDesk 保存，可在剪辑阶段卡片查看产物，通过对话修改。':'图片、视频、声音和文字可以自由组成多轨剪辑。启用后，成片只使用这份剪辑结构；旧镜头、音轨和字幕仍保留。';
+ for(const selector of ['#edit-example','#edit-reload','#edit-activate','#edit-legacy','#edit-timeline'])$(selector).hidden=external;
+ $('#edit-json').closest('details').hidden=external;$('#edit-patch').closest('details').hidden=external;
+ $('#preview-start').closest('label').hidden=external;$('#preview-end').closest('label').hidden=external;$('#range-render').hidden=external;
+ $('#final-tools > summary').textContent=external?'终稿':'局部预览与终稿';
+ const canvas=project?.editDsl?.canvas||{};$('#preview-format').textContent=external?'以 RunDesk 成片为准':active?`${canvas.width||1080} × ${canvas.height||1920} · ${canvas.fps||30} fps`:'9:16 · 1080 × 1920 · 30 fps';
+ $('#production-panel').hidden=active||external;
+ $('#visual-details').hidden=active||external;
+ $('#subtitle-section').hidden=active||external;
+ $('#sound-section').parentElement.hidden=active||external;
  $('#save').textContent=active?'保存剪辑':'保存制作稿';
- $('#preview-label').textContent=active?'剪辑预览（以成片为准）':'镜头预览';
+ $('#preview-label').textContent=external?'video-use 成片预览':active?'剪辑预览（以成片为准）':'镜头预览';
 }
 function drawEditTimeline(ir){
  const box=$('#edit-timeline');box.replaceChildren();if(!ir){box.append(el('p','尚未保存剪辑，可先创建示例或交给 RunDesk 编写。','muted small'));return}
@@ -1646,6 +1671,7 @@ function drawWorkflow(){
  if(workflowProject!==project.id){workflowDirty=false;workflowProject=project.id;}
  if(!workflowDirty){workflowBase=project.revision;const w=project.workflow||{skills:['video-narration','video-editing','video-review'],instructions:''};
  for(const name of ['narration','editing','review'])$('#skill-'+name).checked=w.skills.includes('video-'+name);
+ $('#workflow-backend').value=w.editingBackend||'native';
  $('#workflow-instructions').value=w.instructions||'';}
  $('#draft-start').disabled=sending||startingDraft;
  $('#draft-start').textContent=startingDraft?'正在交给 RunDesk…':pendingMessage(project.id)?'确认原制作提交':'交给 RunDesk 制作';
@@ -1654,14 +1680,15 @@ function drawWorkflow(){
  $('#primary-material-summary').textContent=project.assets?.length?`${counts.image} 张图片 · ${counts.video} 段视频 · ${counts.audio} 段音频`+(counts.other?` · ${counts.other} 份文件`:''):'可添加已有图片、视频和音频，也可先由正文开始。';
 }
 for(const name of ['narration','editing','review'])$('#skill-'+name).onchange=()=>{workflowDirty=true;};
+$('#workflow-backend').onchange=()=>{workflowDirty=true;};
 $('#workflow-instructions').oninput=()=>{workflowDirty=true;};
 async function saveWorkflow(){
  const pid=project.id,gen=epoch,previous=project.revision;
- const workflow={skills:['narration','editing','review'].filter(n=>$('#skill-'+n).checked).map(n=>'video-'+n),instructions:$('#workflow-instructions').value};
+ const workflow={skills:['narration','editing','review'].filter(n=>$('#skill-'+n).checked).map(n=>'video-'+n),instructions:$('#workflow-instructions').value,editingBackend:$('#workflow-backend').value};
  const result=await api('/api/projects/'+pid+'/workflow',{revision:workflowBase,workflow},'PUT');
  if(gen!==epoch||project.id!==pid)return false;
  advanceIndependentBases(previous,result.revision);project=result;
- workflowDirty=$('#workflow-instructions').value!==workflow.instructions||['narration','editing','review'].some(n=>$('#skill-'+n).checked!==workflow.skills.includes('video-'+n));
+ workflowDirty=$('#workflow-instructions').value!==workflow.instructions||$('#workflow-backend').value!==workflow.editingBackend||['narration','editing','review'].some(n=>$('#skill-'+n).checked!==workflow.skills.includes('video-'+n));
  workflowBase=result.revision;drawProject();$('#workflow-status').textContent='制作要求已保存';return true;
 }
 $('#workflow-save').onclick=action(async()=>{await save();await saveWorkflow();});
@@ -1714,26 +1741,65 @@ function boardArtifactURL(value,pid){
  if(typeof value!=='string'||!value)return null;
  try{const url=new URL(value,location.origin);return url.origin===location.origin&&url.pathname.startsWith('/api/projects/'+pid+'/')?url.href:null;}catch{return null;}
 }
+const productionStageLabels={empty:'待制作',running:'进行中',ready:'已有产物',failed:'失败',blocked:'待处理',stale:'需更新'};
+const productionPhaseArtifacts={preparation:['script','plan','speech','media'],editing:['edit','render'],refinement:['review','final']};
+function boardStatus(state){
+ const badge=el('span',productionStageLabels[state]||'状态未知','stage-status');badge.dataset.state=state;return badge;
+}
+function boardDetails(title,key,expanded){
+ const details=el('details');details.dataset.detailKey=key;details.open=expanded.has(key);details.append(el('summary',title));return details;
+}
+function boardItem(item,pid,expanded,key){
+ const node=el('div',undefined,'stage-item');if(item.title)node.append(el('strong',item.title));
+ if(item.summary)node.append(el('p',item.summary,'muted small'));
+ const url=boardArtifactURL(item.url,pid);
+ if(url&&['audio','video','image'].includes(item.kind)){
+  const media=el(item.kind==='image'?'img':item.kind);media.src=url;
+  if(item.kind==='image'){media.alt=item.title||'素材';media.loading='lazy';}else{media.controls=true;media.preload='none';if(item.kind==='video')media.playsInline=true;}
+  node.append(media);
+ }
+ if(item.text){const details=boardDetails('查看内容',key,expanded);details.append(el('pre',item.text));node.append(details);}
+ if(url){const link=el('a',item.kind==='link'?item.title||'打开':'打开 / 下载');link.href=url;link.target='_blank';link.rel='noopener';node.append(link);}
+ return node;
+}
+function boardAlignmentSummary(alignment){
+ if(!alignment?.alignment)return null;
+ const coverage=alignment.coverage||{},node=el('div',undefined,'alignment-coverage');
+ node.append(el('strong','文字与素材关联'),el('p',`${coverage.selectedUnits||0} / ${coverage.totalUnits||0} 处已选素材`+(coverage.missingUnits?` · ${coverage.missingUnits} 处待补`:'')+(alignment.state==='stale'?' · 输入已变化，需重新核对':''),'muted small'));
+ return node;
+}
 function drawProductionBoard(board){
- const box=$('#production-board');box.replaceChildren();
- const labels={empty:'待制作',running:'进行中',ready:'已有产物',failed:'失败',blocked:'待处理',stale:'需更新'};
- for(const stage of board.stages||[]){
+ const box=$('#production-board'),expanded=new Set([...box.querySelectorAll('details[data-detail-key][open]')].map(n=>n.dataset.detailKey));box.replaceChildren();
+ const version=board.versionStatus||project?.production?.stage||'draft',versionLabel=$('#production-version-status');
+ versionLabel.textContent=({draft:'初稿',adjustment:'调整',final:'终稿'})[version]||'初稿';versionLabel.dataset.version=version;
+ for(const [index,stage] of (board.stages||[]).entries()){
   const card=el('article',undefined,'stage-card');card.dataset.stage=stage.id;card.dataset.state=stage.state;
-  const head=el('div',undefined,'stage-card-head');head.append(el('h3',stage.title),el('span',labels[stage.state]||'状态未知','stage-status'));card.append(head);
+  const head=el('div',undefined,'stage-card-head'),title=el('h3');
+  if(productionPhaseArtifacts[stage.id])title.append(el('span',String(index+1),'phase-number'));
+  title.append(document.createTextNode(stage.title));head.append(title,boardStatus(stage.state));card.append(head);
   if(stage.summary)card.append(el('p',stage.summary,'muted small'));
-  if(stage.text){const details=el('details');details.append(el('summary','查看内容'),el('pre',stage.text));card.append(details);}
-  for(const item of stage.items||[]){
-   const node=el('div',undefined,'stage-item');if(item.title)node.append(el('strong',item.title));
-   if(item.summary)node.append(el('p',item.summary,'muted small'));
-   const url=boardArtifactURL(item.url,board.projectId);
-   if(url&&['audio','video','image'].includes(item.kind)){
-    const media=el(item.kind==='image'?'img':item.kind);media.src=url;
-    if(item.kind==='image'){media.alt=item.title||'素材';media.loading='lazy';}else{media.controls=true;media.preload='none';if(item.kind==='video')media.playsInline=true;}
-    node.append(media);
+  const artifacts=(board.artifacts||[]).filter(a=>(productionPhaseArtifacts[stage.id]||[]).includes(a.id));
+  if(stage.text&&!artifacts.some(a=>a.text===stage.text)){const details=boardDetails('查看内容',stage.id+':text',expanded);details.append(el('pre',stage.text));card.append(details);}
+  if(stage.id==='preparation'){const coverage=boardAlignmentSummary(board.alignment);if(coverage)card.append(coverage);}
+  const items=stage.items||[];
+  if(artifacts.length){
+   // Keep the result playable without expanding the detailed production records.
+   const featureKind=stage.id==='preparation'?'audio':'video';
+   const preferredArtifact=artifacts.find(a=>a.id===({preparation:'speech',editing:'render',refinement:'final'})[stage.id]&&a.state==='ready');
+   const featured=(preferredArtifact?.items||items).find(i=>i.kind===featureKind&&boardArtifactURL(i.url,board.projectId));
+   if(featured)card.append(boardItem(featured,board.projectId,expanded,stage.id+':featured'));
+   const details=boardDetails('查看本阶段内容与产物',stage.id+':artifacts',expanded);
+   for(const artifact of artifacts){
+    const section=el('section',undefined,'stage-artifact');section.dataset.artifact=artifact.id;
+    const heading=el('div',undefined,'stage-artifact-head');heading.append(el('h4',artifact.title),boardStatus(artifact.state));section.append(heading);
+    if(artifact.summary)section.append(el('p',artifact.summary,'muted small'));
+    if(artifact.text){const content=boardDetails('查看内容',stage.id+':'+artifact.id+':text',expanded);content.append(el('pre',artifact.text));section.append(content);}
+    for(const item of artifact.items||[])section.append(boardItem(item,board.projectId,expanded,stage.id+':'+artifact.id+':'+item.id));
+    details.append(section);
    }
-   if(item.text){const details=el('details');details.append(el('summary','查看内容'),el('pre',item.text));node.append(details);}
-   if(url){const link=el('a',item.kind==='link'?item.title||'打开':'打开 / 下载');link.href=url;link.target='_blank';link.rel='noopener';node.append(link);}
-   card.append(node);
+   card.append(details);
+  }else{
+   for(const item of items)card.append(boardItem(item,board.projectId,expanded,stage.id+':'+item.id));
   }
   box.append(card);
  }
@@ -1744,7 +1810,7 @@ async function loadProductionBoard(force=false){
  try{
   const board=await api('/api/projects/'+pid+'/production-board');if(gen!==epoch||project?.id!==pid)return;
   const key=JSON.stringify(board);if(force||key!==boardKey){drawProductionBoard(board);boardKey=key;}
-  $('#production-board-status').textContent='根据项目中实际保存的正文、任务和产物更新。';
+  $('#production-board-status').textContent='阶段状态根据实际任务和产物更新；已有产物不代表人工确认。';
  }catch(err){if(gen===epoch)$('#production-board-status').textContent='制作记录暂不可用：'+err.message;throw err;}finally{boardLoading=false;}
 }
 $('#refresh-board').onclick=action(()=>loadProductionBoard(true));
@@ -1778,13 +1844,15 @@ $('#patch-redo').onclick=action(async()=>{
 $('#range-render').onclick=action(async()=>{
  if(editDSLDirty)throw new Error('请先保存剪辑草稿');if(startingRender)return;const pid=project.id,gen=epoch;
  const pending=renderSubmission.read(pid);if(pending&&!pending.options?.range)throw new Error('完整渲染提交仍待确认，请先确认原任务');
+ if(!pending&&project.workflow?.editingBackend==='video_use')throw Error('video-use 的局部预览请通过右侧对话交给 RunDesk');
  const body=pending||{type:'render',revision:project.revision,requestId:id(),options:{kind:'draft',range:{start:Number($('#preview-start').value),end:Number($('#preview-end').value)}}};
  startingRender=true;let job;try{job=await renderSubmission.submit(pid,body,original=>api('/api/projects/'+pid+'/jobs',original));}finally{startingRender=false}if(gen!==epoch)return;$('#final-status').textContent='局部预览任务：'+job.nativeId+'；不能用于终稿';await loadProductionJobs(true);
 });
 $('#final-designate').onclick=action(async()=>{
- if(editDSLDirty||narrationDirty)throw new Error('请先处理未保存内容');const pid=project.id,gen=epoch;
+ if(editDSLDirty||narrationDirty||workflowDirty||dirty)throw new Error('请先处理未保存内容');const pid=project.id,gen=epoch;
  const result=await api('/api/projects/'+pid+'/final',{revision:project.revision,renderId:$('#final-render-id').value.trim(),reviewed:$('#final-reviewed').checked});if(gen!==epoch)return;
  const refreshed=await api('/api/projects/'+pid);if(gen!==epoch)return;project=refreshed;drawProject();$('#final-reviewed').checked=false;$('#final-status').textContent='已保存终稿快照：'+result.final.id;
 });
+$('#final-render-id').onchange=()=>{$('#final-reviewed').checked=false;};
 
 $('#final-verify').onclick=action(async()=>{const pid=project.id,gen=epoch;$('#final-status').textContent='正在读取素材和成片进行复核…';const result=await api('/api/projects/'+pid+'/final/verify');if(gen!==epoch)return;$('#final-status').textContent='输入仍有效：'+(result.inputsCurrent?'是':'否')+'；成片与快照完整：'+(result.outputIntact?'是':'否');});

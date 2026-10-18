@@ -19,12 +19,16 @@ func readBoard(t *testing.T, a *App, id string) (map[string]ProductionCard, stri
 	var v struct {
 		SourceHash string
 		Stages     []ProductionCard
+		Artifacts  []ProductionCard
 	}
 	if e := json.Unmarshal(w.Body.Bytes(), &v); e != nil {
 		t.Fatal(e)
 	}
 	out := map[string]ProductionCard{}
 	for _, c := range v.Stages {
+		out[c.ID] = c
+	}
+	for _, c := range v.Artifacts {
 		out[c.ID] = c
 	}
 	return out, v.SourceHash

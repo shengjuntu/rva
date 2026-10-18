@@ -28,7 +28,7 @@ import (
 	"time"
 )
 
-const version = "0.20.0"
+const version = "0.21.0"
 
 //go:embed web/*
 var ui embed.FS
@@ -53,15 +53,16 @@ type Shot struct {
 	AssetID      string  `json:"assetId"`
 }
 type Asset struct {
-	Description     *AssetDescription `json:"description,omitempty"`
-	ImportRequestID string            `json:"importRequestId,omitempty"`
-	ImportHash      string            `json:"importHash,omitempty"`
-	Source          *NewsImageSource  `json:"source,omitempty"`
-	ID              string            `json:"id"`
-	Name            string            `json:"name"`
-	File            string            `json:"file"`
-	Size            int64             `json:"size"`
-	MIME            string            `json:"mime"`
+	Generated       *GeneratedAssetInfo `json:"generated,omitempty"`
+	Description     *AssetDescription   `json:"description,omitempty"`
+	ImportRequestID string              `json:"importRequestId,omitempty"`
+	ImportHash      string              `json:"importHash,omitempty"`
+	Source          *NewsImageSource    `json:"source,omitempty"`
+	ID              string              `json:"id"`
+	Name            string              `json:"name"`
+	File            string              `json:"file"`
+	Size            int64               `json:"size"`
+	MIME            string              `json:"mime"`
 }
 type Render struct {
 	SourceHash   string       `json:"sourceHash,omitempty"`
@@ -83,36 +84,38 @@ type Render struct {
 	HasAudio     bool         `json:"hasAudio"`
 }
 type Project struct {
-	Checkpoints         []ProductionCheckpoint `json:"checkpoints,omitempty"`
-	Final               *FinalSnapshot         `json:"final,omitempty"`
-	EditRedo            []EditHistory          `json:"editRedo,omitempty"`
-	EditHistory         []EditHistory          `json:"editHistory,omitempty"`
-	Generation          []GenerationJob        `json:"generation,omitempty"`
-	Workflow            *ProductionWorkflow    `json:"workflow,omitempty"`
-	NarrationText       string                 `json:"narrationText,omitempty"`
-	EditActive          bool                   `json:"editActive,omitempty"`
-	EditDSL             *EditDocument          `json:"editDsl,omitempty"`
-	CreationRequestID   string                 `json:"creationRequestId,omitempty"`
-	CreationRequestHash string                 `json:"creationRequestHash,omitempty"`
-	Production          *Production            `json:"production,omitempty"`
-	PreviousSessionIDs  []string               `json:"previousSessionIds,omitempty"`
-	AgentSubmission     *AgentSubmission       `json:"agentSubmission,omitempty"`
-	AgentRunID          string                 `json:"agentRunId,omitempty"`
-	Speech              []SpeechJob            `json:"speech,omitempty"`
-	Subtitles           *SubtitleTrack         `json:"subtitles,omitempty"`
-	News                *NewsOrigin            `json:"news,omitempty"`
-	ID                  string                 `json:"id"`
-	Name                string                 `json:"name"`
-	Brief               string                 `json:"brief"`
-	Revision            int                    `json:"revision"`
-	Shots               []Shot                 `json:"shots"`
-	Audio               *AudioMix              `json:"audio,omitempty"`
-	Assets              []Asset                `json:"assets"`
-	Renders             []Render               `json:"renders"`
-	WorkspaceID         string                 `json:"workspaceId"`
-	SessionID           string                 `json:"sessionId"`
-	Updated             string                 `json:"updated"`
-	ToolsVersion        string                 `json:"toolsVersion,omitempty"`
+	MediaAlignment      *MediaAlignmentDocument `json:"mediaAlignment,omitempty"`
+	ProductionRuns      []ProductionRun         `json:"productionRuns,omitempty"`
+	Checkpoints         []ProductionCheckpoint  `json:"checkpoints,omitempty"`
+	Final               *FinalSnapshot          `json:"final,omitempty"`
+	EditRedo            []EditHistory           `json:"editRedo,omitempty"`
+	EditHistory         []EditHistory           `json:"editHistory,omitempty"`
+	Generation          []GenerationJob         `json:"generation,omitempty"`
+	Workflow            *ProductionWorkflow     `json:"workflow,omitempty"`
+	NarrationText       string                  `json:"narrationText,omitempty"`
+	EditActive          bool                    `json:"editActive,omitempty"`
+	EditDSL             *EditDocument           `json:"editDsl,omitempty"`
+	CreationRequestID   string                  `json:"creationRequestId,omitempty"`
+	CreationRequestHash string                  `json:"creationRequestHash,omitempty"`
+	Production          *Production             `json:"production,omitempty"`
+	PreviousSessionIDs  []string                `json:"previousSessionIds,omitempty"`
+	AgentSubmission     *AgentSubmission        `json:"agentSubmission,omitempty"`
+	AgentRunID          string                  `json:"agentRunId,omitempty"`
+	Speech              []SpeechJob             `json:"speech,omitempty"`
+	Subtitles           *SubtitleTrack          `json:"subtitles,omitempty"`
+	News                *NewsOrigin             `json:"news,omitempty"`
+	ID                  string                  `json:"id"`
+	Name                string                  `json:"name"`
+	Brief               string                  `json:"brief"`
+	Revision            int                     `json:"revision"`
+	Shots               []Shot                  `json:"shots"`
+	Audio               *AudioMix               `json:"audio,omitempty"`
+	Assets              []Asset                 `json:"assets"`
+	Renders             []Render                `json:"renders"`
+	WorkspaceID         string                  `json:"workspaceId"`
+	SessionID           string                  `json:"sessionId"`
+	Updated             string                  `json:"updated"`
+	ToolsVersion        string                  `json:"toolsVersion,omitempty"`
 }
 type Config struct {
 	WorkspaceID      string `json:"workspaceId,omitempty"`
@@ -527,6 +530,12 @@ func (a *App) routes() http.Handler {
 	m.HandleFunc("POST /api/projects/{id}/final", a.finalSave)
 	m.HandleFunc("GET /api/projects/{id}/production-board", a.productionBoard)
 	m.HandleFunc("POST /api/projects/{id}/production-checkpoints", a.productionCheckpoint)
+	m.HandleFunc("GET /api/projects/{id}/media-alignment", a.mediaAlignmentGet)
+	m.HandleFunc("PUT /api/projects/{id}/media-alignment", a.mediaAlignmentUpdate)
+	m.HandleFunc("POST /api/projects/{id}/assets/{aid}/inspect-video", a.assetVideoInspect)
+	m.HandleFunc("POST /api/projects/{id}/production-runs/prepare", a.productionRunPrepare)
+	m.HandleFunc("GET /api/projects/{id}/production-runs/{prid}", a.productionRunGet)
+	m.HandleFunc("POST /api/projects/{id}/production-runs/{prid}/ingest", a.productionRunIngest)
 	m.HandleFunc("POST /api/projects/{id}/renders/{rid}/inspect", a.renderInspect)
 	m.HandleFunc("GET /api/projects/{id}/workflow", a.workflowGet)
 	m.HandleFunc("PUT /api/projects/{id}/workflow", a.workflowSave)

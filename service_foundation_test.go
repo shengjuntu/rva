@@ -46,7 +46,7 @@ func TestCapabilityDiscoverySeparatesConfiguredAndProbed(t *testing.T) {
 		t.Fatal("credentials/endpoint leaked")
 	}
 	for _, c := range probed.Capabilities {
-		if c.ID == "text_media_alignment" && (!c.Implemented || !c.Ready || len(c.Tools) != 2) {
+		if c.ID == "text_media_alignment" && (!c.Implemented || !c.Ready || len(c.Tools) != 4) {
 			t.Fatal("alignment baseline unavailable", c)
 		}
 		if c.ID == "image_generation" || c.ID == "video_generation" {

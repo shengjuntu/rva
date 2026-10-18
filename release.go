@@ -33,7 +33,7 @@ func (a *App) finalGet(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, e)
 		return
 	}
-	current := p.Final != nil && usesEditDSL(p) && p.Final.ContentHash == productionHash(p) && p.Final.NarrationHash == hashBytes([]byte(p.NarrationText))
+	current := finalCurrent(p)
 	writeJSON(w, 200, map[string]any{"revision": p.Revision, "final": p.Final, "current": current})
 }
 func (a *App) finalSave(w http.ResponseWriter, r *http.Request) {
@@ -54,8 +54,8 @@ func (a *App) finalSave(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, e)
 		return
 	}
-	if p.Revision != in.Revision || !usesEditDSL(p) {
-		fail(w, 409, errors.New("版本冲突或不是DSL剪辑"))
+	if p.Revision != in.Revision {
+		fail(w, 409, errors.New("项目版本已变化"))
 		return
 	}
 	var found *Render
@@ -66,7 +66,7 @@ func (a *App) finalSave(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
-	if found == nil || found.State != "completed" || found.Engine != "ffmpeg_edit" || found.Range != nil || found.ContentHash != productionHash(p) {
+	if found == nil || found.State != "completed" || (found.Engine != "ffmpeg_edit" && found.Engine != "video_use") || found.Range != nil || !renderCurrent(p, *found) {
 		fail(w, 409, errors.New("需要当前完整剪辑的已完成渲染，局部预览不能作为终稿"))
 		return
 	}
@@ -97,7 +97,11 @@ func (a *App) finalSave(w http.ResponseWriter, r *http.Request) {
 	var original Project
 	decodeErr := json.NewDecoder(snap).Decode(&original)
 	snap.Close()
-	if e != nil || decodeErr != nil || productionHash(original) != productionHash(p) || original.NarrationText != p.NarrationText {
+	snapshotCurrent := productionHash(original) == productionHash(p)
+	if found.Engine == "video_use" {
+		snapshotCurrent = externalProductionBasis(original) == externalProductionBasis(p)
+	}
+	if e != nil || decodeErr != nil || !snapshotCurrent || original.NarrationText != p.NarrationText {
 		fail(w, 409, errors.New("渲染快照与当前内容不一致"))
 		return
 	}
@@ -106,17 +110,28 @@ func (a *App) finalSave(w http.ResponseWriter, r *http.Request) {
 		fail(w, 409, errors.New("渲染校验记录缺失或产物已改变，请重新渲染"))
 		return
 	}
-	ir, err := compileEdit(*p.EditDSL, p.Assets)
-	if err != nil {
-		fail(w, 409, err)
-		return
+	if found.Engine == "video_use" {
+		if !a.externalRenderInputsIntact(p, *found) || !a.externalArchiveIntact(p, *found, proof) {
+			fail(w, 409, errors.New("外部剪辑的素材或归档依据已改变，请重新制作"))
+			return
+		}
+	} else {
+		if !usesEditDSL(p) {
+			fail(w, 409, errors.New("当前原生剪辑未启用"))
+			return
+		}
+		ir, err := compileEdit(*p.EditDSL, p.Assets)
+		if err != nil {
+			fail(w, 409, err)
+			return
+		}
+		key, err := renderInputKey(r.Context(), filepath.Join(a.dir(p.ID), "workspace", "assets"), ir, p.Assets, a.font, nil)
+		if err != nil || key != proof.Key {
+			fail(w, 409, errors.New("素材、字体或渲染环境已改变，请重新渲染"))
+			return
+		}
 	}
-	key, err := renderInputKey(r.Context(), filepath.Join(a.dir(p.ID), "workspace", "assets"), ir, p.Assets, a.font, nil)
-	if err != nil || key != proof.Key {
-		fail(w, 409, errors.New("素材、字体或渲染环境已改变，请重新渲染"))
-		return
-	}
-	record := FinalSnapshot{ID: uid(), RenderID: found.ID, Created: time.Now().UTC().Format(time.RFC3339Nano), Revision: p.Revision, ContentHash: productionHash(p), NarrationHash: hashBytes([]byte(p.NarrationText)), VideoHash: vh, SnapshotHash: sh, VideoBytes: size, Reviewed: true}
+	record := FinalSnapshot{ID: uid(), RenderID: found.ID, Created: time.Now().UTC().Format(time.RFC3339Nano), Revision: p.Revision, ContentHash: found.ContentHash, NarrationHash: hashBytes([]byte(p.NarrationText)), VideoHash: vh, SnapshotHash: sh, VideoBytes: size, Reviewed: true}
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	latest := a.projects[p.ID]

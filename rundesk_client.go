@@ -262,7 +262,11 @@ func (a *App) recoverAgent(ctx context.Context, p Project, allowSend bool) (any,
 		return nil, nil
 	}
 	suffix := "/turns"
-	body := map[string]any{"text": fmt.Sprintf("[Video App projectId=%s requestId=%s] 按 RunDesk 配置的视频制作能力执行，并通过业务工具保存结果。先读取项目当前 revision。素材存放在 Video App，通过 assetId 引用；Codex 工作目录不挂载 App 数据。渲染必须调用 video_render_start，由 App 容器执行。\n用户要求：\n%s", p.ID, pending.ID, pending.Text), "files": []string{}, "skills": []any{}}
+	productionRoute := "素材通过 assetId 引用；调用 video_render_start 在 App 中渲染当前原生剪辑。"
+	if workflowFor(p).EditingBackend == "video_use" {
+		productionRoute = "采用 video_use：完成配音和文字素材对齐后调用 video_production_run_prepare，按返回的相对路径读取共享目录快照，在 work/edl.json 编排，运行适配器并调用 video_production_run_ingest 归档。以该 EDL 为剪辑依据；不要另写原生 DSL 或调用 video_render_start。"
+	}
+	body := map[string]any{"text": fmt.Sprintf("[Video App projectId=%s requestId=%s] 按素材准备和对齐、剪辑、精修三个阶段执行，通过业务工具保存产物。先读取项目当前 revision。%s\n用户要求：\n%s", p.ID, pending.ID, productionRoute, pending.Text), "files": []string{}, "skills": []any{}}
 	if !a.cfg.ManagedByRunDesk && a.cfg.SkillPath != "" {
 		body["skills"] = []map[string]string{{"name": "video-project", "path": a.cfg.SkillPath}}
 	}

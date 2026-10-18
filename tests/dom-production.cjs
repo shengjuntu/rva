@@ -12,6 +12,7 @@ const root=require('path').resolve(__dirname,'..'), testData=fs.mkdtempSync(requ
   w.fetch=realFetch;w.HTMLMediaElement.prototype.pause=function(){};w.HTMLMediaElement.prototype.load=function(){};w.HTMLDialogElement.prototype.showModal=function(){};w.HTMLDialogElement.prototype.close=function(){};
   w.confirm=()=>true;w.AbortController=AbortController;w.FormData=FormData;
   const ctx=dom.getInternalVMContext();vm.runInContext(fs.readFileSync(root+'/web/speech-submit.js','utf8'),ctx);vm.runInContext(fs.readFileSync(root+'/web/app.js','utf8').replace('boot().catch((e) => {','globalThis.initialBoot = boot(); initialBoot.catch((e) => {'),ctx); await vm.runInContext('initialBoot',ctx);
+  const toolVersion=vm.runInContext('TOOL_VERSION',ctx);
   await vm.runInContext('openProject('+JSON.stringify(p.id)+')',ctx);
   const text=w.document.querySelector('#production-text');text.value='第一条事实。第二条说明！';text.dispatchEvent(new w.Event('input'));await vm.runInContext('save()',ctx);
   if(w.document.querySelectorAll('#alignment-table tr').length!==3)throw Error('table not generated');
@@ -26,7 +27,7 @@ const root=require('path').resolve(__dirname,'..'), testData=fs.mkdtempSync(requ
   const preview=await(await realFetch('/api/mcp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'video_asset_inspect',arguments:{projectId:p.id,assetId:up.assets[0].id}}})})).json();
   if(!preview.result?.content?.some(x=>x.type==='image'))throw Error('MCP preview missing');
   await vm.runInContext('loadCapabilities(false)',ctx);
-  if(w.document.querySelectorAll('#capability-list .capability-row').length!==7)throw Error('capability panel incomplete');
+  if(w.document.querySelectorAll('#capability-list .capability-row').length!==8)throw Error('capability panel incomplete');
   if(!w.document.querySelector('#capability-list').textContent.includes('未配置'))throw Error('unimplemented generators hidden');
   const imported={name:'generated-note.txt',data:Buffer.from('素材导入契约测试').toString('base64'),requestId:'b'.repeat(24)};
   const imports=[];for(let i=0;i<2;i++)imports.push(await(await realFetch('/api/projects/'+p.id+'/assets/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(imported)})).json());
@@ -68,14 +69,36 @@ const root=require('path').resolve(__dirname,'..'), testData=fs.mkdtempSync(requ
   w.document.querySelector('#workflow-instructions').value='保持原意';w.document.querySelector('#workflow-instructions').dispatchEvent(new w.Event('input'));
   await vm.runInContext('saveWorkflow()',ctx);
   const workflowSaved=await(await realFetch('/api/projects/'+p.id)).json();if(workflowSaved.workflow.instructions!=='保持原意')throw Error('workflow not persisted');
-  const instruction=await(await realFetch('/api/projects/'+p.id+'/draft/instruction',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:workflowSaved.revision})})).json();if(!instruction.text?.includes('保持原意'))throw Error('draft instruction missing');
+  const backend=w.document.querySelector('#workflow-backend');if(backend.value!=='native')throw Error('default editing backend missing');
+  backend.value='video_use';backend.dispatchEvent(new w.Event('change'));await vm.runInContext('drawProject()',ctx);
+  if(backend.value!=='video_use')throw Error('unsaved backend selection lost');
+  await vm.runInContext('saveWorkflow()',ctx);
+  const backendSaved=await(await realFetch('/api/projects/'+p.id)).json();if(backendSaved.workflow.editingBackend!=='video_use')throw Error('editing backend not persisted');
+  if(!w.document.querySelector('#edit-mode').textContent.includes('video-use')||!w.document.querySelector('#edit-json').closest('details').hidden||w.document.querySelector('#final-tools').hidden||w.document.querySelector('#final-designate').disabled)throw Error('external editing mode still requires native DSL or hides final tools');
+  backend.value='native';backend.dispatchEvent(new w.Event('change'));await vm.runInContext('saveWorkflow()',ctx);
+  if(w.document.querySelector('#edit-json').closest('details').hidden)throw Error('native editing controls not restored');
+  const currentWorkflow=await(await realFetch('/api/projects/'+p.id)).json();
+  const instruction=await(await realFetch('/api/projects/'+p.id+'/draft/instruction',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:currentWorkflow.revision})})).json();if(!instruction.text?.includes('保持原意'))throw Error('draft instruction missing');
   if(w.document.querySelector('#draft-start').disabled)throw Error('one-click production requires manual connection');
   const advanced=w.document.querySelector('#advanced-workspace');if(advanced.open)throw Error('manual workspace expanded by default');
-  for(const selector of ['#edit-panel','#speech-section','#render','#production-panel','#workflow-save'])if(!advanced.contains(w.document.querySelector(selector)))throw Error('manual operation leaked into primary workbench: '+selector);
+  for(const selector of ['#edit-panel','#speech-section','#render','#production-panel','#workflow-save','#workflow-backend'])if(!advanced.contains(w.document.querySelector(selector)))throw Error('manual operation leaked into primary workbench: '+selector);
   if(advanced.contains(narration)||advanced.contains(w.document.querySelector('#draft-start')))throw Error('primary text production buried in advanced tools');
-  await vm.runInContext(`drawProductionBoard({projectId:project.id,stages:[{id:'script',title:'正文',state:'ready',text:'<img src=x onerror=alert(1)>'},{id:'render',title:'视频',state:'empty',summary:'尚未渲染',items:[{id:'unsafe',title:'unsafe',kind:'video',url:'javascript:alert(1)'}]}]})`,ctx);
-  if(w.document.querySelectorAll('#production-board .stage-card').length!==2||w.document.querySelector('#production-board img')||w.document.querySelector('#production-board video'))throw Error('stage cards unsafe or missing');
-  if(!w.document.querySelector('[data-stage="render"]').textContent.includes('待制作'))throw Error('empty stage falsely marked complete');
+  await vm.runInContext(`globalThis.boardFixture={projectId:project.id,versionStatus:'adjustment',alignment:{alignment:{units:[]},state:'blocked',coverage:{totalUnits:3,selectedUnits:2,missingUnits:1}},stages:[{id:'preparation',title:'素材准备和对齐',state:'blocked',summary:'仍有素材缺口',items:[]},{id:'editing',title:'剪辑',state:'empty',summary:'尚未渲染',items:[{id:'unsafe',title:'unsafe',kind:'video',url:'javascript:alert(1)'}]},{id:'refinement',title:'精修',state:'empty',items:[]}],artifacts:[{id:'script',title:'正文',state:'ready',text:'<img src=x onerror=alert(1)>'},{id:'media',title:'素材',state:'blocked',items:[{id:'unsafe',title:'unsafe',kind:'image',url:'javascript:alert(1)'},{id:'outside',kind:'image',url:'https://example.org/image.png'}]},{id:'render',title:'初稿视频',state:'empty',items:[]},{id:'review',title:'检查记录',state:'empty',items:[]},{id:'final',title:'终稿',state:'empty',items:[]}]};drawProductionBoard(boardFixture)`,ctx);
+  if(w.document.querySelectorAll('#production-board > .stage-card').length!==3||w.document.querySelector('#production-board img')||w.document.querySelector('#production-board video'))throw Error('three stage cards unsafe or missing');
+  if(w.document.querySelector('#production-version-status').textContent!=='调整')throw Error('version status confused with production phase');
+  if(!w.document.querySelector('[data-stage="editing"]').textContent.includes('待制作'))throw Error('empty phase falsely marked complete');
+  if(!w.document.querySelector('[data-stage="preparation"]').textContent.includes('2 / 3 处已选素材'))throw Error('alignment coverage not shown');
+  const phaseDetails=w.document.querySelector('[data-stage="preparation"] > details');if(phaseDetails.open)throw Error('phase details expanded by default');
+  phaseDetails.open=true;await vm.runInContext("boardFixture.stages[0].summary='正在更新';drawProductionBoard(boardFixture)",ctx);
+  if(!w.document.querySelector('[data-stage="preparation"] > details').open)throw Error('phase detail expansion lost during refresh');
+  const phaseNumbers=[...w.document.querySelectorAll('#production-board .phase-number')].map(n=>n.textContent).join(',');if(phaseNumbers!=='1,2,3')throw Error('phase order not displayed');
+  if(!w.document.querySelector('[data-stage="preparation"]').textContent.includes('<img src=x onerror=alert(1)>'))throw Error('authored text not preserved as text');
+  await vm.runInContext(`globalThis.savedRenders=project.renders;project.renders=[{id:'native-full',state:'completed',engine:'ffmpeg_edit',revision:1,duration:3},{id:'external-full',state:'completed',engine:'video_use',revision:2,duration:3},{id:'external-range',state:'completed',engine:'video_use',revision:2,duration:1,range:{start:0,end:1}},{id:'not-ready',state:'running',engine:'video_use',revision:2}];drawRenders()`,ctx);
+  const finalSelect=w.document.querySelector('#final-render-id');if(finalSelect.options.length!==3||![...finalSelect.options].some(o=>o.value==='external-full'&&o.textContent.includes('video-use')))throw Error('external full render missing from final selection');
+  finalSelect.value='external-full';w.document.querySelector('#final-reviewed').checked=true;finalSelect.dispatchEvent(new w.Event('change'));
+  if(w.document.querySelector('#final-reviewed').checked)throw Error('changing final candidate retained previous review');
+  await vm.runInContext('drawFinalRenderOptions()',ctx);if(finalSelect.value!=='external-full')throw Error('selected external final lost on refresh');
+  await vm.runInContext('project.renders=savedRenders;drawRenders()',ctx);
   w.document.querySelector('#prompt').value='尚未发送的修改';
   let blocked=false;try{await vm.runInContext('startProduction()',ctx)}catch(e){blocked=true}
   if(!blocked||w.document.querySelector('#prompt').value!=='尚未发送的修改')throw Error('one-click lost unsent correction');
@@ -91,7 +114,7 @@ const root=require('path').resolve(__dirname,'..'), testData=fs.mkdtempSync(requ
   w.fetch=async(path,opts={})=>{
    if(String(path).match(/\/connect(?:\?|$)/)){
     connections++;const current=await(await realFetch('/api/projects/'+p.id)).json();
-    return new Response(JSON.stringify({...current,sessionId:'test-session',workspaceId:'test-workspace',toolsVersion:'0.20.0'}),{status:200,headers:{'Content-Type':'application/json'}});
+    return new Response(JSON.stringify({...current,sessionId:'test-session',workspaceId:'test-workspace',toolsVersion:toolVersion}),{status:200,headers:{'Content-Type':'application/json'}});
    }
    if(String(path).endsWith('/messages')){
     messages.push(JSON.parse(opts.body));
@@ -108,7 +131,7 @@ const root=require('path').resolve(__dirname,'..'), testData=fs.mkdtempSync(requ
   await vm.runInContext('startProduction()',ctx);
   if(messages.length!==2||JSON.stringify(messages[0])!==JSON.stringify(messages[1])||connections!==1)throw Error('uncertain production was resubmitted as a new task');
   if(w.document.querySelector('#prompt').value!=='保留的下一条调整')throw Error('receipt recovery erased unsent correction');
-  await vm.runInContext("project.sessionId='test-session';project.toolsVersion='0.20.0'",ctx);
+  await vm.runInContext("project.sessionId='test-session';project.toolsVersion="+JSON.stringify(toolVersion),ctx);
   narration.value='修订后的权威正文。';narration.dispatchEvent(new w.Event('input'));
   requirements.value='修改配色但保留事实';requirements.dispatchEvent(new w.Event('input'));
   await vm.runInContext('submitMessage({preventDefault(){}})',ctx);
@@ -116,7 +139,7 @@ const root=require('path').resolve(__dirname,'..'), testData=fs.mkdtempSync(requ
   if(correctionSaved.narrationText!=='修订后的权威正文。'||correctionSaved.workflow.instructions!=='修改配色但保留事实')throw Error('correction sent without saving primary inputs');
   if(messages.length!==3||messages[2].text!=='保留的下一条调整')throw Error('correction request not delivered');
   w.fetch=realFetch;
-  fs.writeFileSync(root+'/docs/dom-validation-0.20.json' ,JSON.stringify({passed:true,environment:'JSDOM + real Go HTTP API, not a graphical browser',checks:['one-click saves narration and requirements and connects automatically','upload materials after editing text without losing drafts or causing false revision conflict','uncertain production resumes original receipt','unsent correction survives receipt recovery','sending correction saves current authored text and requirements','manual tools collapsed by default','stage cards display actual states with safe text and media URLs','load embedded UI','save narration text','build paragraph alignment table','protect canonical text','assign actual uploaded image','preserve mapping after new lead','persist text','return actual MCP image content','capability status panel','actual HTTP import deduplication','unsupported generation rejection','unified task panel','create and save editing DSL','activate DSL render mode','show compiled multi-track timeline','switch back without deleting DSL']},null,2));
+  fs.writeFileSync(root+'/docs/dom-validation-0.21.json' ,JSON.stringify({passed:true,environment:'JSDOM + real Go HTTP API, not a graphical browser',checks:['three production phases with independent version status','alignment coverage and expandable artifact groups','details stay open during refresh','backend selection saves and remains in advanced tools','external editing mode preserves final tools and restores native controls on switch','completed external and native final candidates exclude range and running outputs','changing final candidate resets review while refresh preserves selection','one-click saves narration and requirements and connects automatically','upload materials after editing text without losing drafts or causing false revision conflict','uncertain production resumes original receipt','unsent correction survives receipt recovery','sending correction saves current authored text and requirements','manual tools collapsed by default','stage cards display actual states with safe text and media URLs','load embedded UI','save narration text','build paragraph alignment table','protect canonical text','assign actual uploaded image','preserve mapping after new lead','persist text','return actual MCP image content','capability status panel','actual HTTP import deduplication','unsupported generation rejection','unified task panel','create and save editing DSL','activate DSL render mode','show compiled multi-track timeline','switch back without deleting DSL']},null,2));
   console.log('DOM + HTTP workflow passed');
  }finally{dom?.window.close();proc.kill('SIGTERM')}
 })().catch(e=>{console.error(e);process.exitCode=1});

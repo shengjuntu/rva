@@ -89,7 +89,7 @@ func TestProjectWorkflowAndDraft(t *testing.T) {
 	}
 }
 func TestWorkflowValidation(t *testing.T) {
-	for _, v := range []ProductionWorkflow{{}, {Skills: []string{"unknown"}}, {Skills: []string{"video-review", "video-review"}}} {
+	for _, v := range []ProductionWorkflow{{}, {Skills: []string{"unknown"}}, {Skills: []string{"video-review", "video-review"}}, {Skills: []string{"video-editing"}, EditingBackend: "arbitrary-shell"}} {
 		if validateWorkflow(v) == nil {
 			t.Fatal(v)
 		}
@@ -109,8 +109,66 @@ func TestVersionedSkillsInstallWithoutOverwritingLegacy(t *testing.T) {
 	}
 	for id, entry := range bundles {
 		files := entry.(map[string]string)
-		if !strings.Contains(id, "-v0-20-0") || !strings.Contains(files["SKILL.md"], "name: "+id+"\n") {
+		if !strings.Contains(id, "-v"+strings.ReplaceAll(version, ".", "-")) || !strings.Contains(files["SKILL.md"], "name: "+id+"\n") {
 			t.Fatal(id)
+		}
+	}
+}
+
+func TestWorkflowBackendCompatibilityAndInstruction(t *testing.T) {
+	legacy := ProductionWorkflow{Skills: []string{"video-narration", "video-editing", "video-review"}, Instructions: "保留素材来源"}
+	if got := workflowFor(Project{Workflow: &legacy}); got.EditingBackend != "native" {
+		t.Fatal("legacy backend was not normalized", got)
+	}
+	native := legacy
+	native.EditingBackend = "native"
+	if workflowHash(legacy) != workflowHash(native) {
+		t.Fatal("empty/native backend changed historical workflow hash")
+	}
+	external := native
+	external.EditingBackend = "video_use"
+	if workflowHash(external) == workflowHash(native) {
+		t.Fatal("different editing authorities share a workflow hash")
+	}
+	p := Project{ID: "example", Revision: 3, NarrationText: "原文完整保留。", Workflow: &external}
+	instruction, err := draftInstruction(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, want := range []string{"剪辑后端：video_use", "素材准备和对齐", "（2）剪辑", "（3）精修", "DSL/EDL 只约束剪辑", "video_media_alignment_update", "video_production_run_prepare", "video_production_run_ingest"} {
+		if !strings.Contains(instruction, want) {
+			t.Fatal("missing actionable workflow instruction", want)
+		}
+	}
+	if strings.Contains(instruction, "video_production_run_export") {
+		t.Fatal("instruction refers to nonexistent export tool")
+	}
+}
+
+func TestWorkflowBackendSaveRoundTrip(t *testing.T) {
+	a := testApp(t)
+	p, _ := a.create("backend")
+	u := "/api/projects/" + p.ID + "/workflow"
+	for _, backend := range []string{"", "video_use", "native"} {
+		v := ProductionWorkflow{Skills: []string{"video-editing"}, EditingBackend: backend}
+		w := call(a, "PUT", u, map[string]any{"revision": p.Revision, "workflow": v})
+		if w.Code != 200 {
+			t.Fatal(w.Code, w.Body.String())
+		}
+		if err := json.Unmarshal(w.Body.Bytes(), &p); err != nil {
+			t.Fatal(err)
+		}
+		expect := backend
+		if expect == "" {
+			expect = "native"
+		}
+		if p.Workflow == nil || p.Workflow.EditingBackend != expect {
+			t.Fatal(p.Workflow)
+		}
+		w = call(a, "GET", u, nil)
+		var result struct{ Workflow ProductionWorkflow }
+		if w.Code != 200 || json.Unmarshal(w.Body.Bytes(), &result) != nil || result.Workflow.EditingBackend != expect {
+			t.Fatal(w.Code, w.Body.String())
 		}
 	}
 }

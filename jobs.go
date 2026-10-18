@@ -36,15 +36,18 @@ type ProductionJob struct {
 	Artifacts      []JobArtifact `json:"artifacts"`
 }
 type JobOptions struct {
-	Range    *RenderRange `json:"range,omitempty"`
-	Prompt   string       `json:"prompt,omitempty"`
-	Source   string       `json:"source,omitempty"`
-	Backend  string       `json:"backend,omitempty"`
-	Voice    string       `json:"voice,omitempty"`
-	Language string       `json:"language,omitempty"`
-	Speed    float64      `json:"speed,omitempty"`
-	Rate     int          `json:"rate,omitempty"`
-	Kind     string       `json:"kind,omitempty"`
+	Duration          *float64     `json:"duration,omitempty"`
+	AspectRatio       string       `json:"aspectRatio,omitempty"`
+	ReferenceAssetIDs []string     `json:"referenceAssetIds,omitempty"`
+	Range             *RenderRange `json:"range,omitempty"`
+	Prompt            string       `json:"prompt,omitempty"`
+	Source            string       `json:"source,omitempty"`
+	Backend           string       `json:"backend,omitempty"`
+	Voice             string       `json:"voice,omitempty"`
+	Language          string       `json:"language,omitempty"`
+	Speed             float64      `json:"speed,omitempty"`
+	Rate              int          `json:"rate,omitempty"`
+	Kind              string       `json:"kind,omitempty"`
 }
 
 func (o *JobOptions) UnmarshalJSON(raw []byte) error {
@@ -93,8 +96,8 @@ func speechJobView(pid string, j SpeechJob) ProductionJob {
 	return v
 }
 func renderProvider(j Render) string {
-	if j.Engine == "ffmpeg_edit" {
-		return "ffmpeg_edit"
+	if j.Engine == "ffmpeg_edit" || j.Engine == "video_use" {
+		return j.Engine
 	}
 	return "hyperframes"
 }
@@ -103,7 +106,7 @@ func renderJobView(pid string, j Render) ProductionJob {
 	if j.State == "completed" {
 		v.Artifacts = append(v.Artifacts, JobArtifact{Name: "final.mp4", URL: "/api/projects/" + pid + "/renders/" + j.ID + "/final.mp4"}, JobArtifact{Name: "snapshot.json", URL: "/api/projects/" + pid + "/renders/" + j.ID + "/snapshot.json"}, JobArtifact{Name: "validation.json", URL: "/api/projects/" + pid + "/renders/" + j.ID + "/validation.json"})
 	}
-	if j.State == "completed" && j.Engine == "ffmpeg_edit" {
+	if j.State == "completed" && (j.Engine == "ffmpeg_edit" || j.Engine == "video_use") {
 		v.Artifacts = append(v.Artifacts, JobArtifact{Name: "render-proof.json", URL: "/api/projects/" + pid + "/renders/" + j.ID + "/render-proof.json"}, JobArtifact{Name: "edit-ir.json", URL: "/api/projects/" + pid + "/renders/" + j.ID + "/edit-ir.json"})
 	}
 	return v
@@ -193,13 +196,13 @@ func (a *App) jobStart(w http.ResponseWriter, r *http.Request) {
 		a.startGeneration(w, r, in)
 		return
 	case "tts":
-		if in.Options.Range != nil || in.Options.Prompt != "" || in.Options.Kind != "" {
+		if in.Options.Range != nil || in.Options.Prompt != "" || in.Options.Kind != "" || in.Options.Duration != nil || in.Options.AspectRatio != "" || len(in.Options.ReferenceAssetIDs) != 0 {
 			fail(w, 400, errors.New("TTS不接受渲染kind"))
 			return
 		}
 		native = SpeechRequest{Source: in.Options.Source, Revision: in.Revision, RequestID: in.RequestID, Backend: in.Options.Backend, Voice: in.Options.Voice, Language: in.Options.Language, Speed: in.Options.Speed, Rate: in.Options.Rate}
 	case "render":
-		if in.Options.Prompt != "" || in.Options.Source != "" || in.Options.Backend != "" || in.Options.Voice != "" || in.Options.Language != "" || in.Options.Speed != 0 || in.Options.Rate != 0 {
+		if in.Options.Prompt != "" || in.Options.Source != "" || in.Options.Backend != "" || in.Options.Voice != "" || in.Options.Language != "" || in.Options.Speed != 0 || in.Options.Rate != 0 || in.Options.Duration != nil || in.Options.AspectRatio != "" || len(in.Options.ReferenceAssetIDs) != 0 {
 			fail(w, 400, errors.New("渲染仅接受kind"))
 			return
 		}

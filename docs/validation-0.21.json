@@ -1,0 +1,51 @@
+{
+  "version": "0.21.0",
+  "checkedAt": "2026-10-17T22:29:55.020565+00:00",
+  "goRace": {
+    "passed": 251,
+    "skipped": [
+      "TestSpeechSnapshotGenerationAndAdoption"
+    ],
+    "failures": []
+  },
+  "goVet": true,
+  "nodeTestsPassed": 6,
+  "domHttp": {
+    "passed": true,
+    "checks": 30,
+    "environment": "JSDOM + actual Go HTTP API, not graphical browser"
+  },
+  "mcpTools": 45,
+  "actualMediaTests": [
+    "PNG/JPEG/WebP/MP4/WebM viewing with actual decoded PNGs",
+    "mock generation provider receives actual reference image bytes and target options",
+    "real pinned video-use extraction/concat + external continuous WAV + UTF-8 SRT",
+    "frozen input export + private artifact ingest + final proof",
+    "late older run cannot replace newer accepted EDL",
+    "strict EDL/output duration, canvas, fps and identity validation",
+    "reject playlist wrappers and out-of-root paths",
+    "new EDL snapshot does not change while render runs"
+  ],
+  "builds": {
+    "linuxAmd64": "tested runtime",
+    "windowsAmd64": "cross-compiled only"
+  },
+  "notTested": [
+    "Docker image build and deployment",
+    "real Codex autonomous production and image acceptance",
+    "actual image/video generation model",
+    "actual IndexTTS model voice quality",
+    "graphical browser",
+    "Windows runtime"
+  ],
+  "companion": {
+    "rundeskVersion": "0.49.2",
+    "videoBuildProfile": "1.2.0",
+    "videoUseCommit": "43cfc566833548093455c9d4a46bd69913b7e552"
+  },
+  "limits": [
+    "video_use adapter is single sequential visual track with continuous external narration and captions",
+    "motion/overlays/transitions/music use existing native backend",
+    "TTS timings are measured synthesis chunk boundaries, not forced word alignment"
+  ]
+}

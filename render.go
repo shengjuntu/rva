@@ -70,6 +70,11 @@ func (a *App) startRender(w http.ResponseWriter, r *http.Request) {
 		fail(w, 409, errors.New("项目版本冲突，请重新载入"))
 		return
 	}
+	if workflowFor(*p).EditingBackend == "video_use" {
+		a.mu.Unlock()
+		fail(w, 409, errors.New("当前使用video_use，请导出制作快照、运行共享目录适配器并归档成片"))
+		return
+	}
 	if !usesEditDSL(*p) && len(p.Shots) == 0 {
 		a.mu.Unlock()
 		fail(w, 409, errors.New("请先保存至少一个镜头"))

@@ -59,9 +59,20 @@ func checkpointBasis(p Project, stage, renderID string) string {
 		}
 		v["media"] = media
 	}
+	if stage == "review" && workflowFor(p).EditingBackend == "video_use" {
+		v["externalBasis"] = externalProductionBasis(p)
+		for _, run := range p.ProductionRuns {
+			if run.RenderID == renderID {
+				v["externalEdit"] = run.EditHash
+				v["externalInput"] = run.InputHash
+			}
+		}
+	}
 	if stage == "review" {
-		v["dsl"] = p.EditDSL
-		v["active"] = p.EditActive
+		if workflowFor(p).EditingBackend != "video_use" {
+			v["dsl"] = p.EditDSL
+			v["active"] = p.EditActive
+		}
 		v["renderId"] = renderID
 	}
 	raw, _ := json.Marshal(v)
@@ -98,12 +109,12 @@ func (a *App) productionCheckpoint(w http.ResponseWriter, r *http.Request) {
 	if in.Stage == "review" && in.Status == "completed" {
 		valid := false
 		for _, j := range p.Renders {
-			if j.ID == in.RenderID && j.State == "completed" && j.Engine == "ffmpeg_edit" && j.Range == nil && j.ContentHash == productionHash(*p) && j.SourceHash == narrationSourceHash(*p) {
+			if j.ID == in.RenderID && j.State == "completed" && j.Range == nil && renderCurrent(*p, j) {
 				valid = true
 			}
 		}
 		if !valid {
-			fail(w, 409, fmt.Errorf("完成检查需引用当前正文及完整DSL的已完成渲染"))
+			fail(w, 409, fmt.Errorf("完成检查需引用当前正文及剪辑依据的已完成完整渲染"))
 			return
 		}
 	}
@@ -134,7 +145,7 @@ func checkpointCard(p Project, id, title string) ProductionCard {
 			card.Items = append(card.Items, ProductionItem{ID: c.RenderID, Title: "此报告检查的成片", Kind: "video", URL: "/api/projects/" + p.ID + "/renders/" + c.RenderID + "/final.mp4"})
 			for i := len(p.Renders) - 1; i >= 0; i-- {
 				j := p.Renders[i]
-				if j.State == "completed" && j.Range == nil && j.Engine == "ffmpeg_edit" && j.ContentHash == productionHash(p) && j.SourceHash == narrationSourceHash(p) {
+				if j.State == "completed" && j.Range == nil && renderCurrent(p, j) {
 					if j.ID != c.RenderID {
 						card.State = "stale"
 						card.Summary = "已有较新的完整成片，此报告仅对应所附旧成片。" + c.Summary
@@ -200,6 +211,19 @@ func (a *App) productionBoard(w http.ResponseWriter, r *http.Request) {
 		break
 	}
 	media := checkpointCard(p, "media", "文字与画面安排")
+	alignment := a.mediaAlignmentView(p)
+	if alignment.Alignment != nil {
+		media.State = alignment.State
+		media.Summary = fmt.Sprintf("%d个自由关联 · 已覆盖%d/%d个有效字符 · 待准备%d项 · 缺素材%d项", alignment.Coverage.TotalUnits, alignment.Coverage.CoveredCharacters, alignment.Coverage.TotalCharacters, alignment.Coverage.PlannedUnits, alignment.Coverage.MissingUnits)
+		if alignment.State == "stale" {
+			media.Summary = "关联依据已变化，需重新核对。" + media.Summary
+		}
+		lines := []string{}
+		for _, unit := range alignment.Alignment.Units {
+			lines = append(lines, fmt.Sprintf("- %s：%s；%s；%s", unit.Quote, unit.VisualIntent, unit.Status, unit.Reason))
+		}
+		media.Items = append(media.Items, ProductionItem{ID: "media-alignment", Title: "文字与素材关联表", Kind: "json", URL: "/api/projects/" + p.ID + "/media-alignment", Text: strings.Join(lines, "\n")})
+	}
 	visualCount := 0
 	for _, asset := range p.Assets {
 		kind := ""
@@ -236,6 +260,30 @@ func (a *App) productionBoard(w http.ResponseWriter, r *http.Request) {
 			edit.Items = append(edit.Items, ProductionItem{ID: "dsl", Title: "剪辑详情", Kind: "json", URL: "/api/projects/" + p.ID + "/edit"})
 		}
 	}
+	if workflowFor(p).EditingBackend == "video_use" {
+		edit = ProductionCard{ID: "edit", Title: "video-use剪辑工程", State: "empty", Summary: "素材准备后，由RunDesk在共享目录保存EDL并制作初稿", Items: []ProductionItem{}}
+		for i := len(p.ProductionRuns) - 1; i >= 0; i-- {
+			run := p.ProductionRuns[i]
+			if run.InputBasisHash != externalProductionBasis(p) {
+				continue
+			}
+			if run.State == "completed" {
+				for _, job := range p.Renders {
+					if job.ID == run.RenderID && renderCurrent(p, job) {
+						edit.State = "ready"
+						edit.Summary = "已归档此版本EDL；镜头、配音和字幕以该工程为依据"
+						edit.Items = append(edit.Items, ProductionItem{ID: run.ID, Title: "查看本版EDL", Kind: "json", URL: "/api/projects/" + p.ID + "/renders/" + run.RenderID + "/edit-ir.json"})
+					}
+				}
+				if edit.State == "ready" {
+					break
+				}
+			} else if edit.State == "empty" {
+				edit.State = "blocked"
+				edit.Summary = "输入快照已准备，等待RunDesk完成EDL、渲染及归档"
+			}
+		}
+	}
 	render := ProductionCard{ID: "render", Title: "初稿与调整", State: "empty", Summary: "尚无渲染任务", Items: []ProductionItem{}}
 	for i := len(p.Renders) - 1; i >= 0; i-- {
 		j := p.Renders[i]
@@ -247,7 +295,7 @@ func (a *App) productionBoard(w http.ResponseWriter, r *http.Request) {
 		if j.Error != "" {
 			render.Summary = j.Error
 		}
-		if j.ContentHash != productionHash(p) || j.SourceHash != narrationSourceHash(p) {
+		if j.State == "completed" && !renderCurrent(p, j) || j.Engine != "video_use" && (j.ContentHash != productionHash(p) || j.SourceHash != narrationSourceHash(p)) {
 			render.State = "stale"
 			render.Summary += " · 对应旧内容"
 		}
@@ -260,11 +308,114 @@ func (a *App) productionBoard(w http.ResponseWriter, r *http.Request) {
 	if p.Final != nil {
 		final.State = "ready"
 		final.Summary = "已记录人工确认的完整成片；字节完整性可在高级工具复核"
-		if !usesEditDSL(p) || p.Final.ContentHash != productionHash(p) || p.Final.NarrationHash != narrationSourceHash(p) {
+		if !finalCurrent(p) {
 			final.State = "stale"
 			final.Summary = "终稿对应旧内容"
 		}
 		final.Items = append(final.Items, ProductionItem{ID: p.Final.ID, Title: "查看已确认成片", Kind: "video", URL: "/api/projects/" + p.ID + "/renders/" + p.Final.RenderID + "/final.mp4"})
 	}
-	writeJSON(w, 200, map[string]any{"projectId": p.ID, "revision": p.Revision, "sourceHash": narrationSourceHash(p), "stages": []ProductionCard{script, checkpointCard(p, "plan", "制作简报"), speech, media, edit, render, checkpointCard(p, "review", "结果检查"), final}})
+	plan, review := checkpointCard(p, "plan", "制作简报"), checkpointCard(p, "review", "结果检查")
+	preparation := preparationPhase(p, script, plan, speech, media, alignment)
+	editing := editingPhase(p, edit, render)
+	refinement := refinementPhase(review, final)
+	externalAdjustment := false
+	if workflowFor(p).EditingBackend == "video_use" && len(p.ProductionRuns) > 1 {
+		for _, run := range p.ProductionRuns {
+			if run.State == "completed" {
+				externalAdjustment = true
+				break
+			}
+		}
+	}
+	versionStatus := "draft"
+	if final.State == "ready" {
+		versionStatus = "final"
+	} else if p.Final != nil || len(p.EditHistory) > 0 || p.Production != nil && p.Production.Stage == "adjustment" || externalAdjustment {
+		versionStatus = "adjustment"
+	}
+	writeJSON(w, 200, map[string]any{"projectId": p.ID, "revision": p.Revision, "sourceHash": narrationSourceHash(p), "versionStatus": versionStatus, "stages": []ProductionCard{preparation, editing, refinement}, "artifacts": []ProductionCard{script, plan, speech, media, edit, render, review, final}, "alignment": alignment})
+}
+
+func phaseItems(cards ...ProductionCard) []ProductionItem {
+	out := []ProductionItem{}
+	seen := map[string]bool{}
+	for _, card := range cards {
+		for _, item := range card.Items {
+			key := item.URL
+			if key == "" {
+				key = item.Kind + ":" + item.ID
+			}
+			if !seen[key] {
+				out = append(out, item)
+				seen[key] = true
+			}
+		}
+	}
+	return out
+}
+
+func preparationPhase(p Project, script, plan, speech, media ProductionCard, alignment MediaAlignmentView) ProductionCard {
+	c := ProductionCard{ID: "preparation", Title: "素材准备和对齐", State: "empty", Summary: "提供主播稿后，由RunDesk准备配音、检查或生成素材并建立文字关联", Text: p.NarrationText, Items: phaseItems(script, plan, speech, media)}
+	if script.State == "empty" {
+		return c
+	}
+	c.State, c.Summary = "blocked", "原稿已保存，等待当前配音与文字—素材关联；已有文件不代表准备完成"
+	if speech.State == "ready" && alignment.State == "ready" {
+		c.State, c.Summary = "ready", "当前稿件的配音与完整素材关联已保存，可进入剪辑；关联是制作记录，不代表人工验收"
+		return c
+	}
+	if speech.State == "stale" || alignment.State == "stale" || plan.State == "stale" {
+		c.State, c.Summary = "stale", "主播稿或已选素材发生变化，需要重新核对配音及关联"
+		return c
+	}
+	if speech.State == "failed" {
+		c.State, c.Summary = "failed", speech.Summary
+		return c
+	}
+	if speech.State == "running" || plan.State == "running" || media.State == "running" {
+		c.State, c.Summary = "running", "正在准备配音、画面素材或文字关联"
+	}
+	for _, job := range p.Generation {
+		if job.State == "running" || job.State == "stopping" {
+			c.State, c.Summary = "running", "正在生成素材，完成后仍需查看内容并确认关联"
+		}
+	}
+	if alignment.Alignment != nil && c.State == "blocked" {
+		c.Summary = media.Summary + "；配音与关联齐备后可进入剪辑"
+	}
+	return c
+}
+
+func editingPhase(p Project, edit, render ProductionCard) ProductionCard {
+	c := ProductionCard{ID: "editing", Title: "剪辑", State: "empty", Summary: "按主播稿、配音与素材关联安排镜头，生成完整初稿", Items: phaseItems(edit, render)}
+	for i := len(p.Renders) - 1; i >= 0; i-- {
+		job := p.Renders[i]
+		if job.State == "completed" && job.Range == nil && renderCurrent(p, job) {
+			c.State, c.Summary = "ready", fmt.Sprintf("已生成当前内容的完整初稿 · %.2f秒；等待成片检查或文字调整", job.Duration)
+			c.Items = phaseItems(ProductionCard{Items: []ProductionItem{{ID: job.ID, Title: "观看完整初稿", Kind: "video", URL: "/api/projects/" + p.ID + "/renders/" + job.ID + "/final.mp4"}}}, edit, render)
+			return c
+		}
+	}
+	if render.State == "running" || render.State == "failed" || render.State == "stale" {
+		c.State, c.Summary = render.State, render.Summary
+	} else if edit.State == "failed" || edit.State == "stale" {
+		c.State, c.Summary = edit.State, edit.Summary
+	} else if edit.State == "ready" || render.State == "ready" {
+		c.State, c.Summary = "blocked", "剪辑工程或局部预览已保存，仍需渲染当前内容的完整初稿"
+	}
+	return c
+}
+
+func refinementPhase(review, final ProductionCard) ProductionCard {
+	c := ProductionCard{ID: "refinement", Title: "精修", State: "empty", Summary: "检查成片，按文字意见局部修改，并保存检查结果与终稿", Items: phaseItems(final, review)}
+	if final.State == "ready" {
+		c.State, c.Summary = "ready", "当前内容的完整成片已由人工确认终稿"
+	} else if review.State == "ready" {
+		c.State, c.Summary = "ready", "已保存当前完整成片的检查报告；报告不代表人工确认终稿"
+	} else if review.State != "empty" {
+		c.State, c.Summary = review.State, review.Summary
+	} else if final.State == "stale" {
+		c.State, c.Summary = "stale", "终稿对应旧内容，需检查并确认新的成片"
+	}
+	return c
 }

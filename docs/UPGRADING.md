@@ -1,3 +1,20 @@
+# 升级到 v0.21.0
+
+保留完整data、RunDesk/TTS配置、访问令牌与原会话，停止旧App后替换程序或重建镜像。Docker旧.env显式更新VIDEO_IMAGE=rundesk-video-app:0.21.0。项目会补装并选用v0.21.0版本化Skills，共45项MCP；保留已有定制文件。
+
+默认仍使用原生剪辑后端。三阶段界面自动读取现有产物；旧自由素材记录不会被猜测转换为新关联表，可由Codex查看素材后补齐。配音时序仍是实测合成片段时序，不冒充逐字强制对齐。
+
+使用video_use时：升级配套RunDesk0.49.2，重建并在运行环境中选择video-build1.2.0镜像，按现有流程重建/更新Codex容器（保留账户与工作区）。将同一个RunDesk应用工作目录挂入App并设置VIDEO_EXCHANGE_ROOT；Docker可叠加compose.video-use.yaml。随后在高级制作设置选video_use。只替换ZIP不会改变已经运行的Docker镜像或自动添加挂载。
+
+video_use后端首版使用单视觉轨图片/视频、连续外部配音和字幕。复杂多轨、音乐及原生DSL特效继续选native；后端选择不会删除已有工程。每次精修导出新快照，归档结果独立保存，源素材与旧成片可复用。
+
+生成服务沿用现有自定义HTTP二进制适配协议；新增duration/aspectRatio/referenceImages是可选扩展，供应商适配器需明确支持。参考图为项目内真实PNG/JPEG，最多4张。配置成功不等于真实模型验收。
+
+[实现与验收](THREE-STAGE-0.21.md) · [共享目录](EXCHANGE-0.21.md)
+
+---
+以下为历史说明。
+
 # 升级到 v0.20.0
 
 保留完整data、TTS/RunDesk配置与Token，停止旧App后替换完整二进制/源码包，或重建Docker镜像。旧docker/.env已有VIDEO_IMAGE时显式改为rundesk-video-app:0.20.0，默认示例更新不会覆盖你的配置。

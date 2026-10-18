@@ -45,9 +45,35 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 			send(msg.ID, map[string]any{})
 		case "tools/list":
 			tools := []any{}
-			for _, t := range []struct{ Name, Description string }{{"video_production_board_get", "Read authored narration hash and actual stage artifacts: plan, speech, media mapping, saved edit, render, review and final. States derive from persisted evidence; review documents are Agent records, not human approval."}, {"video_production_checkpoint", "Persist a freeform plan, media coverage map or review record for the exact authored narration hash and current revision. No required scene template. Completed review must reference a current completed full render."}, {"video_render_inspect", "Inspect one actual rendered frame at output time in seconds from a completed project render. Returns bounded PNG visual evidence only, not audio listening or whole-video verification."}, {"video_final_verify", "Rehash current referenced assets/font and final output/snapshot to verify input currency and output integrity. This is more expensive than final_get."}, {"video_final_get", "Read final render designation and whether it still matches current DSL and narration."}, {"video_final_save", "Designate a completed full DSL render as final after explicit human review. Requires revision,renderId,reviewed=true. Rejects partial previews and changed narration. Captures output and project snapshot hashes."}, {"video_edit_redo", "Redo most recent undone patch only if current DSL and mode still match its prior state. Requires revision."}, {"video_edit_patch_preview", "Compile clip/track/anchor/canvas changes without saving. Returns before/after and affected compiled clip IDs including timing dependencies. fields merges top-level clip fields; nested fields replace whole objects."}, {"video_edit_patch_apply", "Apply revision checked clip changes atomically and record an undo snapshot. Preserves active renderer mode."}, {"video_edit_undo", "Undo most recent patch if current DSL and mode still match that patch. Requires revision. Redo is available through video_edit_redo."}, {"video_asset_describe", "Save user supplied or Agent inspected visual description and tags for an actual image/video asset. Requires revision. basis is attribution, not proof that App inspected pixels."}, {"video_media_align", "Rank visual assets using explicit descriptions and lexical overlap with free text units. Read-only revision checked candidates with matching terms. Not a visual semantic model, confidence probability or automatic editing."}, {"video_narration_update", "Save free narration text independently of shots and editing DSL. Requires revision. No automatic content rewriting."}, {"video_speech_materialize", "Import completed independent narration as an audio asset and return measured cues and editing anchors. Requires revision and unchanged narration. Does not overwrite shots or DSL; timings are synthesis chunk boundaries, not forced word alignment."}, {"video_edit_get", "Read stored editing DSL, activation mode, revision and compiled timeline IR. Content remains in referenced assets; no paragraph projection required."}, {"video_edit_validate", "Validate and compile a proposed editing DSL without saving or rendering. Returns stable clip IDs and resolved times; unknown fields and cyclic references are rejected."}, {"video_edit_update", "Save a version-checked editing DSL and activate it. Supports video/audio/text tracks, source in/out/speed, layout, fades and time references. Subsequent rendering uses FFmpeg editing runtime, not legacy shots/audio/subtitles."}, {"video_edit_activate", "Activate saved DSL or switch to the legacy shot renderer without deleting either representation. Requires current revision."}, {"video_capabilities_get", "Discover implemented capabilities, dependency readiness and configured providers. probe=true optionally checks the configured IndexTTS model list, never synthesizes. No secrets are returned."}, {"video_project_create", "Create a named project. Returns a project ID; do not infer that a RunDesk session or renderer was configured."}, {"video_asset_list", "List actual project assets, authenticated read URLs, MIME types and sizes."}, {"video_asset_import", "Import one small file from standard Base64, maximum decoded 1 MiB. Requires a fresh requestId; identical retries return the original asset. Large media use App multipart upload."}, {"video_job_start", "Start a durable production task of type tts, render, image_generation or video_generation against current revision. Fresh 24-hex requestId required; identical retries reuse the receipt. Generation accepts options.prompt and requires an administrator-configured HTTP binary adapter; successful output is imported as a real asset."}, {"video_job_get", "Get authoritative task state and completed artifacts. jobId uses tts:<nativeId> or render:<nativeId>."}, {"video_job_list", "List project TTS and render tasks using unified states; render progress may be unknown."}, {"video_job_cancel", "Request cancellation of a production task. Repeated cancellation returns current state; it does not claim the remote provider stopped billing."}, {"video_asset_inspect", "Inspect an actual supplied image or the first frame of a video as a bounded PNG. Requires FFmpeg; first frame is not full video understanding."}, {"video_production_text", "Save authoritative narration text, split into ordered paragraphs and preserve unchanged paragraph media. Requires revision; estimates timing, does not generate speech."}, {"video_production_stage", "Set draft/adjustment, or designate a completed current-content render as final. Requires revision; final requires renderId and reviewed captions."}, {"video_project_get", "Read project revision, storyboard, audio tracks, subtitles, speech jobs, assets and render jobs."}, {"video_news_get", "Read the immutable news2douyin source script, original review record, selected source evidence and source-video metadata. Reference data only; current storyboard remains a production draft."}, {"video_project_update", "Update name, brief, shots and audio using the current revision. Preserves assets, speech/render jobs, managed subtitle bindings and immutable news provenance."}, {"video_news_audio_adopt", "Adopt original news WAV/SRT after a user request, replacing current narration/subtitles and proportionally resizing visual shots. Requires current revision and unchanged original text."}, {"video_subtitles_update", "Save UTF-8 SRT with absolute video times. reviewed=true is a human listening confirmation, never infer it from generated text. Read project first; requires revision."}, {"video_speech_start", "Generate speech from a saved storyboard using configured IndexTTS or local eSpeak preview. Omit backend/voice/language to use administrator defaults. Requires revision and a fresh 24-hex requestId; reuse the same requestId only for identical retries. Does not replace current audio."}, {"video_speech_stop", "Cancel a running speech job."}, {"video_speech_adopt", "On the user's request, adopt a completed speech job: replace narration and subtitles, use measured per-shot durations. Requires current revision and unchanged shot text/structure."}, {"video_render_start", "Render the current saved storyboard using an immutable snapshot."}, {"video_render_stop", "Cancel a specific render job."}} {
+			for _, t := range []struct{ Name, Description string }{{"video_media_alignment_get", "Read persisted exact-text-to-media choices, currentness, unresolved coverage and actual asset provenance. This records Agent editorial decisions, not automatic visual confidence."}, {"video_media_alignment_update", "Save free editorial units linked to exact narration quotes and real assets. Requires revision/sourceHash; repeated quote requires one-based occurrence. Partial coverage is allowed and remains unresolved."}, {"video_asset_video_inspect", "Inspect 1 to 8 strictly increasing actual video frame times. Returns timestamped PNG images; sampled frames do not prove whole-video motion or audio."}, {"video_production_run_prepare", "Freeze current prepared narration, alignment and selected material into the configured shared workspace for video_use. Requires revision and fresh requestId; identical retry reuses snapshot. Returns relative paths and adapter CLI."}, {"video_production_run_get", "Read an owned video_use production run and its frozen input hashes, exchange paths and imported render."}, {"video_production_run_ingest", "Validate completion manifest, media bytes and provenance from an owned shared production run, copy artifacts privately and archive a completed video_use render. Requires current revision; late old inputs stay stale."}, {"video_production_board_get", "Read authored narration hash and actual stage artifacts: plan, speech, media mapping, saved edit, render, review and final. States derive from persisted evidence; review documents are Agent records, not human approval."}, {"video_production_checkpoint", "Persist a freeform plan, media coverage map or review record for the exact authored narration hash and current revision. No required scene template. Completed review must reference a current completed full render."}, {"video_render_inspect", "Inspect one actual rendered frame at output time in seconds from a completed project render. Returns bounded PNG visual evidence only, not audio listening or whole-video verification."}, {"video_final_verify", "Rehash current referenced assets/font and final output/snapshot to verify input currency and output integrity. This is more expensive than final_get."}, {"video_final_get", "Read final render designation and whether it still matches current DSL and narration."}, {"video_final_save", "Designate a completed full DSL render as final after explicit human review. Requires revision,renderId,reviewed=true. Rejects partial previews and changed narration. Captures output and project snapshot hashes."}, {"video_edit_redo", "Redo most recent undone patch only if current DSL and mode still match its prior state. Requires revision."}, {"video_edit_patch_preview", "Compile clip/track/anchor/canvas changes without saving. Returns before/after and affected compiled clip IDs including timing dependencies. fields merges top-level clip fields; nested fields replace whole objects."}, {"video_edit_patch_apply", "Apply revision checked clip changes atomically and record an undo snapshot. Preserves active renderer mode."}, {"video_edit_undo", "Undo most recent patch if current DSL and mode still match that patch. Requires revision. Redo is available through video_edit_redo."}, {"video_asset_describe", "Save user supplied or Agent inspected visual description and tags for an actual image/video asset. Requires revision. basis is attribution, not proof that App inspected pixels."}, {"video_media_align", "Rank visual assets using explicit descriptions and lexical overlap with free text units. Read-only revision checked candidates with matching terms. Not a visual semantic model, confidence probability or automatic editing."}, {"video_narration_update", "Save free narration text independently of shots and editing DSL. Requires revision. No automatic content rewriting."}, {"video_speech_materialize", "Import completed independent narration as an audio asset and return measured cues and editing anchors. Requires revision and unchanged narration. Does not overwrite shots or DSL; timings are synthesis chunk boundaries, not forced word alignment."}, {"video_edit_get", "Read stored editing DSL, activation mode, revision and compiled timeline IR. Content remains in referenced assets; no paragraph projection required."}, {"video_edit_validate", "Validate and compile a proposed editing DSL without saving or rendering. Returns stable clip IDs and resolved times; unknown fields and cyclic references are rejected."}, {"video_edit_update", "Save a version-checked editing DSL and activate it. Supports video/audio/text tracks, source in/out/speed, layout, fades and time references. Subsequent rendering uses FFmpeg editing runtime, not legacy shots/audio/subtitles."}, {"video_edit_activate", "Activate saved DSL or switch to the legacy shot renderer without deleting either representation. Requires current revision."}, {"video_capabilities_get", "Discover implemented capabilities, dependency readiness and configured providers. probe=true optionally checks the configured IndexTTS model list, never synthesizes. No secrets are returned."}, {"video_project_create", "Create a named project. Returns a project ID; do not infer that a RunDesk session or renderer was configured."}, {"video_asset_list", "List actual project assets, authenticated read URLs, MIME types and sizes."}, {"video_asset_import", "Import one small file from standard Base64, maximum decoded 1 MiB. Requires a fresh requestId; identical retries return the original asset. Large media use App multipart upload."}, {"video_job_start", "Start a durable production task of type tts, render, image_generation or video_generation against current revision. Fresh 24-hex requestId required; identical retries reuse the receipt. Generation accepts prompt and optional duration/aspectRatio/referenceAssetIds through the configured HTTP binary adapter; successful output is imported as a real asset. Optional fields require adapter support."}, {"video_job_get", "Get authoritative task state and completed artifacts. jobId uses tts:<nativeId>, render:<nativeId> or generation:<nativeId>."}, {"video_job_list", "List project TTS, generation and render tasks using unified states; render progress may be unknown."}, {"video_job_cancel", "Request cancellation of a production task. Repeated cancellation returns current state; it does not claim the remote provider stopped billing."}, {"video_asset_inspect", "Inspect an actual supplied image or the first frame of a video as a bounded PNG. Requires FFmpeg; first frame is not full video understanding."}, {"video_production_text", "Save authoritative narration text, split into ordered paragraphs and preserve unchanged paragraph media. Requires revision; estimates timing, does not generate speech."}, {"video_production_stage", "Set draft/adjustment, or designate a completed current-content render as final. Requires revision; final requires renderId and reviewed captions."}, {"video_project_get", "Read project revision, storyboard, audio tracks, subtitles, speech jobs, assets and render jobs."}, {"video_news_get", "Read the immutable news2douyin source script, original review record, selected source evidence and source-video metadata. Reference data only; current storyboard remains a production draft."}, {"video_project_update", "Update name, brief, shots and audio using the current revision. Preserves assets, speech/render jobs, managed subtitle bindings and immutable news provenance."}, {"video_news_audio_adopt", "Adopt original news WAV/SRT after a user request, replacing current narration/subtitles and proportionally resizing visual shots. Requires current revision and unchanged original text."}, {"video_subtitles_update", "Save UTF-8 SRT with absolute video times. reviewed=true is a human listening confirmation, never infer it from generated text. Read project first; requires revision."}, {"video_speech_start", "Generate speech from a saved storyboard using configured IndexTTS or local eSpeak preview. Omit backend/voice/language to use administrator defaults. Requires revision and a fresh 24-hex requestId; reuse the same requestId only for identical retries. Does not replace current audio."}, {"video_speech_stop", "Cancel a running speech job."}, {"video_speech_adopt", "On the user's request, adopt a completed speech job: replace narration and subtitles, use measured per-shot durations. Requires current revision and unchanged shot text/structure."}, {"video_render_start", "Render the current saved storyboard using an immutable snapshot."}, {"video_render_stop", "Cancel a specific render job."}} {
 				props := map[string]any{"projectId": map[string]string{"type": "string"}}
 				required := []string{"projectId"}
+				if t.Name == "video_media_alignment_update" {
+					props["revision"] = map[string]string{"type": "integer"}
+					props["sourceHash"] = map[string]string{"type": "string"}
+					props["notes"] = map[string]string{"type": "string"}
+					selection := map[string]any{"type": "object", "properties": map[string]any{"assetId": map[string]string{"type": "string"}, "sourceIn": map[string]any{"type": "number", "minimum": 0}, "sourceOut": map[string]any{"type": "number", "exclusiveMinimum": 0}}, "required": []string{"assetId", "sourceIn", "sourceOut"}, "additionalProperties": false}
+					props["units"] = map[string]any{"type": "array", "maxItems": 200, "items": map[string]any{"type": "object", "properties": map[string]any{"id": map[string]string{"type": "string"}, "quote": map[string]string{"type": "string"}, "occurrence": map[string]any{"type": "integer", "minimum": 1}, "visualIntent": map[string]string{"type": "string"}, "assetIds": map[string]any{"type": "array", "items": map[string]string{"type": "string"}}, "selections": map[string]any{"type": "array", "items": selection}, "role": map[string]any{"type": "string", "enum": []string{"evidence", "illustration", "background", "textcard"}}, "reason": map[string]string{"type": "string"}, "status": map[string]any{"type": "string", "enum": []string{"selected", "missing", "planned"}}}, "required": []string{"id", "quote", "visualIntent", "role", "reason", "status"}, "additionalProperties": false}}
+					required = append(required, "revision", "sourceHash", "units")
+				}
+				if t.Name == "video_asset_video_inspect" {
+					props["assetId"] = map[string]string{"type": "string"}
+					props["times"] = map[string]any{"type": "array", "minItems": 1, "maxItems": 8, "items": map[string]any{"type": "number", "minimum": 0}}
+					required = append(required, "assetId", "times")
+				}
+				if t.Name == "video_production_run_prepare" {
+					props["revision"] = map[string]string{"type": "integer"}
+					props["requestId"] = map[string]string{"type": "string"}
+					required = append(required, "revision", "requestId")
+				}
+				if t.Name == "video_production_run_get" || t.Name == "video_production_run_ingest" {
+					props["productionRunId"] = map[string]string{"type": "string"}
+					required = append(required, "productionRunId")
+					if t.Name == "video_production_run_ingest" {
+						props["revision"] = map[string]string{"type": "integer"}
+						required = append(required, "revision")
+					}
+				}
 				if t.Name == "video_production_checkpoint" {
 					for _, field := range []string{"sourceHash", "summary", "document"} {
 						props[field] = map[string]string{"type": "string"}
@@ -94,7 +120,7 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 					props["type"] = map[string]any{"type": "string", "enum": []string{"tts", "render", "image_generation", "video_generation"}}
 					props["revision"] = map[string]string{"type": "integer"}
 					props["requestId"] = map[string]string{"type": "string"}
-					props["options"] = map[string]any{"type": "object", "properties": map[string]any{"range": map[string]any{"type": "object", "properties": map[string]any{"start": map[string]string{"type": "number"}, "end": map[string]string{"type": "number"}}, "required": []string{"start", "end"}, "additionalProperties": false}, "prompt": map[string]string{"type": "string"}, "source": map[string]any{"type": "string", "enum": []string{"narration", "shots"}}, "backend": map[string]any{"type": "string", "enum": []string{"indextts", "espeak-ng"}}, "voice": map[string]string{"type": "string"}, "language": map[string]string{"type": "string"}, "speed": map[string]string{"type": "number"}, "rate": map[string]string{"type": "integer"}, "kind": map[string]any{"type": "string", "enum": []string{"draft"}}}, "additionalProperties": false}
+					props["options"] = map[string]any{"type": "object", "properties": map[string]any{"range": map[string]any{"type": "object", "properties": map[string]any{"start": map[string]string{"type": "number"}, "end": map[string]string{"type": "number"}}, "required": []string{"start", "end"}, "additionalProperties": false}, "prompt": map[string]string{"type": "string"}, "duration": map[string]any{"type": "number", "exclusiveMinimum": 0, "maximum": 60}, "aspectRatio": map[string]any{"type": "string", "enum": []string{"16:9", "9:16", "1:1", "4:3", "3:4"}}, "referenceAssetIds": map[string]any{"type": "array", "maxItems": 4, "items": map[string]string{"type": "string"}}, "source": map[string]any{"type": "string", "enum": []string{"narration", "shots"}}, "backend": map[string]any{"type": "string", "enum": []string{"indextts", "espeak-ng"}}, "voice": map[string]string{"type": "string"}, "language": map[string]string{"type": "string"}, "speed": map[string]string{"type": "number"}, "rate": map[string]string{"type": "integer"}, "kind": map[string]any{"type": "string", "enum": []string{"draft"}}}, "additionalProperties": false}
 					required = append(required, "type", "revision", "requestId")
 				}
 				if t.Name == "video_job_get" || t.Name == "video_job_cancel" {
@@ -200,43 +226,46 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 			var p struct {
 				Name      string `json:"name"`
 				Arguments struct {
-					SourceHash  string           `json:"sourceHash"`
-					Summary     string           `json:"summary"`
-					Document    string           `json:"document"`
-					Status      string           `json:"status"`
-					Time        *float64         `json:"time"`
-					Range       *RenderRange     `json:"range"`
-					Changes     []EditChange     `json:"changes"`
-					Description AssetDescription `json:"description"`
-					Units       []AlignUnit      `json:"units"`
-					Limit       int              `json:"limit"`
-					Source      string           `json:"source"`
-					DSL         *EditDocument    `json:"dsl"`
-					Active      bool             `json:"active"`
-					Name        string           `json:"name"`
-					Data        string           `json:"data"`
-					Probe       bool             `json:"probe"`
-					Type        string           `json:"type"`
-					JobID       string           `json:"jobId"`
-					Options     JobOptions       `json:"options"`
-					AssetID     string           `json:"assetId"`
-					Text        string           `json:"text"`
-					Stage       string           `json:"stage"`
-					Kind        string           `json:"kind"`
-					ProjectID   string           `json:"projectId"`
-					Revision    int              `json:"revision"`
-					RequestID   string           `json:"requestId"`
-					Backend     string           `json:"backend"`
-					Language    string           `json:"language"`
-					Speed       float64          `json:"speed"`
-					Voice       string           `json:"voice"`
-					Rate        int              `json:"rate"`
-					SpeechID    string           `json:"speechId"`
-					SRT         string           `json:"srt"`
-					Enabled     bool             `json:"enabled"`
-					Reviewed    bool             `json:"reviewed"`
-					RenderID    string           `json:"renderId"`
-					Project     json.RawMessage  `json:"project"`
+					SourceHash      string           `json:"sourceHash"`
+					Summary         string           `json:"summary"`
+					Document        string           `json:"document"`
+					Status          string           `json:"status"`
+					Time            *float64         `json:"time"`
+					Range           *RenderRange     `json:"range"`
+					Changes         []EditChange     `json:"changes"`
+					Description     AssetDescription `json:"description"`
+					Units           json.RawMessage  `json:"units"`
+					Notes           string           `json:"notes"`
+					Times           json.RawMessage  `json:"times"`
+					ProductionRunID string           `json:"productionRunId"`
+					Limit           int              `json:"limit"`
+					Source          string           `json:"source"`
+					DSL             *EditDocument    `json:"dsl"`
+					Active          bool             `json:"active"`
+					Name            string           `json:"name"`
+					Data            string           `json:"data"`
+					Probe           bool             `json:"probe"`
+					Type            string           `json:"type"`
+					JobID           string           `json:"jobId"`
+					Options         JobOptions       `json:"options"`
+					AssetID         string           `json:"assetId"`
+					Text            string           `json:"text"`
+					Stage           string           `json:"stage"`
+					Kind            string           `json:"kind"`
+					ProjectID       string           `json:"projectId"`
+					Revision        int              `json:"revision"`
+					RequestID       string           `json:"requestId"`
+					Backend         string           `json:"backend"`
+					Language        string           `json:"language"`
+					Speed           float64          `json:"speed"`
+					Voice           string           `json:"voice"`
+					Rate            int              `json:"rate"`
+					SpeechID        string           `json:"speechId"`
+					SRT             string           `json:"srt"`
+					Enabled         bool             `json:"enabled"`
+					Reviewed        bool             `json:"reviewed"`
+					RenderID        string           `json:"renderId"`
+					Project         json.RawMessage  `json:"project"`
 				} `json:"arguments"`
 			}
 			e := json.Unmarshal(msg.Params, &p)
@@ -250,6 +279,33 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 				e = fmt.Errorf("invalid projectId")
 			}
 			switch p.Name {
+			case "video_media_alignment_get":
+				path += "/media-alignment"
+			case "video_media_alignment_update":
+				method = "PUT"
+				path += "/media-alignment"
+				body, _ = json.Marshal(map[string]any{"revision": p.Arguments.Revision, "sourceHash": p.Arguments.SourceHash, "notes": p.Arguments.Notes, "units": p.Arguments.Units})
+			case "video_asset_video_inspect":
+				if !identifier.MatchString(p.Arguments.AssetID) {
+					e = fmt.Errorf("invalid assetId")
+				}
+				method = "POST"
+				path += "/assets/" + p.Arguments.AssetID + "/inspect-video"
+				body, _ = json.Marshal(map[string]any{"times": p.Arguments.Times})
+			case "video_production_run_prepare":
+				method = "POST"
+				path += "/production-runs/prepare"
+				body, _ = json.Marshal(map[string]any{"revision": p.Arguments.Revision, "requestId": p.Arguments.RequestID})
+			case "video_production_run_get", "video_production_run_ingest":
+				if !identifier.MatchString(p.Arguments.ProductionRunID) {
+					e = fmt.Errorf("invalid productionRunId")
+				}
+				path += "/production-runs/" + p.Arguments.ProductionRunID
+				if p.Name == "video_production_run_ingest" {
+					method = "POST"
+					path += "/ingest"
+					body, _ = json.Marshal(map[string]any{"revision": p.Arguments.Revision})
+				}
 			case "video_production_board_get":
 				path += "/production-board"
 			case "video_production_checkpoint":
@@ -293,7 +349,7 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 			case "video_media_align":
 				method = "POST"
 				path += "/media/align"
-				body, _ = json.Marshal(AlignRequest{Revision: p.Arguments.Revision, Units: p.Arguments.Units, Limit: p.Arguments.Limit})
+				body, _ = json.Marshal(map[string]any{"revision": p.Arguments.Revision, "units": p.Arguments.Units, "limit": p.Arguments.Limit})
 			case "video_narration_update":
 				method = "PUT"
 				path += "/narration"
@@ -432,7 +488,7 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 				} else {
 					send(msg.ID, map[string]any{"content": []any{map[string]string{"type": "text", "text": fmt.Sprintf("One rendered frame at %.3fs; single_frame visual evidence, no audio listening or full-video verification.", *p.Arguments.Time)}, map[string]string{"type": "image", "mimeType": "image/png", "data": base64.StdEncoding.EncodeToString(raw)}}})
 				}
-			} else if p.Name == "video_asset_inspect" {
+			} else if p.Name == "video_asset_inspect" || p.Name == "video_asset_video_inspect" {
 				var preview map[string]any
 				if err := json.Unmarshal(raw, &preview); err != nil {
 					send(msg.ID, map[string]any{"isError": true, "content": []any{map[string]string{"type": "text", "text": "Invalid preview response"}}})

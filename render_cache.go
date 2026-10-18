@@ -174,6 +174,19 @@ func (a *App) verifyFinal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f := p.Final
+	for _, render := range p.Renders {
+		if render.ID != f.RenderID || render.Engine != "video_use" {
+			continue
+		}
+		dir := filepath.Join(a.dir(p.ID), "renders", render.ID)
+		vh, n, ve := hashLocal(filepath.Join(dir, "final.mp4"))
+		sh, _, se := hashLocal(filepath.Join(dir, "snapshot.json"))
+		proof, pe := readRenderProof(dir)
+		inputsCurrent := finalCurrent(p) && a.externalRenderInputsIntact(p, render)
+		outputIntact := ve == nil && se == nil && pe == nil && vh == f.VideoHash && n == f.VideoBytes && sh == f.SnapshotHash && a.externalArchiveIntact(p, render, proof)
+		writeJSON(w, 200, map[string]any{"revision": p.Revision, "final": f, "inputsCurrent": inputsCurrent, "outputIntact": outputIntact, "verified": inputsCurrent && outputIntact})
+		return
+	}
 	dir := filepath.Join(a.dir(p.ID), "renders", f.RenderID)
 	vh, n, ve := hashLocal(filepath.Join(dir, "final.mp4"))
 	sh, _, se := hashLocal(filepath.Join(dir, "snapshot.json"))

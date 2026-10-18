@@ -757,15 +757,20 @@ dialog p {
 #workflow-status { margin-top:9px; min-height:18px; }
 #production-results { margin-top:26px; }
 #production-board-status { min-height:20px; margin-bottom:10px; }
-.production-board { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.production-version { display:flex; align-items:center; gap:9px; margin:10px 0; }
+.version-status { font-size:12px; border:1px solid var(--line); border-radius:20px; padding:2px 10px; background:#fff; color:#506760; }
+.version-status[data-version="final"] { background:#e8f3ed; border-color:#cee4d7; color:#286a4c; }
+.production-board { display:grid; grid-template-columns:1fr; gap:14px; }
 .stage-card { background:#fff; border:1px solid var(--line); border-radius:11px; padding:16px; min-width:0; }
 .stage-card-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
-.stage-card h3 { font-size:14px; margin:0; }
+.stage-card h3 { display:flex; align-items:center; gap:9px; font-size:15px; margin:0; }
+.phase-number { display:inline-flex; align-items:center; justify-content:center; width:24px; height:24px; flex-shrink:0; border-radius:50%; background:#edf4f1; color:var(--green); font-size:12px; font-weight:600; }
+.stage-card>details { margin-top:12px; }
 .stage-status { flex-shrink:0; font-size:11px; border-radius:20px; padding:2px 8px; background:#f0f3f2; color:#7d8b85; }
-.stage-card[data-state="ready"] .stage-status { background:#e8f3ed; color:#286a4c; }
-.stage-card[data-state="running"] .stage-status { background:#e9eff9; color:#4169a5; }
-.stage-card[data-state="failed"] .stage-status,.stage-card[data-state="blocked"] .stage-status { background:#fff0e9; color:#9d583f; }
-.stage-card[data-state="stale"] .stage-status { background:#fff6df; color:#967321; }
+.stage-status[data-state="ready"] { background:#e8f3ed; color:#286a4c; }
+.stage-status[data-state="running"] { background:#e9eff9; color:#4169a5; }
+.stage-status[data-state="failed"],.stage-status[data-state="blocked"] { background:#fff0e9; color:#9d583f; }
+.stage-status[data-state="stale"] { background:#fff6df; color:#967321; }
 .stage-card pre { margin:10px 0; padding:10px; border-radius:7px; background:#f5f7f6; max-height:240px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; line-height:1.7; font-family:inherit; }
 .stage-card summary { font-size:12px; cursor:pointer; color:var(--green); }
 .stage-item { margin-top:12px; padding-top:10px; border-top:1px solid #edf1ef; }
@@ -773,14 +778,23 @@ dialog p {
 .stage-item audio,.stage-item video { display:block; width:100%; max-height:320px; margin:8px 0; }
 .stage-item img { display:block; max-width:100%; max-height:180px; object-fit:contain; margin:8px 0; }
 .stage-item a { color:var(--green); font-size:12px; }
+.stage-artifact { margin-top:14px; padding:12px; background:#f8faf9; border:1px solid #eaf0ed; border-radius:8px; }
+.stage-artifact-head { display:flex; justify-content:space-between; align-items:center; gap:10px; margin-bottom:6px; }
+.stage-artifact h4 { margin:0; font-size:13px; font-weight:600; }
+.stage-artifact details { margin-top:8px; }
+.alignment-coverage { margin-top:12px; border-left:3px solid #c6ded5; padding-left:10px; }
+.alignment-coverage strong { font-size:12px; font-weight:600; }
 .advanced-workspace { margin:26px 0; padding-top:18px; border-top:1px solid var(--line); }
 .advanced-intro { margin:12px 0; }
 .advanced-save-actions { margin:16px 0; }
 .advanced-workspace .production-panel { border-color:var(--line); background:#fff; }
 .advanced-workspace .row { flex-wrap:wrap; }
+.advanced-workspace [hidden] { display:none !important; }
 .workflow-skills { display:flex; gap:14px; flex-wrap:wrap; margin-top:12px; }
 .workflow-skills label { display:flex; align-items:center; gap:5px; }
 .workflow-skills input { width:auto; margin:0; }
+.workflow-backend { display:flex; align-items:center; gap:12px; margin:16px 0 8px; font-size:13px; }
+.workflow-backend select { width:auto; max-width:220px; }
 #connection-settings { margin:12px 0; }
 #connection-settings #connect { width:100%; }
 @media (max-width:1150px) { .production-materials { align-items:flex-start; flex-direction:column; } .production-materials .row { justify-content:flex-start; } }

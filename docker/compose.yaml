@@ -1,7 +1,7 @@
 name: rundesk-video
 services:
   video-app:
-    image: ${VIDEO_IMAGE:-rundesk-video-app:0.20.0}
+    image: ${VIDEO_IMAGE:-rundesk-video-app:0.21.0}
     build:
       context: ..
       dockerfile: docker/Dockerfile
@@ -33,6 +33,12 @@ services:
       VIDEO_TTS_LANGUAGE: ${VIDEO_TTS_LANGUAGE:-}
       VIDEO_TTS_TIMEOUT_SECONDS: ${VIDEO_TTS_TIMEOUT_SECONDS:-}
       VIDEO_TTS_API_KEY: ${VIDEO_TTS_API_KEY:-}
+      VIDEO_IMAGE_GEN_URL: ${VIDEO_IMAGE_GEN_URL:-}
+      VIDEO_IMAGE_GEN_MODEL: ${VIDEO_IMAGE_GEN_MODEL:-}
+      VIDEO_IMAGE_GEN_KEY: ${VIDEO_IMAGE_GEN_KEY:-}
+      VIDEO_VIDEO_GEN_URL: ${VIDEO_VIDEO_GEN_URL:-}
+      VIDEO_VIDEO_GEN_MODEL: ${VIDEO_VIDEO_GEN_MODEL:-}
+      VIDEO_VIDEO_GEN_KEY: ${VIDEO_VIDEO_GEN_KEY:-}
     volumes:
       - type: bind
         source: ${VIDEO_HOST_DATA:-../.state/video}

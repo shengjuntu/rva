@@ -1,0 +1,13 @@
+# Optional overlay: mount exactly the existing RunDesk application workspace.
+# RunDesk already mounts that workspace into its Codex container. This overlay
+# gives Video App a separate view of the same directory, never of RunDesk home.
+services:
+  video-app:
+    environment:
+      VIDEO_EXCHANGE_ROOT: /exchange
+    volumes:
+      - type: bind
+        source: ${VIDEO_EXCHANGE_HOST_WORKSPACE:?Set the existing RunDesk video application workspace absolute path}
+        target: /exchange
+        bind:
+          create_host_path: false
