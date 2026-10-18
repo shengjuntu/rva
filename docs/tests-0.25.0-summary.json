@@ -1,0 +1,20 @@
+{
+  "passed": 441,
+  "topLevelPassed": 203,
+  "skippedTests": [
+    "TestRootRuntimeProbeProgramWithActualAppMCP",
+    "TestTextRefsRealAdapterArchiveAndLocator",
+    "TestHyperFramesRealAnimationAudioRender",
+    "TestProductionExchangeRealAdapterArchiveLateResultAndFinalProof",
+    "TestProductionExchangeNewerEditAuthoritySurvivesOlderLateIngest",
+    "TestSpeechSnapshotGenerationAndAdoption"
+  ],
+  "failures": [],
+  "packageTerminals": {
+    "rundesk-video-app/comfyh3": "pass",
+    "rundesk-video-app": "pass"
+  },
+  "missingPackages": [],
+  "command": "go test -race ./... -count=1 -json -timeout 5m",
+  "inventoryNote": "Tests reached pass terminals for all packages. The capture wrapper subsequent go list hit nested-workspace VCS stamping; package inventory was rerun with -buildvcs=false, without repeating or relabeling tests."
+}

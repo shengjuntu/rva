@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Real Video App / RunDesk HTTP, fixture Docker/Codex; never a live model test."""
-import argparse, json, os, shutil, socket, subprocess, tempfile, threading, time
+import argparse, json, os, shutil, socket, subprocess, tempfile, threading, time, uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.request import Request, urlopen
@@ -52,18 +52,21 @@ def main():
         launch(rd/'bin/rundesk',['--demo','--data',str(root/'rundesk'),'--listen',rdurl.split('//')[1]],{},'rundesk.log')
         wait(rdurl+'/api/v1/meta',admin)
         def rcall(method,path,body=None):
-            status,value=http(method,rdurl+'/api/v1'+path,body,admin)
+            key='wire-'+uuid.uuid4().hex if method=='POST' and path in ['/instances','/workspaces'] else None
+            status,value=http(method,rdurl+'/api/v1'+path,body,admin,key)
             assert status<300,(path,status,value)
             return value
         class Proxy(BaseHTTPRequestHandler):
             def log_message(self,*a):pass
             def forward(self):
                 body=json.loads(self.rfile.read(int(self.headers['Content-Length']))) if self.headers.get('Content-Length') else None
-                status,value=http(self.command,rdurl+self.path,body,admin,self.headers.get("Idempotency-Key"))
+                incoming=self.headers.get('Authorization','Bearer '+admin).removeprefix('Bearer ')
+                status,value=http(self.command,rdurl+self.path,body,incoming,self.headers.get("Idempotency-Key"))
                 if self.path.endswith('/runtime/prepare') and status==200:
                     # Demo Codex cannot discover this MCP. Exercise its real HTTP
                     # callback here and substitute ONLY the simulated discovery list.
-                    binding=rcall('GET','/applications/rundesk-video-app/runtime')
+                    preset=(body or {}).get('presetId','')
+                    binding=rcall('GET','/applications/rundesk-video-app/runtime'+('?presetId='+preset if preset else ''))
                     config=rcall('GET','/workspaces/'+binding['workspaceId']+'/mcp?instanceId='+binding['instanceId'])
                     callback=config['effectiveServers']['video_project']['url']
                     assert callback==appurl+'/api/mcp',callback
@@ -74,8 +77,8 @@ def main():
             do_GET=do_POST=do_PUT=do_PATCH=forward
         proxy=ThreadingHTTPServer(('127.0.0.1',0),Proxy);threading.Thread(target=proxy.serve_forever,daemon=True).start()
         proxyurl='http://127.0.0.1:'+str(proxy.server_port)
-        def video():
-            proc=launch(app/'bin/video-app',['--data',str(root/'video'),'--listen',appurl.split('//')[1],'--rundesk',proxyurl],{'VIDEO_APP_TOKEN':token,'VIDEO_APP_PUBLIC_URL':appurl,'VIDEO_APP_MCP_URL':appurl+'/api/mcp'},'video.log')
+        def video(extra=None):
+            proc=launch(app/'bin/video-app',['--data',str(root/'video'),'--listen',appurl.split('//')[1],'--rundesk',proxyurl],{'VIDEO_APP_TOKEN':token,'VIDEO_APP_PUBLIC_URL':appurl,'VIDEO_APP_MCP_URL':appurl+'/api/mcp',**(extra or {})},'video.log')
             wait(appurl+'/api/health',token);return proc
         def call(method,path,body=None):
             status,value=http(method,appurl+path,body,token);assert status<300,(path,status,value);return value
@@ -83,7 +86,7 @@ def main():
             running=video()
             assert http('GET',appurl+'/api/health')[0]==401
             p=call('POST','/api/projects',{'name':'Docker API acceptance'});route='/api/projects/'+p['id']
-            p=call('POST',route+'/connect',{});old=p['sessionId'];iid=json.loads((root/'video/config.json').read_text())['instanceId']
+            p=call('POST',route+'/connect',{});old=p['sessionId'];iid=(p.get('runtimeBinding') or {}).get('instanceId') or json.loads((root/'video/config.json').read_text())['instanceId']
             assert call('POST',route+'/connect',{})['sessionId']==old
             checks.append('idempotent_application_registration_and_session')
             instance=next(i for i in rcall('GET','/instances') if i['id']==iid)
@@ -98,7 +101,7 @@ def main():
             cp='/workspaces/'+binding['workspaceId']+'/mcp?instanceId='+iid
             saved=rcall('GET',cp)
             rcall('PUT','/workspaces/'+binding['workspaceId']+'/mcp/video_project?instanceId='+iid,{'version':saved['version'],'config':{'url':appurl+'/api/mcp','http_headers':{'Authorization':'Bearer '+token},'enabled':True}})
-            ready=call('POST','/api/runtime/prepare',{});assert ready['probed'] and ready['accountReady'] and len(ready['servers']['video_project'])==10
+            ready=call('POST','/api/runtime/prepare',{});assert ready['probed'] and ready['accountReady'] and len(ready['servers']['video_project'])>=52
             call('POST','/api/runtime/prepare',{})
             checks.append('docker_prepare_reuses_environment_and_real_mcp_http_callback')
             rpc=call('POST','/api/mcp',{'jsonrpc':'2.0','id':2,'method':'tools/call','params':{'name':'video_project_get','arguments':{'projectId':p['id']}}})
@@ -117,7 +120,7 @@ def main():
             p=call('POST',newpath,{});assert p['sessionId']!=sid and sid in p['previousSessionIds']
             assert call('POST',newpath,{})['sessionId']==p['sessionId']
             checks.append('explicit_new_conversation_is_fenced_and_retry_safe')
-            running.kill();running.wait(timeout=10);video()
+            running.kill();running.wait(timeout=10);running=video()
             loaded=call('GET',route);assert loaded['sessionId']==p['sessionId'] and loaded['workspaceId']==p['workspaceId']
             checks.append('sigkill_restart_releases_data_lock_and_preserves_state')
             calls=[json.loads(line) for line in (engine/'calls.jsonl').read_text().splitlines()]
@@ -125,6 +128,35 @@ def main():
             assert sum(c[:2]==['container','start'] for c in calls)==1
             assert not any(c[0] in ['build','pull'] for c in calls)
             checks.append('one_container_create_start_and_no_build_on_registration_or_message')
+            profile_projects=[]
+            for profile in ['hyperframes-test','video-use-test']:
+                inst=rcall('POST','/instances',{'name':profile})
+                rcall('PUT','/instances/'+inst['id']+'/execution',{'revision':inst['revision'],'spec':{'mode':'docker','image':profile+':fixture','network':'bridge'}})
+                work=rcall('POST','/workspaces',{'name':profile})
+                rcall('PUT','/applications/rundesk-video-app/runtime-presets/'+profile,{'name':profile,'instanceId':inst['id'],'workspaceId':work['id'],'enabled':True})
+                project=call('POST','/api/projects',{'name':profile,'productionProfile':profile})
+                project=call('POST','/api/projects/'+project['id']+'/connect',{})
+                assert project['runtimeBinding']['presetId']==profile
+                assert project['runtimeBinding']['instanceId']==inst['id']
+                assert project['workspaceId']==work['id']
+                prepared=call('POST','/api/runtime/prepare?projectId='+project['id'],{})
+                assert prepared['presetId']==profile and prepared['image']==profile+':fixture'
+                profile_projects.append(project)
+            assert profile_projects[0]['runtimeBinding']['instanceId']!=profile_projects[1]['runtimeBinding']['instanceId']
+            assert call('GET','/api/runtime')['instanceId']==iid
+            checks.append('two_named_profiles_use_distinct_instances_workspaces_images_and_preserve_legacy_default')
+            key=rcall('POST','/applications/rundesk-video-app/keys',{'name':'preset-only-test','workspaceIds':[],'presetIds':['hyperframes-test'],'scopes':['read','run']})
+            running.terminate();running.wait(timeout=10);running=video({'RUNDESK_TOKEN':key['token']})
+            pa,pb=profile_projects
+            call('POST','/api/projects/'+pa['id']+'/connect',{})
+            blocked=http('POST',appurl+'/api/projects/'+pb['id']+'/messages',{'text':'must be denied','requestId':'blocked-preset-001'},token)
+            assert blocked[0]==403,blocked
+            accepted=call('POST','/api/projects/'+pa['id']+'/messages',{'text':'preset protocol test','requestId':'preset-message-001'})
+            assert accepted['runId']
+            scoped=http('GET',rdurl+'/api/v1/applications/rundesk-video-app/runtime/skills?presetId=hyperframes-test',token=key['token'])
+            assert scoped[0]==200 and scoped[1]['instanceId']==pa['runtimeBinding']['instanceId']
+            assert http('GET',rdurl+'/api/v1/instances/'+pa['runtimeBinding']['instanceId']+'/configuration',token=key['token'])[0]==403
+            checks.append('preset_only_application_key_runs_owned_project_with_scoped_skills_and_rejects_other_preset_and_full_configuration')
             report={'passed':len(checks),'checks':checks,'mode':'real RunDesk and Video App HTTP; Docker CLI/Codex discovery fixtures','realDockerTested':False,'modelTested':False,'renderTested':False}
             (out/'integration.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n');print(json.dumps(report,ensure_ascii=False))
         finally:

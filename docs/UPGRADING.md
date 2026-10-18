@@ -1,3 +1,16 @@
+# 升级到 v0.25.0
+
+备份并保留完整data、令牌、RunDesk绑定、会话、原稿、素材与历史输出。旧docker/.env中显式更新VIDEO_IMAGE=rundesk-video-app:0.25.0，再build/up；不要用示例覆盖实际服务配置。IndexTTS和ComfyUI继续使用已有服务，不重装模型。
+
+未设置VIDEO_PRODUCTION_PROFILE时继续使用原默认RunDesk环境，兼容旧服务。需要多个制作环境时先升级RunDesk到0.50.0，由管理员在应用中登记独立实例/工作区的预设并完成镜像、认证和Skills/MCP，再设置App启动默认或创建项目时传productionProfile。旧凭据不自动获得新预设权限，需签发包含presetIds的应用凭据。
+
+创建后的项目保存所选预设，首次连接后保存精确绑定。改变启动默认不会迁移旧项目或未完成提交；已有会话按原身份继续。旧项目没有新字段时，从原会话/默认绑定恢复归属，不以新的启动默认替换。预设不受支持、禁用或绑定不一致时明确报错，不自动回退。
+
+App日常界面保持简单；过程调试和预设管理在RunDesk。上游制作镜像需实际准备，本次没有自动引入OpenMontage源码、审批流程或新的渲染后端。详见 [多制作环境](PRODUCTION-PROFILES.md)，本轮验证见validation-0.25.0.json。
+
+---
+以下为历史说明。
+
 # 升级到 v0.24.0
 
 本版以 shengjuntu/rva 的 `065e4c7` 为基线，合入 v0.23.1 的 HyperFrames 与简化工作台，并加固新增 ComfyUI MiniMax-H3 文生视频后端。IndexTTS 源码和已有配置保留，不要求重装模型或重新登记音色。

@@ -1,3 +1,11 @@
+# v0.25.0
+
+- 接入 RunDesk 0.50.0 的管理员批准运行预设，启动默认和创建项目可选择 productionProfile。
+- 创建时保存选择，首次连接冻结 preset/instance/workspace；改变启动默认不迁移旧项目，旧单一环境继续兼容。
+- 按项目解析连接、环境准备、诊断、Skills和会话归属；提交回执保存原绑定，避免迟到响应或重试串到其他环境。
+- 日常界面保持导入、一键制作、成片、对话和导出；容器、镜像、认证和详细调试留在 RunDesk。
+- IndexTTS、ComfyUI H3、HyperFrames、旧剪辑后端与历史结果继续保留。本次不自动打包或转换 OpenMontage 工程。
+
 # v0.24.0
 
 - 以 shengjuntu/rva 的 065e4c7 为基线合入 v0.23.1，保留用户提交历史、IndexTTS、内置 ComfyUI MiniMax-H3 与双语说明。

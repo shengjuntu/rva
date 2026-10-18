@@ -23,25 +23,28 @@ import (
 // ProductionRun is a frozen exchange receipt, not the RunDesk agent task itself.
 // Paths are relative to the configured workspace; no host paths or secrets are exported.
 type ProductionRun struct {
-	ID              string         `json:"id"`
-	RequestID       string         `json:"requestId"`
-	RequestHash     string         `json:"requestHash"`
-	Revision        int            `json:"revision"`
-	SessionID       string         `json:"sessionId"`
-	RelativeRunRoot string         `json:"relativeRunRoot"`
-	ManifestPath    string         `json:"manifestPath"`
-	State           string         `json:"state"`
-	SourceHash      string         `json:"sourceHash"`
-	InputHash       string         `json:"inputHash"`
-	InputBasisHash  string         `json:"inputBasisHash"`
-	SnapshotHash    string         `json:"snapshotHash"`
-	Created         string         `json:"created"`
-	SpeechID        string         `json:"speechId"`
-	Duration        float64        `json:"duration"`
-	RenderID        string         `json:"renderId,omitempty"`
-	EditHash        string         `json:"editHash,omitempty"`
-	OutputHash      string         `json:"outputHash,omitempty"`
-	Files           []ExchangeFile `json:"files"`
+	PresetID                string         `json:"presetId,omitempty"`
+	WorkspaceID             string         `json:"workspaceId,omitempty"`
+	ExchangeRootFingerprint string         `json:"exchangeRootFingerprint,omitempty"`
+	ID                      string         `json:"id"`
+	RequestID               string         `json:"requestId"`
+	RequestHash             string         `json:"requestHash"`
+	Revision                int            `json:"revision"`
+	SessionID               string         `json:"sessionId"`
+	RelativeRunRoot         string         `json:"relativeRunRoot"`
+	ManifestPath            string         `json:"manifestPath"`
+	State                   string         `json:"state"`
+	SourceHash              string         `json:"sourceHash"`
+	InputHash               string         `json:"inputHash"`
+	InputBasisHash          string         `json:"inputBasisHash"`
+	SnapshotHash            string         `json:"snapshotHash"`
+	Created                 string         `json:"created"`
+	SpeechID                string         `json:"speechId"`
+	Duration                float64        `json:"duration"`
+	RenderID                string         `json:"renderId,omitempty"`
+	EditHash                string         `json:"editHash,omitempty"`
+	OutputHash              string         `json:"outputHash,omitempty"`
+	Files                   []ExchangeFile `json:"files"`
 }
 type ExchangeFile struct {
 	Path   string `json:"path"`
@@ -244,7 +247,12 @@ func externalProductionBasis(p Project) string {
 		Duration       float64
 		Files          map[string]NewsFile
 	}{speech.ID, speech.ScriptHash, speech.Duration, speech.Files}})
-	return hashBytes(b)
+	basis := hashBytes(b)
+	if p.RuntimeBinding != nil && p.RuntimeBinding.PresetID != "" {
+		bound, _ := json.Marshal(struct{ Basis, PresetID, InstanceID, WorkspaceID string }{basis, p.RuntimeBinding.PresetID, p.RuntimeBinding.InstanceID, p.RuntimeBinding.WorkspaceID})
+		return hashBytes(bound)
+	}
+	return basis
 }
 func externalRenderCurrent(p Project, r Render) bool {
 	if r.Engine != "video_use" || r.State != "completed" || r.Range != nil || workflowFor(p).EditingBackend != "video_use" || r.SourceHash != narrationSourceHash(p) {
@@ -345,15 +353,11 @@ func (a *App) externalArchiveIntact(p Project, r Render, proof RenderProof) bool
 	return true
 }
 func exchangeRoot() (*os.Root, error) {
-	dir := strings.TrimSpace(os.Getenv("VIDEO_EXCHANGE_ROOT"))
-	if dir == "" {
-		return nil, errors.New("未配置 VIDEO_EXCHANGE_ROOT；请挂载现有 RunDesk 工作目录")
+	selected, err := exchangeSelectionForProject(Project{})
+	if err != nil {
+		return nil, err
 	}
-	root, e := os.OpenRoot(dir)
-	if e != nil {
-		return nil, errors.New("无法打开已配置的交换工作目录")
-	}
-	return root, nil
+	return openSelectedExchangeRoot(selected)
 }
 func productionRunResponse(p Project, run ProductionRun) map[string]any {
 	current := run.InputBasisHash == externalProductionBasis(p)
@@ -408,6 +412,17 @@ func (a *App) productionRunPrepare(w http.ResponseWriter, r *http.Request) {
 				fail(w, 409, errors.New("相同 requestId 的请求内容不同"))
 				return
 			}
+			if run.RenderID == "" {
+				selected, err := exchangeSelectionForProject(*p)
+				if err != nil {
+					fail(w, 409, err)
+					return
+				}
+				if err = exchangeSelectionMatchesRun(*p, run, selected); err != nil {
+					fail(w, 409, err)
+					return
+				}
+			}
 			writeJSON(w, 200, productionRunResponse(*p, run))
 			return
 		}
@@ -435,13 +450,40 @@ func (a *App) productionRunPrepare(w http.ResponseWriter, r *http.Request) {
 		fail(w, 409, errors.New("需要当前正文的已完成独立配音"))
 		return
 	}
-	root, e := exchangeRoot()
+	selected, e := exchangeSelectionForProject(*p)
+	if e != nil {
+		fail(w, 409, e)
+		return
+	}
+	root, e := openSelectedExchangeRoot(selected)
 	if e != nil {
 		fail(w, 409, e)
 		return
 	}
 	defer root.Close()
-	run := ProductionRun{ID: uid(), RequestID: in.RequestID, RequestHash: requestHash, Revision: p.Revision, SessionID: p.SessionID, State: "prepared", SourceHash: narrationSourceHash(*p), InputBasisHash: externalProductionBasis(*p), Created: time.Now().UTC().Format(time.RFC3339Nano), SpeechID: j.ID, Duration: j.Duration, Files: []ExchangeFile{}}
+	if p.RuntimeBinding != nil && p.RuntimeBinding.PresetID != "" {
+		before := clone(p)
+		a.mu.Unlock()
+		probeErr := a.verifyPresetExchange(r.Context(), before, root)
+		a.mu.Lock()
+		latest := a.projects[before.ID]
+		if probeErr != nil {
+			fail(w, 409, probeErr)
+			return
+		}
+		if latest == nil || latest.Revision != before.Revision || latest.SessionID != before.SessionID || latest.WorkspaceID != before.WorkspaceID || projectRuntimeBinding(latest, a.cfg) != projectRuntimeBinding(&before, a.cfg) || externalProductionBasis(*latest) != externalProductionBasis(before) {
+			fail(w, 409, errors.New("共享目录验证期间项目绑定或内容已改变，请重读项目后重试"))
+			return
+		}
+		current, err := exchangeSelectionForProject(*latest)
+		if err != nil || current.Fingerprint != selected.Fingerprint {
+			fail(w, 409, errors.New("共享目录验证期间挂载映射已改变，未导出素材"))
+			return
+		}
+		p = latest
+	}
+	presetID, workspaceID := exchangeRunBinding(*p, selected)
+	run := ProductionRun{PresetID: presetID, WorkspaceID: workspaceID, ExchangeRootFingerprint: selected.Fingerprint, ID: uid(), RequestID: in.RequestID, RequestHash: requestHash, Revision: p.Revision, SessionID: p.SessionID, State: "prepared", SourceHash: narrationSourceHash(*p), InputBasisHash: externalProductionBasis(*p), Created: time.Now().UTC().Format(time.RFC3339Nano), SpeechID: j.ID, Duration: j.Duration, Files: []ExchangeFile{}}
 	run.RelativeRunRoot = "outputs/" + p.SessionID + "/runs/" + run.ID
 	run.ManifestPath = run.RelativeRunRoot + "/input/manifest.json"
 	if e = root.MkdirAll(path.Dir(run.RelativeRunRoot), 0700); e != nil {
@@ -721,7 +763,16 @@ func (a *App) productionRunIngest(w http.ResponseWriter, r *http.Request) {
 		fail(w, 409, errors.New("项目版本冲突"))
 		return
 	}
-	root, e := exchangeRoot()
+	selected, e := exchangeSelectionForProject(p)
+	if e != nil {
+		fail(w, 409, e)
+		return
+	}
+	if e = exchangeSelectionMatchesRun(p, run, selected); e != nil {
+		fail(w, 409, e)
+		return
+	}
+	root, e := openSelectedExchangeRoot(selected)
 	if e != nil {
 		fail(w, 409, e)
 		return
@@ -899,6 +950,11 @@ func (a *App) productionRunIngest(w http.ResponseWriter, r *http.Request) {
 	latest := a.projects[p.ID]
 	if latest == nil || latest.Revision != in.Revision {
 		fail(w, 409, errors.New("产物校验期间项目已改变，请使用当前revision重试"))
+		return
+	}
+	currentSelection, selectionErr := exchangeSelectionForProject(*latest)
+	if selectionErr != nil || exchangeSelectionMatchesRun(*latest, run, currentSelection) != nil {
+		fail(w, 409, errors.New("产物校验期间工作区映射或项目绑定已改变，未归档共享产物"))
 		return
 	}
 	q := clone(latest)

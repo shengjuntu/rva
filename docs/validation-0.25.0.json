@@ -1,0 +1,88 @@
+{
+  "version": "0.25.0",
+  "checkedAt": "2026-10-18T14:55:49.132339+00:00",
+  "repository": "https://github.com/shengjuntu/rva",
+  "baseCommit": "a3e8d208a345e81f8504ec627df99baf9c87f4ca",
+  "rundeskVersion": "0.50.0",
+  "goRace": {
+    "passed": 441,
+    "topLevelPassed": 203,
+    "skippedTests": [
+      "TestRootRuntimeProbeProgramWithActualAppMCP",
+      "TestTextRefsRealAdapterArchiveAndLocator",
+      "TestHyperFramesRealAnimationAudioRender",
+      "TestProductionExchangeRealAdapterArchiveLateResultAndFinalProof",
+      "TestProductionExchangeNewerEditAuthoritySurvivesOlderLateIngest",
+      "TestSpeechSnapshotGenerationAndAdoption"
+    ],
+    "failures": [],
+    "packageTerminals": {
+      "rundesk-video-app/comfyh3": "pass",
+      "rundesk-video-app": "pass"
+    },
+    "missingPackages": [],
+    "command": "go test -race ./... -count=1 -json -timeout 5m",
+    "inventoryNote": "Tests reached pass terminals for all packages. The capture wrapper subsequent go list hit nested-workspace VCS stamping; package inventory was rerun with -buildvcs=false, without repeating or relabeling tests.",
+    "evidence": "tests-0.25.0.jsonl"
+  },
+  "goVet": "passed",
+  "frontendNodeTests": {
+    "passed": 10,
+    "failed": 0
+  },
+  "httpDomChecks": {
+    "passed": 24,
+    "evidence": "dom-validation-0.25.0.json"
+  },
+  "twoServiceIntegration": {
+    "passed": 10,
+    "checks": [
+      "idempotent_application_registration_and_session",
+      "empty_local_session_switches_to_docker_without_overwriting_history",
+      "docker_prepare_reuses_environment_and_real_mcp_http_callback",
+      "business_mcp_project_read",
+      "new_message_preflight_and_duplicate_request_reuse",
+      "explicit_new_conversation_is_fenced_and_retry_safe",
+      "sigkill_restart_releases_data_lock_and_preserves_state",
+      "one_container_create_start_and_no_build_on_registration_or_message",
+      "two_named_profiles_use_distinct_instances_workspaces_images_and_preserve_legacy_default",
+      "preset_only_application_key_runs_owned_project_with_scoped_skills_and_rejects_other_preset_and_full_configuration"
+    ],
+    "mode": "real RunDesk and Video App HTTP; Docker CLI/Codex discovery fixtures",
+    "realDockerTested": false,
+    "modelTested": false,
+    "renderTested": false
+  },
+  "integrationEvidence": "runtime-presets-http-0.25.0.json",
+  "coverage": [
+    "project creation profile presence/idempotency and startup default freezing",
+    "immutable per-project binding and legacy-session recovery",
+    "precise connect/prepare/diagnostics/messages and scoped skill lookup",
+    "original pending request recovery without cross-environment reuse",
+    "workspace-specific exchange mapping, fresh sharing challenge, filesystem identity and mapping change checks",
+    "independent private archives remain readable"
+  ],
+  "binaries": [
+    {
+      "path": "bin/video-app",
+      "target": "linux/amd64",
+      "runtimeExecuted": true,
+      "bytes": 12991535,
+      "sha256": "e4e5661068b15b4d3ee5c0f502b9fc2342e0ad2e88a0ed603fc23ad641feca6a"
+    },
+    {
+      "path": "bin/video-app-windows-amd64.exe",
+      "target": "windows/amd64",
+      "runtimeExecuted": false,
+      "bytes": 13129728,
+      "sha256": "942f0ed0088a1231190275ffb77ea74c94d305534fa6c97c63e674cff253fc9c"
+    }
+  ],
+  "buildCommand": "go build -buildvcs=false (Linux and Windows amd64)",
+  "limitations": [
+    "No actual Docker Engine or live Codex account used; Docker CLI and Codex discovery use fixtures.",
+    "No GPU/IndexTTS/ComfyUI inference or new production render in this change. Existing 0.24.0 render evidence remains separately labeled.",
+    "Windows binary was cross-compiled only.",
+    "OpenMontage/video-use images and upstream workflows are not newly bundled or certified by naming a preset."
+  ]
+}

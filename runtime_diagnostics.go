@@ -23,6 +23,7 @@ type RuntimeDiagnosticRow struct {
 	Remedy  string `json:"remedy,omitempty"`
 }
 type RuntimeDiagnosticBinding struct {
+	PresetID      string `json:"presetId,omitempty"`
 	InstanceID    string `json:"instanceId"`
 	WorkspaceID   string `json:"workspaceId"`
 	SessionID     string `json:"sessionId"`
@@ -51,6 +52,7 @@ type runDeskDiagnosticRuntime struct {
 	Checks                 map[string]string `json:"checks,omitempty"`
 }
 type runDeskDiagnosticResponse struct {
+	PresetID         string                   `json:"presetId,omitempty"`
 	SchemaVersion    int                      `json:"schemaVersion"`
 	AppID            string                   `json:"appId"`
 	InstanceID       string                   `json:"instanceId"`
@@ -126,6 +128,16 @@ func newRuntimeProbe(sessionID, nonce string) (*runtimeProbe, error) {
 	if err != nil {
 		return nil, err
 	}
+	return newRuntimeProbeRoot(root, sessionID, nonce)
+}
+
+// Takes ownership of root, including on errors.
+func newRuntimeProbeRoot(root *os.Root, sessionID, nonce string) (*runtimeProbe, error) {
+	if !exchangeSessionID.MatchString(sessionID) || !identifier.MatchString(nonce) {
+		root.Close()
+		return nil, errors.New("需要有效的RunDesk会话")
+	}
+	var err error
 	p := &runtimeProbe{root: root, nonce: nonce}
 	p.dir = "outputs/" + sessionID + "/.rundesk-probes/" + uid()
 	p.requestPath, p.responsePath = p.dir+"/request.json", p.dir+"/response.json"
@@ -230,8 +242,9 @@ func (a *App) diagnoseRuntime(ctx context.Context, projectID string) (RuntimeDia
 	a.mu.Lock()
 	cfg := a.cfg
 	a.mu.Unlock()
+	binding := projectRuntimeBinding(&p, cfg)
 	backend := workflowFor(p).EditingBackend
-	out := RuntimeDiagnostics{Schema: "video.runtime-diagnostics.v1", ProjectID: projectID, CheckedAt: time.Now().UTC().Format(time.RFC3339Nano), EditingBackend: backend, Ready: true, Binding: RuntimeDiagnosticBinding{InstanceID: cfg.InstanceID, WorkspaceID: p.WorkspaceID, SessionID: p.SessionID}, Rows: []RuntimeDiagnosticRow{}}
+	out := RuntimeDiagnostics{Schema: "video.runtime-diagnostics.v1", ProjectID: projectID, CheckedAt: time.Now().UTC().Format(time.RFC3339Nano), EditingBackend: backend, Ready: true, Binding: RuntimeDiagnosticBinding{PresetID: binding.PresetID, InstanceID: binding.InstanceID, WorkspaceID: p.WorkspaceID, SessionID: p.SessionID}, Rows: []RuntimeDiagnosticRow{}}
 	add := func(id, title, state, summary, code, remedy string, required bool) {
 		out.Rows = append(out.Rows, RuntimeDiagnosticRow{id, title, state, summary, code, remedy})
 		if required && state != "passed" {
@@ -246,15 +259,15 @@ func (a *App) diagnoseRuntime(ctx context.Context, projectID string) (RuntimeDia
 	}
 	add("model_vision", "模型视觉理解", "not_checked", "本诊断不调用模型，未验证模型是否理解图片；工具返回图片与模型看懂图片分别验收", "model_not_tested", "实际制作时让 Codex 描述测试图片，并核对描述与原图", false)
 	add("generation_services", "图片与视频生成", "not_checked", "生成服务按需调用；本诊断不发起生成或计费请求", "optional_services_not_called", "需要生成素材时再检查对应服务配置与真实任务", false)
-	if cfg.InstanceID == "" || p.SessionID == "" || p.WorkspaceID == "" || !exchangeSessionID.MatchString(p.SessionID) {
+	if binding.InstanceID == "" || p.SessionID == "" || p.WorkspaceID == "" || !exchangeSessionID.MatchString(p.SessionID) {
 		add("binding", "RunDesk 项目绑定", "blocked", "项目尚未建立有效的 RunDesk 会话", "connect_required", "先连接 RunDesk 并为当前项目建立会话，再运行诊断", true)
 		return out, nil
 	}
-	if cfg.WorkspaceID != "" && cfg.WorkspaceID != p.WorkspaceID {
+	if binding.WorkspaceID != "" && binding.WorkspaceID != p.WorkspaceID {
 		add("binding", "RunDesk 项目绑定", "failed", "项目工作区与当前应用绑定不一致", "binding_mismatch", "恢复原 RunDesk 连接，或核对后为项目建立新会话", true)
 		return out, nil
 	}
-	v, err := a.runtime(ctx)
+	v, err := a.runtimeForProject(ctx, &p)
 	if err != nil {
 		add("binding", "RunDesk 项目绑定", "failed", err.Error(), "runtime_unavailable", "核对 RunDesk 地址、应用 Token 和当前实例绑定", true)
 		return out, nil
@@ -265,7 +278,7 @@ func (a *App) diagnoseRuntime(ctx context.Context, projectID string) (RuntimeDia
 		WorkspaceID   string `json:"workspaceId"`
 		ExecutionMode string `json:"executionMode"`
 	}
-	if err = a.rdCall(ctx, "GET", "/sessions/"+p.SessionID, nil, &session); err != nil || session.InstanceID != cfg.InstanceID || session.WorkspaceID != p.WorkspaceID || session.ExecutionMode != v.ExecutionMode {
+	if err = a.rdCall(ctx, "GET", "/sessions/"+p.SessionID, nil, &session); err != nil || session.InstanceID != binding.InstanceID || session.WorkspaceID != p.WorkspaceID || session.ExecutionMode != v.ExecutionMode {
 		add("binding", "RunDesk 项目绑定", "failed", "原会话与当前实例、工作区或运行方式不一致，或无法读取", "session_binding_mismatch", "在 RunDesk 核对原会话；切换环境后为项目建立新会话", true)
 		return out, nil
 	}
@@ -292,12 +305,24 @@ func (a *App) diagnoseRuntime(ctx context.Context, projectID string) (RuntimeDia
 		}
 	} else {
 		nonce := uid()
-		request := map[string]any{"instanceId": cfg.InstanceID, "workspaceId": p.WorkspaceID, "nonce": nonce, "mcpImageServer": "video_project"}
+		request := map[string]any{"instanceId": binding.InstanceID, "workspaceId": p.WorkspaceID, "nonce": nonce, "mcpImageServer": "video_project"}
+		if binding.PresetID != "" {
+			request["presetId"] = binding.PresetID
+		}
 		var probe *runtimeProbe
 		if backend == "video_use" {
-			probe, err = newRuntimeProbe(p.SessionID, nonce)
+			selected, selectionErr := exchangeSelectionForProject(p)
+			if selectionErr != nil {
+				err = selectionErr
+			} else {
+				var root *os.Root
+				root, err = openSelectedExchangeRoot(selected)
+				if err == nil {
+					probe, err = newRuntimeProbeRoot(root, p.SessionID, nonce)
+				}
+			}
 			if err != nil {
-				add("shared_workspace", "共享目录双向读写", "blocked", err.Error(), "exchange_unavailable", "设置 VIDEO_EXCHANGE_ROOT 并挂载与 RunDesk 应用工作区相同的物理目录，核对读写权限", true)
+				add("shared_workspace", "共享目录双向读写", "blocked", err.Error(), "exchange_unavailable", "preset须在VIDEO_EXCHANGE_ROOTS为该workspaceId配置独立挂载；legacy使用VIDEO_EXCHANGE_ROOT，核对物理目录和读写权限", true)
 			} else {
 				defer probe.close()
 				request["challenge"] = map[string]string{"path": probe.requestPath, "nonce": probe.nonce}
@@ -320,7 +345,7 @@ func (a *App) diagnoseRuntime(ctx context.Context, projectID string) (RuntimeDia
 					add("shared_workspace", "共享目录双向读写", "blocked", "未取得容器挑战响应，未验证共享挂载", code, remedy, true)
 				}
 			}
-		} else if remote.SchemaVersion != 1 || remote.AppID != "rundesk-video-app" || remote.InstanceID != cfg.InstanceID || remote.WorkspaceID != p.WorkspaceID || remote.ExecutionMode != "docker" {
+		} else if remote.SchemaVersion != 1 || remote.AppID != "rundesk-video-app" || remote.PresetID != binding.PresetID || remote.InstanceID != binding.InstanceID || remote.WorkspaceID != p.WorkspaceID || remote.ExecutionMode != "docker" {
 			add("mcp_image_transport", "MCP 图片传输", "failed", "诊断返回的版本、实例或工作区不匹配", "diagnostic_binding_mismatch", "恢复当前绑定后重新诊断", true)
 			if backend == "video_use" {
 				add("video_use_runtime", "video-use 运行时", "failed", "未接受其他绑定的运行时结果", "diagnostic_binding_mismatch", "核对 RunDesk 实例和工作区", true)
@@ -401,7 +426,7 @@ func (a *App) diagnoseRuntime(ctx context.Context, projectID string) (RuntimeDia
 	// reconnected or switched the selected backend/session.
 	a.mu.Lock()
 	current, exists := a.projects[projectID]
-	unchanged := exists && current.SessionID == p.SessionID && current.WorkspaceID == p.WorkspaceID && workflowFor(*current).EditingBackend == backend && a.cfg.InstanceID == cfg.InstanceID && a.cfg.WorkspaceID == cfg.WorkspaceID && a.cfg.RunDeskURL == cfg.RunDeskURL
+	unchanged := exists && current.SessionID == p.SessionID && current.WorkspaceID == p.WorkspaceID && workflowFor(*current).EditingBackend == backend && projectRuntimeBinding(current, a.cfg) == binding && a.cfg.RunDeskURL == cfg.RunDeskURL
 	a.mu.Unlock()
 	if !unchanged {
 		add("binding_stability", "诊断期间绑定", "failed", "诊断期间项目会话、后端或应用绑定已改变；本次结果不可用于制作预检", "binding_changed", "等待连接操作结束后重新诊断", true)

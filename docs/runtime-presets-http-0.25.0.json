@@ -1,0 +1,19 @@
+{
+  "passed": 10,
+  "checks": [
+    "idempotent_application_registration_and_session",
+    "empty_local_session_switches_to_docker_without_overwriting_history",
+    "docker_prepare_reuses_environment_and_real_mcp_http_callback",
+    "business_mcp_project_read",
+    "new_message_preflight_and_duplicate_request_reuse",
+    "explicit_new_conversation_is_fenced_and_retry_safe",
+    "sigkill_restart_releases_data_lock_and_preserves_state",
+    "one_container_create_start_and_no_build_on_registration_or_message",
+    "two_named_profiles_use_distinct_instances_workspaces_images_and_preserve_legacy_default",
+    "preset_only_application_key_runs_owned_project_with_scoped_skills_and_rejects_other_preset_and_full_configuration"
+  ],
+  "mode": "real RunDesk and Video App HTTP; Docker CLI/Codex discovery fixtures",
+  "realDockerTested": false,
+  "modelTested": false,
+  "renderTested": false
+}

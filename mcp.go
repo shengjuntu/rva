@@ -118,6 +118,7 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 				}
 				if t.Name == "video_project_create" {
 					props = map[string]any{"name": map[string]string{"type": "string"}, "requestId": map[string]string{"type": "string"}}
+					props["productionProfile"] = map[string]string{"type": "string", "description": "Optional administrator-approved RunDesk preset ID, chosen only at project creation. Omit to freeze the App startup default; empty string selects the legacy environment. This is not a Docker image or path."}
 					required = []string{"name", "requestId"}
 				}
 				if t.Name == "video_asset_import" {
@@ -246,50 +247,51 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 			var p struct {
 				Name      string `json:"name"`
 				Arguments struct {
-					Nonce           string           `json:"nonce"`
-					Quote           string           `json:"quote"`
-					Occurrence      int              `json:"occurrence"`
-					TextSourceHash  *string          `json:"textSourceHash"`
-					SourceHash      string           `json:"sourceHash"`
-					Summary         string           `json:"summary"`
-					Document        string           `json:"document"`
-					Status          string           `json:"status"`
-					Time            *float64         `json:"time"`
-					Range           *RenderRange     `json:"range"`
-					Changes         []EditChange     `json:"changes"`
-					Description     AssetDescription `json:"description"`
-					Units           json.RawMessage  `json:"units"`
-					Notes           string           `json:"notes"`
-					Times           json.RawMessage  `json:"times"`
-					ProductionRunID string           `json:"productionRunId"`
-					Limit           int              `json:"limit"`
-					Source          string           `json:"source"`
-					DSL             *EditDocument    `json:"dsl"`
-					Active          bool             `json:"active"`
-					Name            string           `json:"name"`
-					Data            string           `json:"data"`
-					Probe           bool             `json:"probe"`
-					Type            string           `json:"type"`
-					JobID           string           `json:"jobId"`
-					Options         JobOptions       `json:"options"`
-					AssetID         string           `json:"assetId"`
-					Text            string           `json:"text"`
-					Stage           string           `json:"stage"`
-					Kind            string           `json:"kind"`
-					ProjectID       string           `json:"projectId"`
-					Revision        int              `json:"revision"`
-					RequestID       string           `json:"requestId"`
-					Backend         string           `json:"backend"`
-					Language        string           `json:"language"`
-					Speed           float64          `json:"speed"`
-					Voice           string           `json:"voice"`
-					Rate            int              `json:"rate"`
-					SpeechID        string           `json:"speechId"`
-					SRT             string           `json:"srt"`
-					Enabled         bool             `json:"enabled"`
-					Reviewed        bool             `json:"reviewed"`
-					RenderID        string           `json:"renderId"`
-					Project         json.RawMessage  `json:"project"`
+					Nonce             string           `json:"nonce"`
+					Quote             string           `json:"quote"`
+					Occurrence        int              `json:"occurrence"`
+					TextSourceHash    *string          `json:"textSourceHash"`
+					SourceHash        string           `json:"sourceHash"`
+					Summary           string           `json:"summary"`
+					Document          string           `json:"document"`
+					Status            string           `json:"status"`
+					Time              *float64         `json:"time"`
+					Range             *RenderRange     `json:"range"`
+					Changes           []EditChange     `json:"changes"`
+					Description       AssetDescription `json:"description"`
+					Units             json.RawMessage  `json:"units"`
+					Notes             string           `json:"notes"`
+					Times             json.RawMessage  `json:"times"`
+					ProductionRunID   string           `json:"productionRunId"`
+					Limit             int              `json:"limit"`
+					Source            string           `json:"source"`
+					DSL               *EditDocument    `json:"dsl"`
+					Active            bool             `json:"active"`
+					Name              string           `json:"name"`
+					ProductionProfile *string          `json:"productionProfile"`
+					Data              string           `json:"data"`
+					Probe             bool             `json:"probe"`
+					Type              string           `json:"type"`
+					JobID             string           `json:"jobId"`
+					Options           JobOptions       `json:"options"`
+					AssetID           string           `json:"assetId"`
+					Text              string           `json:"text"`
+					Stage             string           `json:"stage"`
+					Kind              string           `json:"kind"`
+					ProjectID         string           `json:"projectId"`
+					Revision          int              `json:"revision"`
+					RequestID         string           `json:"requestId"`
+					Backend           string           `json:"backend"`
+					Language          string           `json:"language"`
+					Speed             float64          `json:"speed"`
+					Voice             string           `json:"voice"`
+					Rate              int              `json:"rate"`
+					SpeechID          string           `json:"speechId"`
+					SRT               string           `json:"srt"`
+					Enabled           bool             `json:"enabled"`
+					Reviewed          bool             `json:"reviewed"`
+					RenderID          string           `json:"renderId"`
+					Project           json.RawMessage  `json:"project"`
 				} `json:"arguments"`
 			}
 			e := json.Unmarshal(msg.Params, &p)
@@ -416,7 +418,11 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 			case "video_project_create":
 				method = "POST"
 				path = "/api/projects"
-				body, _ = json.Marshal(map[string]string{"name": p.Arguments.Name, "requestId": p.Arguments.RequestID})
+				createBody := map[string]any{"name": p.Arguments.Name, "requestId": p.Arguments.RequestID}
+				if p.Arguments.ProductionProfile != nil {
+					createBody["productionProfile"] = *p.Arguments.ProductionProfile
+				}
+				body, _ = json.Marshal(createBody)
 			case "video_asset_list":
 				path += "/assets"
 			case "video_asset_import":

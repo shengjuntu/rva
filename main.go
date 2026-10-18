@@ -28,7 +28,7 @@ import (
 	"time"
 )
 
-const version = "0.24.0"
+const version = "0.25.0"
 
 //go:embed web/*
 var ui embed.FS
@@ -114,6 +114,8 @@ type Project struct {
 	Assets              []Asset                 `json:"assets"`
 	Renders             []Render                `json:"renders"`
 	WorkspaceID         string                  `json:"workspaceId"`
+	RuntimeBinding      *ProjectRuntimeBinding  `json:"runtimeBinding,omitempty"`
+	ProductionProfile   *string                 `json:"productionProfile,omitempty"`
 	SessionID           string                  `json:"sessionId"`
 	Updated             string                  `json:"updated"`
 	ToolsVersion        string                  `json:"toolsVersion,omitempty"`
@@ -134,6 +136,7 @@ type App struct {
 	speechJobs                                               map[string]context.CancelFunc
 	mu                                                       sync.Mutex
 	data, rd, token, rdToken, hf, font, gsap, public, mcpURL string
+	productionProfile                                        string
 	cfg                                                      Config
 	projects                                                 map[string]*Project
 	jobs                                                     map[string]context.CancelFunc
@@ -279,6 +282,9 @@ var errCreateRequestConflict = errors.New("同一requestId不能用于不同新�
 
 func (a *App) create(name string) (Project, error) { return a.createRequested(name, "") }
 func (a *App) createRequested(name, requestID string) (Project, error) {
+	return a.createRequestedProfile(name, requestID, nil)
+}
+func (a *App) createRequestedProfile(name, requestID string, requestedProfile *string) (Project, error) {
 	name = strings.TrimSpace(name)
 	if name == "" || len([]rune(name)) > 80 {
 		return Project{}, errors.New("项目名不能为空，最多 80 字")
@@ -289,6 +295,16 @@ func (a *App) createRequested(name, requestID string) (Project, error) {
 		return Project{}, errors.New("新建项目requestId无效")
 	}
 	requestHash := hashBytes([]byte(name))
+	if requestedProfile != nil {
+		if !validProductionProfile(*requestedProfile) {
+			return Project{}, errors.New("productionProfile必须为合法的RunDesk preset ID；空字符串表示原默认环境")
+		}
+		raw, _ := json.Marshal(struct {
+			Name              string `json:"name"`
+			ProductionProfile string `json:"productionProfile"`
+		}{name, *requestedProfile})
+		requestHash = hashBytes(raw)
+	}
 	if requestID != "" {
 		for _, old := range a.projects {
 			if old.CreationRequestID == requestID {
@@ -300,7 +316,14 @@ func (a *App) createRequested(name, requestID string) (Project, error) {
 		}
 	}
 	wf := newProjectWorkflow()
-	p := Project{Workflow: &wf, CreationRequestID: requestID, CreationRequestHash: requestHash, ID: uid(), Name: name, Revision: 1, Shots: []Shot{}, Assets: []Asset{}, Renders: []Render{}}
+	profile := a.productionProfile
+	if requestedProfile != nil {
+		profile = *requestedProfile
+	}
+	if !validProductionProfile(profile) {
+		return Project{}, errors.New("默认制作环境preset ID无效")
+	}
+	p := Project{ProductionProfile: &profile, Workflow: &wf, CreationRequestID: requestID, CreationRequestHash: requestHash, ID: uid(), Name: name, Revision: 1, Shots: []Shot{}, Assets: []Asset{}, Renders: []Render{}}
 	if e := os.MkdirAll(filepath.Join(a.dir(p.ID), "workspace", "assets"), 0700); e != nil {
 		return p, e
 	}
@@ -475,13 +498,14 @@ func (a *App) routes() http.Handler {
 	})
 	m.HandleFunc("POST /api/projects", func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
-			Name      string `json:"name"`
-			RequestID string `json:"requestId"`
+			Name              string  `json:"name"`
+			RequestID         string  `json:"requestId"`
+			ProductionProfile *string `json:"productionProfile"`
 		}
 		if !decode(w, r, &in) {
 			return
 		}
-		p, e := a.createRequested(in.Name, in.RequestID)
+		p, e := a.createRequestedProfile(in.Name, in.RequestID, in.ProductionProfile)
 		if e != nil {
 			if errors.Is(e, errCreateRequestConflict) {
 				fail(w, 409, e)
@@ -705,7 +729,7 @@ func (a *App) environment(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
 	instanceID := a.cfg.InstanceID
 	a.mu.Unlock()
-	writeJSON(w, 200, map[string]any{"version": version, "checks": checks, "rundeskReady": e == nil, "rundeskError": errText(e), "rundesk": meta, "rundeskURL": a.rd, "instanceId": instanceID, "data": a.data})
+	writeJSON(w, 200, map[string]any{"version": version, "checks": checks, "rundeskReady": e == nil, "rundeskError": errText(e), "rundesk": meta, "rundeskURL": a.rd, "instanceId": instanceID, "productionProfile": a.productionProfile, "data": a.data})
 }
 func errText(e error) string {
 	if e == nil {
@@ -732,15 +756,19 @@ func main() {
 	font := flag.String("font", "", "local Chinese font file")
 	gsap := flag.String("gsap", "", "local gsap.min.js file")
 	espeak := flag.String("espeak", "", "local espeak-ng executable (defaults to PATH)")
+	productionProfile := flag.String("production-profile", os.Getenv("VIDEO_PRODUCTION_PROFILE"), "RunDesk administrator-approved runtime preset ID for newly created projects")
 	flag.Parse()
-	if e := serve(serverOptions{Data: *data, Listen: *listen, RunDesk: *rd, HyperFrames: *hf, Font: *font, GSAP: *gsap, ESpeak: *espeak}); e != nil {
+	if e := serve(serverOptions{Data: *data, Listen: *listen, RunDesk: *rd, HyperFrames: *hf, Font: *font, GSAP: *gsap, ESpeak: *espeak, ProductionProfile: *productionProfile}); e != nil {
 		log.Fatal(e)
 	}
 }
 
-type serverOptions struct{ Data, Listen, RunDesk, HyperFrames, Font, GSAP, ESpeak string }
+type serverOptions struct{ Data, Listen, RunDesk, HyperFrames, Font, GSAP, ESpeak, ProductionProfile string }
 
 func serve(opts serverOptions) error {
+	if !validProductionProfile(opts.ProductionProfile) {
+		return errors.New("--production-profile / VIDEO_PRODUCTION_PROFILE 必须是合法的 RunDesk preset ID，不接受镜像、地址或文件路径")
+	}
 	host, _, e := net.SplitHostPort(opts.Listen)
 	if e != nil || net.ParseIP(host) == nil {
 		return errors.New("--listen must use an IP address and port")
@@ -757,6 +785,7 @@ func serve(opts serverOptions) error {
 	if e != nil {
 		return e
 	}
+	a.productionProfile = opts.ProductionProfile
 	a.rd = strings.TrimSuffix(strings.TrimSuffix(strings.TrimRight(opts.RunDesk, "/"), "/api/v1"), "/api")
 	u, e := url.Parse(a.rd)
 	if e != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {

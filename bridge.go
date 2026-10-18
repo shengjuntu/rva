@@ -79,7 +79,27 @@ func (a *App) connect(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	if e = a.requireV1(r.Context()); e != nil {
+	a.mu.Lock()
+	cfg := a.cfg
+	a.mu.Unlock()
+	legacyCheckedID := ""
+	if p.RuntimeBinding == nil && p.SessionID != "" && !cfg.ManagedByRunDesk && cfg.InstanceID != "" {
+		if e = a.requireV1(r.Context()); e != nil {
+			fail(w, 409, e)
+			return
+		}
+		if e = a.checkLegacyMigrationBusy(r.Context(), cfg.InstanceID); e != nil {
+			fail(w, 409, e)
+			return
+		}
+		legacyCheckedID = cfg.InstanceID
+	}
+	selected, e := a.connectionBinding(r.Context(), p, cfg)
+	if e != nil {
+		fail(w, 409, e)
+		return
+	}
+	if e = a.requireV1ForPreset(r.Context(), selected.PresetID); e != nil {
 		fail(w, 409, e)
 		return
 	}
@@ -102,27 +122,17 @@ func (a *App) connect(w http.ResponseWriter, r *http.Request) {
 		a.cfg.InstallationID = uid()
 		e = atomicJSON(filepath.Join(a.data, "config.json"), a.cfg)
 	}
-	installationID, iid := a.cfg.InstallationID, a.cfg.InstanceID
+	installationID, iid := a.cfg.InstallationID, selected.InstanceID
 	a.mu.Unlock()
 	if e != nil {
 		fail(w, 500, e)
 		return
 	}
 	// Migrating an old app must not change capabilities during an active turn.
-	if iid != "" && !a.cfg.ManagedByRunDesk {
-		var sessions []struct {
-			InstanceID string `json:"instanceId"`
-			Status     string `json:"status"`
-		}
-		if e = a.rdCall(r.Context(), "GET", "/sessions", nil, &sessions); e != nil {
-			fail(w, 502, e)
+	if iid != "" && !selected.ManagedByRunDesk && iid != legacyCheckedID {
+		if e = a.checkLegacyMigrationBusy(r.Context(), iid); e != nil {
+			fail(w, 409, e)
 			return
-		}
-		for _, ss := range sessions {
-			if ss.InstanceID == iid && (ss.Status == "running" || ss.Status == "waiting" || ss.Status == "starting" || ss.Status == "stopping") {
-				fail(w, 409, errors.New("请等待旧应用当前任务结束后迁移连接"))
-				return
-			}
 		}
 	}
 	base := a.public
@@ -141,35 +151,62 @@ func (a *App) connect(w http.ResponseWriter, r *http.Request) {
 		Application struct {
 			InstanceID  string `json:"instanceId"`
 			WorkspaceID string `json:"workspaceId"`
+			PresetID    string `json:"presetId"`
 		} `json:"application"`
-		Status  string `json:"status"`
-		Message string `json:"message"`
+		PresetID string `json:"presetId"`
+		Status   string `json:"status"`
+		Message  string `json:"message"`
 	}
-	e = a.rdCall(r.Context(), "POST", "/applications/rundesk-video-app/connect", map[string]any{
+	connectBody := map[string]any{
 		"name": "视频制作", "description": "读取视频项目与素材，编写脚本、分镜并保存项目；按用户要求制作视频。任务须提供 projectId。",
-		"installationId": installationID, "instanceId": iid, "workspaceId": p.WorkspaceID, "entryUrl": base,
+		"installationId": installationID, "instanceId": iid, "workspaceId": selected.WorkspaceID, "entryUrl": base,
 		"defaults": map[string]any{"skills": installedProductionSkills(), "mcp": map[string]any{"video_project": map[string]any{"url": callback, "http_headers": map[string]string{"Authorization": "Bearer " + a.token}, "enabled": true}}},
-	}, &binding)
+	}
+	if selected.PresetID != "" {
+		connectBody["presetId"] = selected.PresetID
+	}
+	e = a.rdCall(r.Context(), "POST", "/applications/rundesk-video-app/connect", connectBody, &binding)
 	if e != nil {
 		fail(w, 502, e)
 		return
 	}
-	iid = binding.Application.InstanceID
-	a.mu.Lock()
-	a.cfg.InstanceID = iid
-	a.cfg.WorkspaceID = binding.Application.WorkspaceID
-	a.cfg.SkillPath = ""
-	a.cfg.ManagedByRunDesk = true
-	e = atomicJSON(filepath.Join(a.data, "config.json"), a.cfg)
-	a.mu.Unlock()
-	if e != nil {
-		fail(w, 500, e)
+	if binding.Application.InstanceID == "" || binding.Application.WorkspaceID == "" || binding.PresetID != selected.PresetID || binding.Application.PresetID != selected.PresetID {
+		fail(w, 409, errors.New("RunDesk 返回的制作环境预设或绑定无效，未切换到其他环境"))
 		return
 	}
-	if p.WorkspaceID == "" {
+	if p.RuntimeBinding != nil || p.SessionID != "" && selected.ManagedByRunDesk {
+		if selected.InstanceID != binding.Application.InstanceID || selected.WorkspaceID != binding.Application.WorkspaceID {
+			fail(w, 409, errors.New("RunDesk 项目原实例或工作区已改变，未迁移原会话"))
+			return
+		}
+	}
+	iid = binding.Application.InstanceID
+	// Initialize only the original legacy default on a fresh installation. A
+	// preset or later project must never overwrite an existing global pair.
+	if selected.PresetID == "" {
+		a.mu.Lock()
+		if a.cfg.InstanceID == "" {
+			next := a.cfg
+			next.InstanceID, next.WorkspaceID = iid, binding.Application.WorkspaceID
+			next.ManagedByRunDesk, next.SkillPath = true, ""
+			e = atomicJSON(filepath.Join(a.data, "config.json"), next)
+			if e == nil {
+				a.cfg = next
+			}
+		}
+		a.mu.Unlock()
+		if e != nil {
+			fail(w, 500, e)
+			return
+		}
+	}
+	// Freeze the project pair before any session side effect. Never replace the
+	// App's global legacy instance when a different project selects a preset.
+	if p.RuntimeBinding == nil {
 		a.mu.Lock()
 		q := clone(a.projects[id])
 		q.WorkspaceID = binding.Application.WorkspaceID
+		q.RuntimeBinding = &ProjectRuntimeBinding{PresetID: selected.PresetID, InstanceID: iid, WorkspaceID: q.WorkspaceID, ManagedByRunDesk: true}
 		e = a.save(&q)
 		if e == nil {
 			a.projects[id] = &q
@@ -200,7 +237,7 @@ func (a *App) connect(w http.ResponseWriter, r *http.Request) {
 			fail(w, 502, e)
 			return
 		}
-		runtime, err := a.runtime(r.Context())
+		runtime, err := a.runtimeForProject(r.Context(), &p)
 		if err != nil {
 			fail(w, 409, err)
 			return
@@ -224,9 +261,22 @@ func (a *App) connect(w http.ResponseWriter, r *http.Request) {
 		var ss struct {
 			ID string `json:"id"`
 		}
-		e = a.rdOperation(r.Context(), sessionScope, "/sessions", map[string]any{"workspaceId": p.WorkspaceID, "instanceId": iid, "title": "视频 · " + p.Name, "source": map[string]string{"kind": "application", "appId": "rundesk-video-app", "taskId": p.ID}}, &ss, false, true)
+		source := map[string]string{"kind": "application", "appId": "rundesk-video-app", "taskId": p.ID}
+		if selected.PresetID != "" {
+			source["presetId"] = selected.PresetID
+		}
+		sessionBody := map[string]any{"workspaceId": p.WorkspaceID, "instanceId": iid, "title": "视频 · " + p.Name, "source": source}
+		if e = a.validateSessionOperationBinding(sessionScope, *p.RuntimeBinding); e != nil {
+			fail(w, 409, e)
+			return
+		}
+		e = a.rdOperation(r.Context(), sessionScope, "/sessions", sessionBody, &ss, false, true)
 		if e != nil {
 			fail(w, 502, e)
+			return
+		}
+		if ss.ID == "" {
+			fail(w, 409, uncertain("RunDesk 会话创建回执缺少会话编号，保留原请求等待核对"))
 			return
 		}
 		a.mu.Lock()
@@ -323,8 +373,13 @@ func (a *App) message(w http.ResponseWriter, r *http.Request) {
 		}
 		if in.ExpectedTurnID != "" {
 			var current struct {
-				RunID  string `json:"runId"`
-				TurnID string `json:"turnId"`
+				RunID       string `json:"runId"`
+				TurnID      string `json:"turnId"`
+				InstanceID  string `json:"instanceId"`
+				WorkspaceID string `json:"workspaceId"`
+				Source      struct {
+					PresetID string `json:"presetId"`
+				} `json:"source"`
 			}
 			if e = a.rdCall(r.Context(), "GET", "/sessions/"+p.SessionID, nil, &current); e != nil {
 				fail(w, 502, e)
@@ -334,9 +389,13 @@ func (a *App) message(w http.ResponseWriter, r *http.Request) {
 				fail(w, 409, &RunDeskError{Status: 409, Code: "run_conflict", Message: "运行已改变，请刷新并核对当前任务"})
 				return
 			}
+			if p.RuntimeBinding != nil && (current.InstanceID != p.RuntimeBinding.InstanceID || current.WorkspaceID != p.RuntimeBinding.WorkspaceID || current.Source.PresetID != p.RuntimeBinding.PresetID) {
+				fail(w, 409, errors.New("当前会话不属于项目保存的制作环境，未发送补充指令"))
+				return
+			}
 		}
 		if e = a.saveAgent(p.ID, func(q *Project) {
-			q.AgentSubmission = &AgentSubmission{Skills: in.Skills, ID: in.RequestID, Text: in.Text, TurnID: in.ExpectedTurnID, RunID: q.AgentRunID, State: "pending"}
+			q.AgentSubmission = &AgentSubmission{SessionID: q.SessionID, RuntimeBinding: cloneRuntimeBinding(q.RuntimeBinding), Skills: in.Skills, ID: in.RequestID, Text: in.Text, TurnID: in.ExpectedTurnID, RunID: q.AgentRunID, State: "pending"}
 		}); e != nil {
 			fail(w, 500, e)
 			return

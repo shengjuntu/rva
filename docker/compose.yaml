@@ -1,7 +1,7 @@
 name: rundesk-video
 services:
   video-app:
-    image: ${VIDEO_IMAGE:-rundesk-video-app:0.24.0}
+    image: ${VIDEO_IMAGE:-rundesk-video-app:0.25.0}
     build:
       context: ..
       dockerfile: docker/Dockerfile
@@ -26,6 +26,8 @@ services:
       VIDEO_APP_MCP_URL: ${VIDEO_APP_MCP_URL:-http://host.docker.internal:3220/api/mcp}
       RUNDESK_URL: ${RUNDESK_URL:-http://127.0.0.1:3210}
       RUNDESK_TOKEN: ${RUNDESK_TOKEN:-}
+      VIDEO_PRODUCTION_PROFILE: ${VIDEO_PRODUCTION_PROFILE:-}
+      VIDEO_EXCHANGE_ROOTS: ${VIDEO_EXCHANGE_ROOTS:-}
       VIDEO_TTS_BACKEND: ${VIDEO_TTS_BACKEND:-}
       VIDEO_TTS_URL: ${VIDEO_TTS_URL:-}
       VIDEO_TTS_MODEL: ${VIDEO_TTS_MODEL:-}

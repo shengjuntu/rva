@@ -1,3 +1,9 @@
+# v0.25.0 项目绑定命名制作环境
+
+RunDesk 0.50.0 管理多个批准的 Codex Docker 预设，每个预设固定独立实例与工作区。App 启动默认只影响新项目，项目保存 productionProfile 和实际 runtimeBinding，后续制作、对话、诊断与回执恢复始终核对原绑定。详细配置及 video_use 按工作区隔离的共享目录见 [PRODUCTION-PROFILES](PRODUCTION-PROFILES.md)。日常页面保持导入、一键初稿、查看、对话与导出。
+
+以下保留生成服务与既有工程协议。
+
 # v0.24.0 统一生成服务与简洁制作入口
 
 生成任务可以调用通用 http_binary_v1 服务，或内置 ComfyUI MiniMax-H3 Go 客户端。H3模型仍在独立 ComfyUI 服务中运行；App负责提交、查询、实际媒体校验、生成来源与素材归档。两种视频提供方共用现有环境配置槽位，不新增 Agent 编排循环。IndexTTS 和简洁工作台沿用既有接口，RunDesk负责执行与详细轨迹。

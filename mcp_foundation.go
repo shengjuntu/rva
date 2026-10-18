@@ -96,8 +96,8 @@ func validateFoundationArguments(name string, params json.RawMessage) error {
 	case "video_capabilities_get":
 		allowed = []string{"probe"}
 	case "video_project_create":
-		allowed = []string{"name", "requestId"}
-		required = allowed
+		allowed = []string{"name", "requestId", "productionProfile"}
+		required = []string{"name", "requestId"}
 	case "video_asset_list", "video_job_list":
 		allowed = []string{"projectId"}
 		required = allowed

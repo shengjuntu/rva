@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 	"strings"
 )
 
@@ -181,14 +182,29 @@ func installedProductionSkills() map[string]any {
 }
 func (a *App) resolveProductionSkills(ctx context.Context, p Project) ([]map[string]string, error) {
 	var cfg struct {
-		Skills []struct {
+		AppID       string `json:"appId"`
+		PresetID    string `json:"presetId"`
+		InstanceID  string `json:"instanceId"`
+		WorkspaceID string `json:"workspaceId"`
+		Skills      []struct {
 			Name    string `json:"name"`
 			Path    string `json:"path"`
 			Enabled bool   `json:"enabled"`
 		} `json:"skills"`
 	}
-	if e := a.rdCall(ctx, "GET", "/instances/"+a.cfg.InstanceID+"/configuration", nil, &cfg); e != nil {
+	binding := a.projectRuntimeBinding(&p)
+	if binding.InstanceID == "" {
+		return nil, errors.New("项目尚未保存 RunDesk 实例绑定")
+	}
+	path := "/instances/" + binding.InstanceID + "/configuration"
+	if binding.PresetID != "" {
+		path = "/applications/rundesk-video-app/runtime/skills?presetId=" + url.QueryEscape(binding.PresetID)
+	}
+	if e := a.rdCall(ctx, "GET", path, nil, &cfg); e != nil {
 		return nil, e
+	}
+	if binding.PresetID != "" && (cfg.AppID != "rundesk-video-app" || cfg.PresetID != binding.PresetID || cfg.InstanceID != binding.InstanceID || cfg.WorkspaceID != binding.WorkspaceID) {
+		return nil, errors.New("RunDesk 返回的 Skill 路径不属于项目保存的制作环境")
 	}
 	ids := append([]string{"video-project"}, p.AgentSubmission.Skills...)
 	refs := []map[string]string{}

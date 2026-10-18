@@ -5,12 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
 )
 
 var videoTools = []string{"video_hyperframes_get", "video_hyperframes_update", "video_hyperframes_check", "video_review_timeline_get", "rundesk_diagnostic_image", "video_runtime_diagnose", "video_edit_locate", "video_media_alignment_get", "video_media_alignment_update", "video_asset_video_inspect", "video_production_run_prepare", "video_production_run_get", "video_production_run_ingest", "video_production_board_get", "video_production_checkpoint", "video_render_inspect", "video_final_verify", "video_final_get", "video_final_save", "video_edit_redo", "video_edit_patch_preview", "video_edit_patch_apply", "video_edit_undo", "video_asset_describe", "video_media_align", "video_narration_update", "video_speech_materialize", "video_edit_get", "video_edit_validate", "video_edit_update", "video_edit_activate", "video_project_create", "video_production_text", "video_production_stage", "video_capabilities_get", "video_asset_list", "video_asset_import", "video_asset_inspect", "video_job_start", "video_job_get", "video_job_list", "video_job_cancel", "video_project_get", "video_news_get", "video_project_update", "video_news_audio_adopt", "video_subtitles_update", "video_speech_start", "video_speech_stop", "video_speech_adopt", "video_render_start", "video_render_stop"}
 
 type runtimeView struct {
 	AppID         string `json:"appId"`
+	PresetID      string `json:"presetId,omitempty"`
 	InstanceID    string `json:"instanceId"`
 	WorkspaceID   string `json:"workspaceId"`
 	ExecutionMode string `json:"executionMode"`
@@ -27,31 +29,43 @@ type runtimeView struct {
 }
 
 func (a *App) runtime(ctx context.Context) (runtimeView, error) {
+	return a.runtimeForProject(ctx, nil)
+}
+func (a *App) runtimeForProject(ctx context.Context, p *Project) (runtimeView, error) {
 	var v runtimeView
-	a.mu.Lock()
-	cfg := a.cfg
-	a.mu.Unlock()
-	if cfg.InstanceID == "" {
+	if p != nil && p.ID != "" && p.RuntimeBinding == nil && p.SessionID == "" {
+		return v, errors.New("项目尚未绑定制作环境，请先连接 RunDesk；未使用其他项目或原默认环境")
+	}
+	binding := a.projectRuntimeBinding(p)
+	if binding.InstanceID == "" {
 		return v, errors.New("请先打开项目并连接 RunDesk，再在 RunDesk 为视频应用选择运行环境")
 	}
-	if e := a.rdCall(ctx, "GET", "/applications/rundesk-video-app/runtime", nil, &v); e != nil {
+	path := "/applications/rundesk-video-app/runtime"
+	if binding.PresetID != "" {
+		if e := a.requireV1ForPreset(ctx, binding.PresetID); e != nil {
+			return v, e
+		}
+		path += "?presetId=" + url.QueryEscape(binding.PresetID)
+	}
+	if e := a.rdCall(ctx, "GET", path, nil, &v); e != nil {
 		return v, e
 	}
-	if v.AppID != "rundesk-video-app" || v.InstanceID != cfg.InstanceID || v.WorkspaceID == "" || cfg.WorkspaceID != "" && cfg.WorkspaceID != v.WorkspaceID {
+	if v.AppID != "rundesk-video-app" || v.PresetID != binding.PresetID || v.InstanceID != binding.InstanceID || v.WorkspaceID == "" || binding.WorkspaceID != "" && binding.WorkspaceID != v.WorkspaceID || p != nil && p.WorkspaceID != "" && p.WorkspaceID != v.WorkspaceID {
 		return v, errors.New("RunDesk 应用绑定已改变，请先核对并重新连接项目")
 	}
 	return v, nil
 }
 
 func (a *App) prepareRuntime(ctx context.Context, p *Project) (runtimeView, error) {
-	a.mu.Lock()
-	managed := a.cfg.ManagedByRunDesk
-	a.mu.Unlock()
+	if p != nil && p.ID != "" && p.RuntimeBinding == nil && p.SessionID == "" {
+		return runtimeView{}, errors.New("项目尚未绑定制作环境，请先连接 RunDesk；未准备其他项目或原默认环境")
+	}
+	binding := a.projectRuntimeBinding(p)
 	// Preserve the old unmanaged adapter until the user migrates its connection.
-	if !managed {
+	if !binding.ManagedByRunDesk {
 		return runtimeView{ExecutionMode: "local"}, nil
 	}
-	v, e := a.runtime(ctx)
+	v, e := a.runtimeForProject(ctx, p)
 	if e != nil {
 		return v, e
 	}
@@ -81,11 +95,15 @@ func (a *App) prepareRuntime(ctx context.Context, p *Project) (runtimeView, erro
 		return v, errors.New("不支持的运行环境")
 	}
 	iid, wid := v.InstanceID, v.WorkspaceID
-	e = a.rdCall(ctx, "POST", "/applications/rundesk-video-app/runtime/prepare", map[string]any{"instanceId": iid, "workspaceId": wid, "probe": true}, &v)
+	body := map[string]any{"instanceId": iid, "workspaceId": wid, "probe": true}
+	if binding.PresetID != "" {
+		body["presetId"] = binding.PresetID
+	}
+	e = a.rdCall(ctx, "POST", "/applications/rundesk-video-app/runtime/prepare", body, &v)
 	if e != nil {
 		return v, e
 	}
-	if v.AppID != "rundesk-video-app" || v.InstanceID != iid || v.WorkspaceID != wid || v.ExecutionMode != "docker" || v.Environment == nil || v.Environment.State != "running" || v.Environment.PendingUpdate {
+	if v.AppID != "rundesk-video-app" || v.PresetID != binding.PresetID || v.InstanceID != iid || v.WorkspaceID != wid || v.ExecutionMode != "docker" || v.Environment == nil || v.Environment.State != "running" || v.Environment.PendingUpdate {
 		return v, errors.New("Docker 环境尚未就绪或配置已改变，请在 RunDesk 检查")
 	}
 	if !v.Probed || !v.AccountReady {
@@ -121,7 +139,12 @@ func (a *App) prepareRuntime(ctx context.Context, p *Project) (runtimeView, erro
 }
 
 func (a *App) runtimeStatus(w http.ResponseWriter, r *http.Request) {
-	v, e := a.runtime(r.Context())
+	p, e := a.runtimeRequestProject(r)
+	if e != nil {
+		fail(w, 404, e)
+		return
+	}
+	v, e := a.runtimeForProject(r.Context(), p)
 	if e != nil {
 		fail(w, 409, e)
 		return
@@ -131,10 +154,26 @@ func (a *App) runtimeStatus(w http.ResponseWriter, r *http.Request) {
 func (a *App) runtimePrepare(w http.ResponseWriter, r *http.Request) {
 	a.bridgeMu.Lock()
 	defer a.bridgeMu.Unlock()
-	v, e := a.prepareRuntime(r.Context(), nil)
+	p, e := a.runtimeRequestProject(r)
+	if e != nil {
+		fail(w, 404, e)
+		return
+	}
+	v, e := a.prepareRuntime(r.Context(), p)
 	if e != nil {
 		fail(w, 409, e)
 		return
 	}
 	writeJSON(w, 200, v)
+}
+func (a *App) runtimeRequestProject(r *http.Request) (*Project, error) {
+	id := r.URL.Query().Get("projectId")
+	if id == "" {
+		return nil, nil
+	}
+	p, err := a.get(id)
+	if err != nil {
+		return nil, err
+	}
+	return &p, nil
 }

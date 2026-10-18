@@ -16,4 +16,4 @@ git fetch /absolute/path/merge/rva-v0.24.0.bundle refs/heads/merge/rva-indextts-
 git switch integration/video-app-v0.24.0
 ```
 
-如果当前 master 仍是 `065e4c7`，本集成分支是其直接后继。若之后已有新提交，正常合并并解决实际冲突，不强制覆盖仓库。当前环境可读取 GitHub，但没有写入凭据；未推送远端 master 或其他分支。交付包附带 bundle，供原仓库导入与审阅。
+如果当前 master 仍是 `065e4c7`，本集成分支是其直接后继。若之后已有新提交，正常合并并解决实际冲突，不强制覆盖仓库。该离线交付包生成时尚未推送，随后按用户授权将 a3e8d20 推送到了原仓库 master。包中 bundle 保留为离线导入与审阅材料。

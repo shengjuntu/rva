@@ -97,6 +97,9 @@ func (a *App) rdCall(ctx context.Context, method, path string, body, out any) er
 	return a.rdRequest(ctx, method, path, body, "", out)
 }
 func (a *App) requireV1(ctx context.Context) error {
+	return a.requireV1ForPreset(ctx, "")
+}
+func (a *App) requireV1ForPreset(ctx context.Context, presetID string) error {
 	var meta struct {
 		APIVersions  []string `json:"apiVersions"`
 		Capabilities []string `json:"capabilities"`
@@ -114,6 +117,9 @@ func (a *App) requireV1(ctx context.Context) error {
 	}
 	if !has(meta.APIVersions, "v1") || !has(meta.Capabilities, "idempotency") || !has(meta.Capabilities, "configuration-summary") || !has(meta.Capabilities, "application-connect") || !has(meta.Capabilities, "application-runtime") {
 		return errors.New("需要支持应用注册、Docker 准备和 API v1 回执的 RunDesk；请使用 0.48.0 或更新版本")
+	}
+	if presetID != "" && !has(meta.Capabilities, "application-runtime-presets") {
+		return &RunDeskError{Status: 409, Code: "production_profile_unsupported", Message: "当前 RunDesk 不支持制作环境预设；请升级至支持 application-runtime-presets 的版本，未回退到默认环境"}
 	}
 	return nil
 }
@@ -232,15 +238,17 @@ func (a *App) rdOperation(ctx context.Context, scope, path string, body any, out
 }
 
 type AgentSubmission struct {
-	Skills          []string        `json:"skills,omitempty"`
-	ID              string          `json:"id"`
-	Text            string          `json:"text"`
-	TurnID          string          `json:"turnId,omitempty"`
-	RunID           string          `json:"runId,omitempty"`
-	State           string          `json:"state"`
-	Error           string          `json:"error,omitempty"`
-	CancelRequested bool            `json:"cancelRequested,omitempty"`
-	Body            json.RawMessage `json:"body,omitempty"`
+	SessionID       string                 `json:"sessionId,omitempty"`
+	RuntimeBinding  *ProjectRuntimeBinding `json:"runtimeBinding,omitempty"`
+	Skills          []string               `json:"skills,omitempty"`
+	ID              string                 `json:"id"`
+	Text            string                 `json:"text"`
+	TurnID          string                 `json:"turnId,omitempty"`
+	RunID           string                 `json:"runId,omitempty"`
+	State           string                 `json:"state"`
+	Error           string                 `json:"error,omitempty"`
+	CancelRequested bool                   `json:"cancelRequested,omitempty"`
+	Body            json.RawMessage        `json:"body,omitempty"`
 }
 
 func (a *App) saveAgent(id string, update func(*Project)) error {
@@ -263,6 +271,10 @@ func (a *App) recoverAgent(ctx context.Context, p Project, allowSend bool) (any,
 	if pending == nil || (pending.State != "pending" && pending.State != "accepted") {
 		return nil, nil
 	}
+	binding := a.projectRuntimeBinding(&p)
+	if pending.SessionID != "" && pending.SessionID != p.SessionID || pending.RuntimeBinding != nil && *pending.RuntimeBinding != binding {
+		return nil, uncertain("原消息属于保存的制作环境或会话，未在其他环境恢复提交")
+	}
 	suffix := "/turns"
 	productionRoute := "当前后端 native：素材通过 assetId 引用；读取当前原生工程，按实际支持的 DSL/模板能力修改，通过 video_job_start(type=render) 或 video_render_start 渲染，不假设支持自由动画。"
 	switch workflowFor(p).EditingBackend {
@@ -272,8 +284,8 @@ func (a *App) recoverAgent(ctx context.Context, p Project, allowSend bool) (any,
 		productionRoute = "当前后端 video_use：需要冻结已准备的配音和文字素材关联时调用 video_production_run_prepare，按返回的相对路径读取共享目录快照，在 work/edl.json 编排，运行适配器并调用 video_production_run_ingest 归档。以该 EDL 为剪辑依据；不要另写原生 DSL 或调用 video_render_start。"
 	}
 	body := map[string]any{"text": fmt.Sprintf("[Video App projectId=%s requestId=%s] 先读取项目当前 revision、已有工程和产物；自主选择必要工具与执行顺序。素材准备和对齐、剪辑、精修是产物记录和审阅视图，可以交错、重复或局部返回，不是固定步骤或审批。执行后检查实际结果；发现可修复问题就修订并重做，不把工具成功当作质量合格，真实阻塞和未执行的检查须说明。局部修改只处理受影响部分，保留无关且已满意的内容，不要求重走全部流程。通过业务工具保存真实产物与检查记录。%s\n用户要求：\n%s", p.ID, pending.ID, productionRoute, pending.Text), "files": []string{}, "skills": []any{}}
-	if !a.cfg.ManagedByRunDesk && a.cfg.SkillPath != "" {
-		body["skills"] = []map[string]string{{"name": "video-project", "path": a.cfg.SkillPath}}
+	if !binding.ManagedByRunDesk && binding.SkillPath != "" {
+		body["skills"] = []map[string]string{{"name": "video-project", "path": binding.SkillPath}}
 	}
 	if pending.TurnID != "" {
 		suffix = "/steer"
@@ -281,7 +293,7 @@ func (a *App) recoverAgent(ctx context.Context, p Project, allowSend bool) (any,
 		body["requestId"] = pending.ID
 	}
 	if len(pending.Body) == 0 {
-		if len(pending.Skills) > 0 && a.cfg.ManagedByRunDesk {
+		if len(pending.Skills) > 0 && binding.ManagedByRunDesk {
 			refs, err := a.resolveProductionSkills(ctx, p)
 			if err != nil {
 				return nil, err
