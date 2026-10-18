@@ -22,6 +22,7 @@ import (
 const speechSampleRate = 24000
 
 type SpeechJob struct {
+	Source      string              `json:"source,omitempty"`
 	Backend     string              `json:"backend,omitempty"`
 	Model       string              `json:"model,omitempty"`
 	Language    string              `json:"language,omitempty"`
@@ -42,6 +43,7 @@ type SpeechJob struct {
 	Files       map[string]NewsFile `json:"files,omitempty"`
 }
 type SpeechRequest struct {
+	Source    string  `json:"source,omitempty"`
 	Backend   string  `json:"backend,omitempty"`
 	Language  string  `json:"language,omitempty"`
 	Speed     float64 `json:"speed,omitempty"`
@@ -217,8 +219,15 @@ func (a *App) startSpeech(w http.ResponseWriter, r *http.Request) {
 		fail(w, 409, errors.New("当前项目已达 100 个配音任务，请使用新项目"))
 		return
 	}
+	snapshot := clone(p)
+	if in.Source == "narration" {
+		snapshot.Shots = narrationShots(p.NarrationText)
+	} else if in.Source != "" && in.Source != "shots" {
+		fail(w, 400, errors.New("source 必须为 narration 或 shots"))
+		return
+	}
 	total := 0
-	for _, s := range p.Shots {
+	for _, s := range snapshot.Shots {
 		total += len(speechChunks(s.Text))
 	}
 	if total == 0 || total > 300 {
@@ -246,11 +255,10 @@ func (a *App) startSpeech(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	job := SpeechJob{Backend: in.Backend, Language: in.Language, Speed: in.Speed, RequestHash: requestHash, ID: uid(), RequestID: in.RequestID, Revision: p.Revision, State: "running", Created: time.Now().UTC().Format(time.RFC3339Nano), Voice: in.Voice, Rate: in.Rate, ScriptHash: speechScriptHash(*p), Total: total}
+	job := SpeechJob{Source: in.Source, Backend: in.Backend, Language: in.Language, Speed: in.Speed, RequestHash: requestHash, ID: uid(), RequestID: in.RequestID, Revision: p.Revision, State: "running", Created: time.Now().UTC().Format(time.RFC3339Nano), Voice: in.Voice, Rate: in.Rate, ScriptHash: speechScriptHash(snapshot), Total: total}
 	if in.Backend == "indextts" {
 		job.Model = cfg.Model
 	}
-	snapshot := clone(p)
 	dir := a.speechDir(p.ID, job.ID)
 	if e = os.MkdirAll(dir, 0700); e != nil {
 		fail(w, 500, e)
@@ -632,6 +640,10 @@ func (a *App) adoptSpeech(w http.ResponseWriter, r *http.Request) {
 	job, e := findSpeech(p, r.PathValue("sid"))
 	if e != nil {
 		fail(w, 404, e)
+		return
+	}
+	if job.Source == "narration" {
+		fail(w, 409, errors.New("独立口播请使用 materialize，不覆盖旧分镜"))
 		return
 	}
 	if job.State != "completed" || job.ScriptHash != speechScriptHash(p) {

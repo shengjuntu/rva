@@ -36,6 +36,7 @@ type ProductionJob struct {
 	Artifacts      []JobArtifact `json:"artifacts"`
 }
 type JobOptions struct {
+	Source   string  `json:"source,omitempty"`
 	Backend  string  `json:"backend,omitempty"`
 	Voice    string  `json:"voice,omitempty"`
 	Language string  `json:"language,omitempty"`
@@ -188,9 +189,9 @@ func (a *App) jobStart(w http.ResponseWriter, r *http.Request) {
 			fail(w, 400, errors.New("TTS不接受渲染kind"))
 			return
 		}
-		native = SpeechRequest{Revision: in.Revision, RequestID: in.RequestID, Backend: in.Options.Backend, Voice: in.Options.Voice, Language: in.Options.Language, Speed: in.Options.Speed, Rate: in.Options.Rate}
+		native = SpeechRequest{Source: in.Options.Source, Revision: in.Revision, RequestID: in.RequestID, Backend: in.Options.Backend, Voice: in.Options.Voice, Language: in.Options.Language, Speed: in.Options.Speed, Rate: in.Options.Rate}
 	case "render":
-		if in.Options.Backend != "" || in.Options.Voice != "" || in.Options.Language != "" || in.Options.Speed != 0 || in.Options.Rate != 0 {
+		if in.Options.Source != "" || in.Options.Backend != "" || in.Options.Voice != "" || in.Options.Language != "" || in.Options.Speed != 0 || in.Options.Rate != 0 {
 			fail(w, 400, errors.New("渲染仅接受kind"))
 			return
 		}

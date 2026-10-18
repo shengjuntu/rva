@@ -1,5 +1,5 @@
 "use strict";
-const TOOL_VERSION = "0.11.0";
+const TOOL_VERSION = "0.12.0";
 const $ = (s) => document.querySelector(s),
   el = (tag, text, cls) => {
     const n = document.createElement(tag);
@@ -159,7 +159,11 @@ async function openProject(pid) {
   drawProject();
   reconcileMessage(p.agentSubmission);
 }
+let narrationDirty=false,narrationBase=0,narrationProject="";
 function drawProject() {
+ if(project && narrationProject!==project.id){narrationDirty=false;narrationProject=project.id;}
+ if(project && !narrationDirty) narrationBase=project.revision;
+ if(project && !narrationDirty) $("#narration-text").value=project.narrationText||"";
   if (!project) return;
   $("#project-name").textContent = project.name;
   $("#brief").value = project.brief;
@@ -1581,3 +1585,6 @@ $('#edit-save').onclick=action(saveEditDSL);
 $('#edit-reload').onclick=action(async()=>{if(editDSLDirty&&!confirm('放弃未保存剪辑并载入？'))return;editDSLDirty=false;await loadEditPanel(true)});
 async function switchEditing(active){if(editDSLDirty)throw Error('请先保存剪辑或载入已保存版本');await save();const gen=epoch,pid=project.id;const p=await api('/api/projects/'+pid+'/edit/active',{revision:project.revision,active});if(gen!==epoch)return;project=p;drawProject()}
 $('#edit-activate').onclick=action(()=>switchEditing(true));$('#edit-legacy').onclick=action(()=>switchEditing(false));
+
+$("#narration-text").oninput=()=>{narrationDirty=true;};
+$("#narration-save").onclick=action(async()=>{const pid=project.id,gen=epoch;const result=await api("/api/projects/"+pid+"/narration",{revision:narrationBase,text:$("#narration-text").value},"PUT");if(epoch!==gen||project.id!==pid)return;project=result;narrationDirty=false;drawProject();$("#narration-status").textContent="正文已保存，配音需重新核对";});

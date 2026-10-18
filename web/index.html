@@ -92,6 +92,7 @@
             <p class="muted small">配音、渲染和Agent对话各自运行。取消制作任务不会停止对话；远端模型是否停止由服务端决定。</p>
             <div id="production-jobs"></div>
           </details>
+          <section class="production-panel"><h2>独立口播正文</h2><p class="muted small">正文自由编写；由 Codex 调用配音、取得时序，再编排剪辑。</p><textarea id="narration-text" rows="6"></textarea><button id="narration-save">保存口播正文</button><span id="narration-status"></span></section>
           <section id="edit-panel" class="production-panel">
             <div class="section-head"><h2>剪辑时间线</h2><span id="edit-mode" class="stage-pill">旧镜头模式</span></div>
             <p class="muted small">图片、视频、声音和文字可以自由组成多轨剪辑。启用后，成片只使用这份剪辑结构；旧镜头、音轨和字幕仍保留。</p>
