@@ -9,6 +9,12 @@ import (
 func validateFoundationArguments(name string, params json.RawMessage) error {
 	var allowed, required []string
 	switch name {
+	case "video_edit_patch_preview", "video_edit_patch_apply":
+		allowed = []string{"projectId", "revision", "changes"}
+		required = allowed
+	case "video_edit_undo":
+		allowed = []string{"projectId", "revision"}
+		required = allowed
 	case "video_asset_describe":
 		allowed = []string{"projectId", "revision", "assetId", "description"}
 		required = allowed

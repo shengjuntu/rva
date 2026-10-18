@@ -28,7 +28,7 @@ import (
 	"time"
 )
 
-const version = "0.15.0"
+const version = "0.16.0"
 
 //go:embed web/*
 var ui embed.FS
@@ -79,6 +79,7 @@ type Render struct {
 	HasAudio     bool    `json:"hasAudio"`
 }
 type Project struct {
+	EditHistory         []EditHistory       `json:"editHistory,omitempty"`
 	Generation          []GenerationJob     `json:"generation,omitempty"`
 	Workflow            *ProductionWorkflow `json:"workflow,omitempty"`
 	NarrationText       string              `json:"narrationText,omitempty"`
@@ -511,6 +512,8 @@ func (a *App) routes() http.Handler {
 	m.HandleFunc("POST /api/projects/{id}/messages", a.message)
 	m.HandleFunc("PUT /api/projects/{id}/assets/{aid}/description", a.assetDescribe)
 	m.HandleFunc("POST /api/projects/{id}/media/align", a.mediaAlign)
+	m.HandleFunc("POST /api/projects/{id}/edit/patch/{action}", a.editPatch)
+	m.HandleFunc("POST /api/projects/{id}/edit/undo", a.editUndo)
 	m.HandleFunc("GET /api/projects/{id}/workflow", a.workflowGet)
 	m.HandleFunc("PUT /api/projects/{id}/workflow", a.workflowSave)
 	m.HandleFunc("POST /api/projects/{id}/draft/instruction", a.draftInstruction)

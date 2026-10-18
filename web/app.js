@@ -1,5 +1,5 @@
 "use strict";
-const TOOL_VERSION = "0.15.0";
+const TOOL_VERSION = "0.16.0";
 const $ = (s) => document.querySelector(s),
   el = (tag, text, cls) => {
     const n = document.createElement(tag);
@@ -1561,7 +1561,7 @@ function drawEditTimeline(ir){
  const box=$('#edit-timeline');box.replaceChildren();if(!ir){box.append(el('p','尚未保存剪辑，可先创建示例或交给 RunDesk 编写。','muted small'));return}
  box.append(el('p',`${ir.canvas.width} × ${ir.canvas.height} · ${ir.canvas.fps} fps · ${ir.duration.toFixed(3)} 秒`,'muted small'));
  const tracks=new Map();for(const clip of ir.clips){if(!tracks.has(clip.track))tracks.set(clip.track,[]);tracks.get(clip.track).push(clip)}
- for(const [id,clips]of tracks){const lane=el('div',undefined,'edit-lane');lane.append(el('strong',id+' · '+clips[0].kind));const strip=el('div',undefined,'edit-strip');for(const clip of clips){const block=el('button',clip.id,'edit-block '+clip.kind);block.style.left=(clip.start/ir.duration*100)+'%';block.style.width=Math.max(1,clip.duration/ir.duration*100)+'%';block.title=clip.id+' · '+clip.start.toFixed(3)+'–'+clip.end.toFixed(3)+' 秒';block.onclick=()=>{$('#edit-status').textContent='选中片段：'+clip.id+'，轨道：'+clip.track+'。可在对话中使用这个对象ID要求调整。'};strip.append(block)}lane.append(strip);box.append(lane)}
+ for(const [id,clips]of tracks){const lane=el('div',undefined,'edit-lane');lane.append(el('strong',id+' · '+clips[0].kind));const strip=el('div',undefined,'edit-strip');for(const clip of clips){const block=el('button',clip.id,'edit-block '+clip.kind);block.style.left=(clip.start/ir.duration*100)+'%';block.style.width=Math.max(1,clip.duration/ir.duration*100)+'%';block.title=clip.id+' · '+clip.start.toFixed(3)+'–'+clip.end.toFixed(3)+' 秒';block.onclick=()=>{$('#edit-selection').textContent='选中对象：'+clip.id;$('#edit-status').textContent='选中片段：'+clip.id+'，轨道：'+clip.track+'。可在对话中使用这个对象ID要求调整。'};strip.append(block)}lane.append(strip);box.append(lane)}
 }
 async function loadEditPanel(force=false){
  if(!project||editPanelLoading||editDSLDirty&&!force)return;
@@ -1621,4 +1621,24 @@ $('#draft-start').onclick=action(async()=>{
  $('#prompt').value=instruction.text;
  await submitMessage({preventDefault(){}});
  if(gen===epoch)$('#workflow-status').textContent='已交给 RunDesk；任务与取消状态见当前对话';
+});
+
+let patchPreview=null;
+$('#edit-patch').oninput=()=>{patchPreview=null;$('#patch-apply').disabled=true;};
+$('#patch-preview').onclick=action(async()=>{
+ if(editDSLDirty)throw new Error('请先保存完整剪辑草稿');
+ const pid=project.id,gen=epoch,body={revision:project.revision,changes:JSON.parse($('#edit-patch').value)};
+ const result=await api('/api/projects/'+pid+'/edit/patch/preview',body);if(gen!==epoch||JSON.stringify(JSON.parse($('#edit-patch').value))!==JSON.stringify(body.changes))return;
+ patchPreview={pid,body};$('#patch-apply').disabled=false;$('#patch-diff').textContent=JSON.stringify({affectedClipIds:result.affectedClipIds,before:result.before,after:result.after},null,2);
+});
+$('#patch-apply').onclick=action(async()=>{
+ if(!patchPreview||patchPreview.pid!==project.id)throw new Error('请先预览本项目的修改');
+ if(editDSLDirty)throw new Error('请先处理完整剪辑草稿');
+ const pid=project.id,gen=epoch;await api('/api/projects/'+pid+'/edit/patch/apply',patchPreview.body);patchPreview=null;$('#patch-apply').disabled=true;
+ if(gen!==epoch)return;const refreshed=await api('/api/projects/'+pid);if(gen!==epoch)return;project=refreshed;drawProject();await loadEditPanel(true);
+});
+$('#patch-undo').onclick=action(async()=>{
+ if(editDSLDirty)throw new Error('请先处理完整剪辑草稿');const pid=project.id,gen=epoch;
+ await api('/api/projects/'+pid+'/edit/undo',{revision:project.revision});if(gen!==epoch)return;
+ const result=await api('/api/projects/'+pid);if(gen!==epoch)return;project=result;patchPreview=null;$('#patch-apply').disabled=true;drawProject();await loadEditPanel(true);
 });

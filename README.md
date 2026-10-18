@@ -1,4 +1,4 @@
-# RunDesk Video App · v0.15.0
+# RunDesk Video App · v0.16.0
 
 第二阶段：剪辑DSL v1。内容通过素材引用自由组合，DSL描述轨道、片段、裁剪、布局、声音和时间关系，不强制一段正文一个镜头。
 
@@ -27,7 +27,7 @@ bin/video-app --data ./data --font /absolute/path/to/NotoSansCJK-Regular.ttc
 
 独立的视频制作工作台：管理项目、素材、分镜、音轨、字幕、预览配音和成片。通过 RunDesk 调用 Codex，通过 HTTP MCP 让 Agent 读取和更新项目、启动渲染；RunDesk 保留会话、审批和执行轨迹。
 
-推荐配套 **RunDesk 0.48.1**（0.48.0 也有所需运行环境 API）与 **news2douyin 0.15.0**。Go 主程序只使用标准库，WebUI 嵌入二进制；视频渲染使用锁定的 HyperFrames 0.8.87 / GSAP 3.15.0，以及 Chromium、FFmpeg、Noto CJK。配音可连接已有 IndexTTS-2.5 服务，eSpeak NG 保留为机械预览。App 无需 Python 或 GPU，IndexTTS 在你的现有服务器运行。
+推荐配套 **RunDesk 0.48.1**（0.48.0 也有所需运行环境 API）与 **news2douyin 0.16.0**。Go 主程序只使用标准库，WebUI 嵌入二进制；视频渲染使用锁定的 HyperFrames 0.8.87 / GSAP 3.15.0，以及 Chromium、FFmpeg、Noto CJK。配音可连接已有 IndexTTS-2.5 服务，eSpeak NG 保留为机械预览。App 无需 Python 或 GPU，IndexTTS 在你的现有服务器运行。
 
 ## 本版变化
 
@@ -51,7 +51,7 @@ bash scripts/docker.sh doctor
 bash scripts/docker.sh smoke
 ```
 
-`build` 构建 `rundesk-video-app:0.15.0`；`up` 只启动已有镜像。`smoke` 创建两秒中文标题与测试音视频，检查实际 MP4。`logs / status / stop` 提供日常运维入口。数据默认保存到 `.state/video`，升级须保留原完整数据目录。
+`build` 构建 `rundesk-video-app:0.16.0`；`up` 只启动已有镜像。`smoke` 创建两秒中文标题与测试音视频，检查实际 MP4。`logs / status / stop` 提供日常运维入口。数据默认保存到 `.state/video`，升级须保留原完整数据目录。
 
 RunDesk 中的 `video-build` 是另一个 **Codex 工具镜像**，通过初始化向导准备一次并选给视频应用。它不包含本 App 的 HyperFrames 渲染服务。首次切换到 Docker，需要为该容器配置视频 MCP/Skill 和 Codex 认证，详见联调文档。
 
@@ -86,6 +86,6 @@ bash scripts/start.sh
 - [IndexTTS 部署与接入](docs/INDEXTTS.md)、[v0.8 验证结果](docs/VALIDATION-0.8.md)
 - `integrations/video-project/SKILL.md`：可安装到 RunDesk 当前容器环境的业务 Skill。
 - `scripts/integration_rundesk.py`：真实 App/RunDesk HTTP + Docker/Codex 测试替身；不是实际模型或 Docker 验收。
-- `examples/short_script_bundle.zip`：news2douyin 0.15.0 实际导出器生成的协议样例，新闻和图片均为测试数据。
+- `examples/short_script_bundle.zip`：news2douyin 0.16.0 实际导出器生成的协议样例，新闻和图片均为测试数据。
 
 旧版本验证文档仅说明当时版本的检查结果，不代表本版镜像已实机构建或完成视频验收。

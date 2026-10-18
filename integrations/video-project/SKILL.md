@@ -4,6 +4,10 @@ description: Manage this video app project through video_project MCP tools. Use 
 ---
 # Video project workflow
 
+## Precise clip edits (v0.16)
+Use video_edit_patch_preview then video_edit_patch_apply with the identical changes and base revision for localized edits. changes contains {id,op:add/update/delete,fields}. fields merges top-level fields only; nested layout/source replaces its entire object; null clears an optional placement field. Never change id in fields. Preview returns before/after DSL and affectedClipIds including resolved timing changes. The compiler rejects dangling references; fix all related clips in one patch. Add appends a clip; track/canvas/anchor editing still uses full DSL update. Apply preserves activation mode and saves up to20 undo snapshots. video_edit_undo reverses the latest patch only if current DSL and mode still match it; no redo. Re-read revision after any save.
+
+
 ## Generated assets (v0.15)
 Check video_capabilities_get first. image_generation/video_generation use a custom HTTP binary adapter, not a native vendor API. Start video_job_start(type=image_generation or video_generation, options={prompt:"..."}), with fresh requestId and current revision. Poll and read the completed artifact URL; its final path is the imported asset ID. Re-read project for actual assets and revision, inspect and describe before editing. Model/URL/key are administrator settings, not tool arguments. Do not retry an unknown remote result with a new request automatically: cancellation/restart may leave remote work running.
 
