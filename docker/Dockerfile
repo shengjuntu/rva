@@ -1,10 +1,10 @@
-# syntax=docker/dockerfile:1
 ARG GO_IMAGE=golang:1.25.12-bookworm
 ARG NODE_IMAGE=node:22-bookworm-slim
 FROM ${GO_IMAGE} AS build
 WORKDIR /src
 COPY go.mod ./
 COPY *.go ./
+COPY comfyh3 ./comfyh3
 COPY web ./web
 RUN CGO_ENABLED=0 go build -buildvcs=false -trimpath -ldflags='-s -w' -o /out/video-app .
 

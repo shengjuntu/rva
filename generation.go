@@ -72,7 +72,19 @@ func generationTarget(kind string) (GenerationTarget, error) {
 	}
 	v := GenerationTarget{os.Getenv(prefix + "URL"), os.Getenv(prefix + "MODEL"), os.Getenv(prefix + "KEY")}
 	u, e := url.Parse(v.URL)
-	if e != nil || u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || u.Fragment != "" || strings.TrimSpace(v.Model) == "" || len(v.Model) > 200 || len(v.Key) > 4096 || strings.ContainsAny(v.Key, "\r\n") {
+	if e != nil {
+		return v, errors.New("未配置合法的生成服务 URL/MODEL/KEY")
+	}
+	// Built-in ComfyUI backend: VIDEO_VIDEO_GEN_URL=comfy://host:port
+	// (video_generation only). fetchGenerated then calls the embedded
+	// comfyh3 library directly instead of an HTTP adapter.
+	if u.Scheme == "comfy" && kind == "video_generation" && u.Host != "" {
+		if strings.TrimSpace(v.Model) == "" || len(v.Model) > 200 || len(v.Key) > 4096 || strings.ContainsAny(v.Key, "\r\n") {
+			return v, errors.New("未配置合法的生成服务 URL/MODEL/KEY")
+		}
+		return v, nil
+	}
+	if u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || u.Fragment != "" || strings.TrimSpace(v.Model) == "" || len(v.Model) > 200 || len(v.Key) > 4096 || strings.ContainsAny(v.Key, "\r\n") {
 		return v, errors.New("未配置合法的生成服务 URL/MODEL/KEY")
 	}
 	return v, nil
@@ -210,6 +222,9 @@ func (a *App) runGeneration(ctx context.Context, pid string, j GenerationJob, ta
 	}
 }
 func fetchGenerated(ctx context.Context, j GenerationJob, target GenerationTarget, references []generationReferenceImage) ([]byte, error) {
+	if strings.HasPrefix(target.URL, "comfy://") {
+		return fetchComfyGenerated(ctx, j, target, references)
+	}
 	payload := map[string]any{"schema": "video.generation-request.v1", "requestId": j.RequestID, "type": j.Type, "model": target.Model, "prompt": j.Prompt}
 	if j.Duration != nil {
 		payload["duration"] = *j.Duration
