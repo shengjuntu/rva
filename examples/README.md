@@ -1,3 +1,9 @@
+# 剪辑DSL实测示例
+
+edit-preview.mp4为v0.11.0实际FFmpeg输出：图片、裁剪变速视频、半透明小画面、字面文字、延迟音轨与淡入淡出。edit-preview.mp4.edit-ir.json为对应编译结果，filter.ffscript及render.log记录生成流程。素材ID属于测试项目，不可直接引用到新项目。
+
+可运行go test -run TestEditFFmpeg -v重新验证；VIDEO_EDIT_TEST_EXPORT=examples/edit-preview.mp4会导出示例。测试使用DejaVuSans英文文字验证字面内容；中文字体质量须在配置的CJK字体环境检查。
+
 # 新闻交接演示包
 
 两份 ZIP 由 news2douyin 0.4.1 的 smoke_video 工具实际生成，内容为软件验证演示，不是真实新闻。

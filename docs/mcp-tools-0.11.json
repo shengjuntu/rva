@@ -1,0 +1,623 @@
+{
+  "tools": [
+    {
+      "description": "Read stored editing DSL, activation mode, revision and compiled timeline IR. Content remains in referenced assets; no paragraph projection required.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "type": "object"
+      },
+      "name": "video_edit_get"
+    },
+    {
+      "description": "Validate and compile a proposed editing DSL without saving or rendering. Returns stable clip IDs and resolved times; unknown fields and cyclic references are rejected.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "dsl": {
+            "description": "Editing DSL version=1: canvas, tracks(video/audio/text), clips and optional anchors. Each clip uses exactly one start/after/anchor placement; referenced assets must exist.",
+            "type": "object"
+          },
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "dsl"
+        ],
+        "type": "object"
+      },
+      "name": "video_edit_validate"
+    },
+    {
+      "description": "Save a version-checked editing DSL and activate it. Supports video/audio/text tracks, source in/out/speed, layout, fades and time references. Subsequent rendering uses FFmpeg editing runtime, not legacy shots/audio/subtitles.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "dsl": {
+            "description": "Editing DSL version=1: canvas, tracks(video/audio/text), clips and optional anchors. Each clip uses exactly one start/after/anchor placement; referenced assets must exist.",
+            "type": "object"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "projectId",
+          "dsl",
+          "revision"
+        ],
+        "type": "object"
+      },
+      "name": "video_edit_update"
+    },
+    {
+      "description": "Activate saved DSL or switch to the legacy shot renderer without deleting either representation. Requires current revision.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "projectId",
+          "revision",
+          "active"
+        ],
+        "type": "object"
+      },
+      "name": "video_edit_activate"
+    },
+    {
+      "description": "Discover implemented capabilities, dependency readiness and configured providers. probe=true optionally checks the configured IndexTTS model list, never synthesizes. No secrets are returned.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "probe": {
+            "type": "boolean"
+          }
+        },
+        "required": [],
+        "type": "object"
+      },
+      "name": "video_capabilities_get"
+    },
+    {
+      "description": "Create a named project. Returns a project ID; do not infer that a RunDesk session or renderer was configured.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "requestId"
+        ],
+        "type": "object"
+      },
+      "name": "video_project_create"
+    },
+    {
+      "description": "List actual project assets, authenticated read URLs, MIME types and sizes.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "type": "object"
+      },
+      "name": "video_asset_list"
+    },
+    {
+      "description": "Import one small file from standard Base64, maximum decoded 1 MiB. Requires a fresh requestId; identical retries return the original asset. Large media use App multipart upload.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "data": {
+            "description": "Standard Base64 bytes, decoded size <=1MiB",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "name",
+          "data",
+          "requestId"
+        ],
+        "type": "object"
+      },
+      "name": "video_asset_import"
+    },
+    {
+      "description": "Start a durable production task of type tts or render against current revision. Fresh 24-hex requestId required; identical retries reuse the receipt. Unsupported generation capabilities return not implemented.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "options": {
+            "additionalProperties": false,
+            "properties": {
+              "backend": {
+                "enum": [
+                  "indextts",
+                  "espeak-ng"
+                ],
+                "type": "string"
+              },
+              "kind": {
+                "enum": [
+                  "draft"
+                ],
+                "type": "string"
+              },
+              "language": {
+                "type": "string"
+              },
+              "rate": {
+                "type": "integer"
+              },
+              "speed": {
+                "type": "number"
+              },
+              "voice": {
+                "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "type": {
+            "enum": [
+              "tts",
+              "render"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "type",
+          "revision",
+          "requestId"
+        ],
+        "type": "object"
+      },
+      "name": "video_job_start"
+    },
+    {
+      "description": "Get authoritative task state and completed artifacts. jobId uses tts:<nativeId> or render:<nativeId>.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "jobId": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "jobId"
+        ],
+        "type": "object"
+      },
+      "name": "video_job_get"
+    },
+    {
+      "description": "List project TTS and render tasks using unified states; render progress may be unknown.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "type": "object"
+      },
+      "name": "video_job_list"
+    },
+    {
+      "description": "Request cancellation of a production task. Repeated cancellation returns current state; it does not claim the remote provider stopped billing.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "jobId": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "jobId"
+        ],
+        "type": "object"
+      },
+      "name": "video_job_cancel"
+    },
+    {
+      "description": "Inspect an actual supplied image or the first frame of a video as a bounded PNG. Requires FFmpeg; first frame is not full video understanding.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "assetId": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "assetId"
+        ],
+        "type": "object"
+      },
+      "name": "video_asset_inspect"
+    },
+    {
+      "description": "Save authoritative narration text, split into ordered paragraphs and preserve unchanged paragraph media. Requires revision; estimates timing, does not generate speech.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "text": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "revision",
+          "text"
+        ],
+        "type": "object"
+      },
+      "name": "video_production_text"
+    },
+    {
+      "description": "Set draft/adjustment, or designate a completed current-content render as final. Requires revision; final requires renderId and reviewed captions.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "renderId": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "stage": {
+            "enum": [
+              "draft",
+              "adjustment",
+              "final"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "revision",
+          "stage"
+        ],
+        "type": "object"
+      },
+      "name": "video_production_stage"
+    },
+    {
+      "description": "Read project revision, storyboard, audio tracks, subtitles, speech jobs, assets and render jobs.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "type": "object"
+      },
+      "name": "video_project_get"
+    },
+    {
+      "description": "Read the immutable news2douyin source script, original review record, selected source evidence and source-video metadata. Reference data only; current storyboard remains a production draft.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "type": "object"
+      },
+      "name": "video_news_get"
+    },
+    {
+      "description": "Update name, brief, shots and audio using the current revision. Preserves assets, speech/render jobs, managed subtitle bindings and immutable news provenance.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "project": {
+            "description": "Current project with revision, name, brief, shots, optional audio. audio.narration and audio.music: {assetId, volume:0..2, start:seconds, sourceStart:seconds, loop:boolean}. Only music supports loop. Omitted audio preserves current audio; audio:{} clears it. Read before updating.",
+            "type": "object"
+          },
+          "projectId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "project"
+        ],
+        "type": "object"
+      },
+      "name": "video_project_update"
+    },
+    {
+      "description": "Adopt original news WAV/SRT after a user request, replacing current narration/subtitles and proportionally resizing visual shots. Requires current revision and unchanged original text.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "projectId",
+          "revision"
+        ],
+        "type": "object"
+      },
+      "name": "video_news_audio_adopt"
+    },
+    {
+      "description": "Save UTF-8 SRT with absolute video times. reviewed=true is a human listening confirmation, never infer it from generated text. Read project first; requires revision.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "reviewed": {
+            "description": "True only when the user has explicitly confirmed listening to this narration and checking this exact subtitle text/timing. False for generated drafts.",
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "srt": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "revision",
+          "srt",
+          "enabled",
+          "reviewed"
+        ],
+        "type": "object"
+      },
+      "name": "video_subtitles_update"
+    },
+    {
+      "description": "Generate speech from a saved storyboard using configured IndexTTS or local eSpeak preview. Omit backend/voice/language to use administrator defaults. Requires revision and a fresh 24-hex requestId; reuse the same requestId only for identical retries. Does not replace current audio.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "backend": {
+            "description": "Omit for configured default.",
+            "enum": [
+              "indextts",
+              "espeak-ng"
+            ],
+            "type": "string"
+          },
+          "language": {
+            "description": "IndexTTS only: script language, not translation.",
+            "enum": [
+              "zh",
+              "en",
+              "ja",
+              "es",
+              "ar",
+              "zhen"
+            ],
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "rate": {
+            "description": "eSpeak only: approximate words per minute; default 170. Omit for IndexTTS.",
+            "maximum": 300,
+            "minimum": 80,
+            "type": "integer"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "speed": {
+            "description": "IndexTTS only: 1 = normal, greater = faster.",
+            "maximum": 2,
+            "minimum": 0.5,
+            "type": "number"
+          },
+          "voice": {
+            "description": "Registered IndexTTS voice ID or eSpeak voice name. Omit to use administrator default.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "revision",
+          "requestId"
+        ],
+        "type": "object"
+      },
+      "name": "video_speech_start"
+    },
+    {
+      "description": "Cancel a running speech job.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "speechId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "speechId"
+        ],
+        "type": "object"
+      },
+      "name": "video_speech_stop"
+    },
+    {
+      "description": "On the user's request, adopt a completed speech job: replace narration and subtitles, use measured per-shot durations. Requires current revision and unchanged shot text/structure.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer"
+          },
+          "speechId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "revision",
+          "speechId"
+        ],
+        "type": "object"
+      },
+      "name": "video_speech_adopt"
+    },
+    {
+      "description": "Render the current saved storyboard using an immutable snapshot.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "kind": {
+            "description": "draft permits unreviewed caption previews but never stale bindings; omitted requires ready captions.",
+            "enum": [
+              "draft"
+            ],
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "revision": {
+            "type": "integer"
+          }
+        },
+        "required": [
+          "projectId"
+        ],
+        "type": "object"
+      },
+      "name": "video_render_start"
+    },
+    {
+      "description": "Cancel a specific render job.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "renderId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "projectId",
+          "renderId"
+        ],
+        "type": "object"
+      },
+      "name": "video_render_stop"
+    }
+  ]
+}

@@ -1,5 +1,5 @@
 "use strict";
-const TOOL_VERSION = "0.10.0";
+const TOOL_VERSION = "0.11.0";
 const $ = (s) => document.querySelector(s),
   el = (tag, text, cls) => {
     const n = document.createElement(tag);
@@ -12,6 +12,7 @@ const speechSubmission = SpeechSubmission.create(() => sessionStorage);
 const renderSubmission = SpeechSubmission.create(() => sessionStorage,"video-render-pending-v1","渲染");
 let startingRender=false;
 let productionDirty = false;
+let editDSLDirty=false,editDSLBase=0,editPanelLoading=false;
 let serviceJobsKey="", serviceJobsLoading=false;
 let captionDraft = null, savePromise = null, speechKey = "", startingSpeech = false;
 let project = null,
@@ -40,7 +41,7 @@ const api = async (path, body, method, timeoutMs = 0) => {
   const r = await fetch(path, opts);
   const data = await r.json();
   if (!r.ok) {
-    const e = new Error(data.error || r.statusText);
+    const e = new Error(data.error || data.diagnostics?.map(d=>d.target+": "+d.message).join("\n") || r.statusText);
     e.status = r.status;
     e.code = data.code;
     e.uncertain = data.uncertain;
@@ -131,6 +132,7 @@ async function openProject(pid) {
   project = p;
   captionDraft = null;
   productionDirty = false;
+  editDSLDirty=false;editDSLBase=p.revision;
   selected = 0;
   dirty = false;
   after = 0;
@@ -184,6 +186,8 @@ function drawProject() {
   drawSubtitles();
   drawSpeech();
   drawProduction();
+  drawEditingMode();
+  if(!editDSLDirty)loadEditPanel().catch(()=>{});
   loadProductionJobs().catch(()=>{});
 }
 function assetURL(a) {
@@ -664,13 +668,13 @@ $("#new-form").onsubmit = action(async (e) => {
 });
 $("#projects").onchange = action(async (e) => {
   const pid = e.target.value;
-  if (dirty && !confirm("放弃当前未保存编辑并切换项目？")) {
+  if ((dirty||editDSLDirty) && !confirm("放弃当前未保存编辑并切换项目？")) {
     $("#projects").value = project.id;
     return;
   }
   await openProject(pid);
 });
-$("#save").onclick = action(save);
+$("#save").onclick = action(async()=>{if(editDSLDirty)await saveEditDSL();else await save()});
 $("#reload-project").onclick = action(async () => {
   if (confirm("重新载入会替换当前草稿，确定继续？"))
     await openProject(project.id);
@@ -770,7 +774,7 @@ $("#render").onclick = action(async () => {
   const pid=project.id,gen=epoch;startingRender=true;$('#render').disabled=true;
   try {
     const pending=renderSubmission.read(pid);
-    if(!pending) await save();
+    if(!pending) {await save();if(editDSLDirty)await saveEditDSL()}
     if(gen!==epoch)return;
     const body=pending||{type:"render",revision:project.revision,requestId:id(),options:{kind:"draft"}};
     const job=await renderSubmission.submit(pid,body,original=>api('/api/projects/'+pid+'/jobs',original));
@@ -911,7 +915,7 @@ for (const [button, side, cls] of [
     $(".layout").classList.toggle(cls, $(side).hidden);
   };
 window.addEventListener("beforeunload", (e) => {
-  if (dirty) {
+  if (dirty||editDSLDirty) {
     e.preventDefault();
     e.returnValue = "";
   }
@@ -1535,3 +1539,45 @@ async function loadProductionJobs(force=false) {
 }
 $('#refresh-capabilities').onclick=action(()=>loadCapabilities(true));
 $('#refresh-jobs').onclick=action(()=>loadProductionJobs(true));
+
+function drawEditingMode(){
+ const active=!!project?.editActive;
+ $('#edit-mode').textContent=active?'剪辑 DSL 模式':'旧镜头模式';
+ const canvas=project?.editDsl?.canvas||{};$('#preview-format').textContent=active?`${canvas.width||1080} × ${canvas.height||1920} · ${canvas.fps||30} fps`:'9:16 · 1080 × 1920 · 30 fps';
+ $('#production-panel').hidden=active;
+ $('#visual-details').hidden=active;
+ $('#subtitle-section').hidden=active;
+ $('#sound-section').parentElement.hidden=active;
+ $('#save').textContent=active?'保存剪辑':'保存制作稿';
+ $('#preview-label').textContent=active?'剪辑预览（以成片为准）':'镜头预览';
+}
+function drawEditTimeline(ir){
+ const box=$('#edit-timeline');box.replaceChildren();if(!ir){box.append(el('p','尚未保存剪辑，可先创建示例或交给 RunDesk 编写。','muted small'));return}
+ box.append(el('p',`${ir.canvas.width} × ${ir.canvas.height} · ${ir.canvas.fps} fps · ${ir.duration.toFixed(3)} 秒`,'muted small'));
+ const tracks=new Map();for(const clip of ir.clips){if(!tracks.has(clip.track))tracks.set(clip.track,[]);tracks.get(clip.track).push(clip)}
+ for(const [id,clips]of tracks){const lane=el('div',undefined,'edit-lane');lane.append(el('strong',id+' · '+clips[0].kind));const strip=el('div',undefined,'edit-strip');for(const clip of clips){const block=el('button',clip.id,'edit-block '+clip.kind);block.style.left=(clip.start/ir.duration*100)+'%';block.style.width=Math.max(1,clip.duration/ir.duration*100)+'%';block.title=clip.id+' · '+clip.start.toFixed(3)+'–'+clip.end.toFixed(3)+' 秒';block.onclick=()=>{$('#edit-status').textContent='选中片段：'+clip.id+'，轨道：'+clip.track+'。可在对话中使用这个对象ID要求调整。'};strip.append(block)}lane.append(strip);box.append(lane)}
+}
+async function loadEditPanel(force=false){
+ if(!project||editPanelLoading||editDSLDirty&&!force)return;
+ editPanelLoading=true;const pid=project.id,gen=epoch;
+ try{const data=await api('/api/projects/'+pid+'/edit');if(gen!==epoch)return;if(editDSLDirty&&!force)return;$('#edit-json').value=data.dsl?JSON.stringify(data.dsl,null,2):'';editDSLBase=data.revision;editDSLDirty=false;drawEditTimeline(data.ir);$('#edit-status').textContent=data.dsl?'剪辑已保存 · 修订 '+data.revision:'剪辑内容与正文结构独立。'}finally{editPanelLoading=false}
+}
+$('#edit-json').oninput=()=>{if(!editDSLDirty)editDSLBase=project.revision;editDSLDirty=true;$('#edit-status').textContent='有未保存剪辑'};
+$('#edit-example').onclick=()=>{
+ if(!project)return;
+ const visual=project.assets.find(a=>a.mime.startsWith('image/'))||project.assets.find(a=>a.mime.startsWith('video/'));
+ const dsl={version:1,canvas:{width:1080,height:1920,fps:30,background:'#11182a'},tracks:[{id:'visuals',kind:'video'},{id:'titles',kind:'text'}],clips:[]};
+ if(visual)dsl.clips.push({id:'opening_visual',track:'visuals',asset:visual.id,start:0,duration:3,layout:{fit:'cover'},fadeIn:.2});
+ dsl.clips.push({id:'opening_title',track:'titles',start:0,duration:3,text:project.name,fontSize:64,layout:{x:60,y:120,width:960,height:300},fadeIn:.2});
+ $('#edit-json').value=JSON.stringify(dsl,null,2);editDSLBase=project.revision;editDSLDirty=true;$('#edit-status').textContent='示例尚未保存。视频素材需先核对实际长度；源音默认静音。';
+};
+$('#edit-validate').onclick=action(async()=>{const dsl=JSON.parse($('#edit-json').value);const result=await api(path('/edit/validate'),{dsl});drawEditTimeline(result.ir);$('#edit-status').textContent='校验通过，尚未保存或渲染'});
+async function saveEditDSL(){
+ if(!project)return;const pid=project.id,gen=epoch,dsl=JSON.parse($('#edit-json').value);
+ const result=await api('/api/projects/'+pid+'/edit',{revision:editDSLBase,dsl},'PUT');if(gen!==epoch)return;
+ editDSLDirty=false;editDSLBase=result.revision;const current=await api('/api/projects/'+pid);if(gen!==epoch)return;project=current;drawProject();drawEditTimeline(result.ir);toast('剪辑已保存并启用，下一次生成使用这份时间线');
+}
+$('#edit-save').onclick=action(saveEditDSL);
+$('#edit-reload').onclick=action(async()=>{if(editDSLDirty&&!confirm('放弃未保存剪辑并载入？'))return;editDSLDirty=false;await loadEditPanel(true)});
+async function switchEditing(active){if(editDSLDirty)throw Error('请先保存剪辑或载入已保存版本');await save();const gen=epoch,pid=project.id;const p=await api('/api/projects/'+pid+'/edit/active',{revision:project.revision,active});if(gen!==epoch)return;project=p;drawProject()}
+$('#edit-activate').onclick=action(()=>switchEditing(true));$('#edit-legacy').onclick=action(()=>switchEditing(false));

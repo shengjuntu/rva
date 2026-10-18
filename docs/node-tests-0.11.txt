@@ -1,0 +1,14 @@
+✔ lost response and tab reload resend the exact request, even if options change (2.136391ms)
+✔ polling reconciles only the correct project and request receipt (0.399076ms)
+✔ uncertain errors and authentication retain request; explicit rejection clears it (0.708181ms)
+✔ unmatched response cannot acknowledge an uncertain request (0.236919ms)
+✔ disabled storage never sends the request (0.264389ms)
+✔ render and speech receipts remain isolated and uncertain render retries preserve input (1.603788ms)
+ℹ tests 6
+ℹ suites 0
+ℹ pass 6
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 98.810203

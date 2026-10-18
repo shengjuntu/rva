@@ -28,7 +28,7 @@ import (
 	"time"
 )
 
-const version = "0.10.0"
+const version = "0.11.0"
 
 //go:embed web/*
 var ui embed.FS
@@ -63,6 +63,7 @@ type Asset struct {
 	MIME            string           `json:"mime"`
 }
 type Render struct {
+	Engine       string  `json:"engine,omitempty"`
 	RequestID    string  `json:"requestId,omitempty"`
 	RequestHash  string  `json:"requestHash,omitempty"`
 	ContentHash  string  `json:"contentHash,omitempty"`
@@ -77,6 +78,8 @@ type Render struct {
 	HasAudio     bool    `json:"hasAudio"`
 }
 type Project struct {
+	EditActive          bool             `json:"editActive,omitempty"`
+	EditDSL             *EditDocument    `json:"editDsl,omitempty"`
 	CreationRequestID   string           `json:"creationRequestId,omitempty"`
 	CreationRequestHash string           `json:"creationRequestHash,omitempty"`
 	Production          *Production      `json:"production,omitempty"`
@@ -382,6 +385,10 @@ func (a *App) auth(next http.Handler) http.Handler {
 }
 func (a *App) routes() http.Handler {
 	m := http.NewServeMux()
+	m.HandleFunc("POST /api/projects/{id}/edit/active", a.editActivate)
+	m.HandleFunc("GET /api/projects/{id}/edit", a.editGet)
+	m.HandleFunc("PUT /api/projects/{id}/edit", a.editSave)
+	m.HandleFunc("POST /api/projects/{id}/edit/validate", a.editValidate)
 	m.HandleFunc("GET /api/capabilities", a.capabilities)
 	m.HandleFunc("GET /api/projects/{id}/jobs", a.jobsList)
 	m.HandleFunc("POST /api/projects/{id}/jobs", a.jobStart)

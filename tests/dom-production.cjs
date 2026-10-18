@@ -34,7 +34,16 @@ const root=require('path').resolve(__dirname,'..'), testData=fs.mkdtempSync(requ
   if(unsupported.status!==501)throw Error('unsupported generation created a job');
   await vm.runInContext('loadProductionJobs(true)',ctx);
   if(!w.document.querySelector('#production-jobs').textContent.includes('还没有'))throw Error('unexpected placeholder job');
-  fs.writeFileSync(root+'/docs/dom-validation-0.10.json' ,JSON.stringify({passed:true,environment:'JSDOM + real Go HTTP API, not a graphical browser',checks:['load embedded UI','save narration text','build paragraph alignment table','protect canonical text','assign actual uploaded image','preserve mapping after new lead','persist text','return actual MCP image content','capability status panel','actual HTTP import deduplication','unsupported generation rejection','unified task panel']},null,2));
+  await vm.runInContext('openProject('+JSON.stringify(p.id)+')',ctx);
+  w.document.querySelector('#edit-example').click();
+  if(!w.document.querySelector('#edit-json').value.includes('opening_title'))throw Error('DSL example missing');
+  await vm.runInContext('saveEditDSL()',ctx);
+  if(!w.document.querySelector('#edit-mode').textContent.includes('DSL'))throw Error('saved DSL not active');
+  const editSaved=await(await realFetch('/api/projects/'+p.id+'/edit')).json();if(!editSaved.active||editSaved.ir.clips.length!==2)throw Error('DSL HTTP compilation failed');
+  if(w.document.querySelectorAll('#edit-timeline .edit-block').length!==2)throw Error('timeline not rendered');
+  await vm.runInContext('switchEditing(false)',ctx);
+  const retained=await(await realFetch('/api/projects/'+p.id+'/edit')).json();if(retained.active||!retained.dsl)throw Error('switch deleted DSL');
+  fs.writeFileSync(root+'/docs/dom-validation-0.11.json' ,JSON.stringify({passed:true,environment:'JSDOM + real Go HTTP API, not a graphical browser',checks:['load embedded UI','save narration text','build paragraph alignment table','protect canonical text','assign actual uploaded image','preserve mapping after new lead','persist text','return actual MCP image content','capability status panel','actual HTTP import deduplication','unsupported generation rejection','unified task panel','create and save editing DSL','activate DSL render mode','show compiled multi-track timeline','switch back without deleting DSL']},null,2));
   console.log('DOM + HTTP workflow passed');
  }finally{dom?.window.close();proc.kill('SIGTERM')}
 })().catch(e=>{console.error(e);process.exitCode=1});

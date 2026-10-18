@@ -1,15 +1,29 @@
-# RunDesk Video App · v0.10.0
+# RunDesk Video App · v0.11.0
 
-第一阶段：制作服务基础。RunDesk/Codex负责创作与编排，video-app提供能力发现、素材服务与统一制作任务。新增8个MCP工具，共21个；已实现TTS与渲染任务，图片生成、视频生成和语义对齐明确报告未实现。
+第二阶段：剪辑DSL v1。内容通过素材引用自由组合，DSL描述轨道、片段、裁剪、布局、声音和时间关系，不强制一段正文一个镜头。
 
-本版不新增模型依赖，继续复用IndexTTS、HyperFrames、GSAP与FFmpeg。剪辑DSL将在第二阶段实现；当前仍兼容旧版镜头/段落编辑，不把它当作未来的内容模板。
+新增4个MCP工具，共25个；剪辑DSL可校验、保存、编译为IR、显示时间线并通过FFmpeg实际生成MP4。剪辑模式无需Node.js或浏览器，文字片段需要字体；旧HyperFrames镜头模式继续保留，两个模式明确切换。
 
-- 能力注册表区分未实现、未就绪、已配置与检查通过；默认不联系远端服务，显式探测只查询IndexTTS模型列表。
-- 统一任务启动、查询、列表与取消；状态直接来自原有持久记录，取消配音、渲染和Agent各自独立。
-- 项目创建、素材导入和渲染支持请求幂等；浏览器保留不确定渲染提交的原请求。
-- 完成的任务返回需认证的产物URL，未知渲染进度不会伪造成百分比。
+- 多轨：图片/视频、音频、文字；轨道顺序决定叠放，音轨可混合。
+- 片段：素材入出点、0.5–2倍速、cover/contain、位置、尺寸、透明度、淡入淡出。
+- 时间：绝对起点、跟随片段末尾、锚点与偏移；循环与悬空引用拒绝。
+- 编辑：版本校验、严格字段检查、编译诊断、稳定片段ID与不可变渲染快照。
 
-见[服务契约](docs/PRODUCTION-SERVICE.md)、[分阶段计划](docs/ROADMAP.md)、[验证](docs/VALIDATION-0.10.md)。
+见[DSL使用说明](docs/EDIT-DSL.md)、[JSON Schema](schemas/edit-dsl-v1.json)、[本版验证](docs/VALIDATION-0.11.md)。包内examples/edit-preview.mp4为实际FFmpeg多轨渲染测试示例。
+
+TTS内容自由输入与RunDesk制作闭环是第三阶段；生成模型和语义对齐仍待第四阶段。当前DSL不支持任意组件代码、关键帧或局部渲染缓存。
+
+## 剪辑模式最小启动
+
+配置FFmpeg/FFprobe及字体后直接运行：
+
+```bash
+bin/video-app --data ./data --font /absolute/path/to/NotoSansCJK-Regular.ttc
+```
+
+页面上传素材，创建或由Codex编写剪辑，校验后保存并启用，再生成视频。RunDesk连接配置沿用现有方式。
+
+## 旧镜头模式兼容说明
 
 独立的视频制作工作台：管理项目、素材、分镜、音轨、字幕、预览配音和成片。通过 RunDesk 调用 Codex，通过 HTTP MCP 让 Agent 读取和更新项目、启动渲染；RunDesk 保留会话、审批和执行轨迹。
 
@@ -37,7 +51,7 @@ bash scripts/docker.sh doctor
 bash scripts/docker.sh smoke
 ```
 
-`build` 构建 `rundesk-video-app:0.10.0`；`up` 只启动已有镜像。`smoke` 创建两秒中文标题与测试音视频，检查实际 MP4。`logs / status / stop` 提供日常运维入口。数据默认保存到 `.state/video`，升级须保留原完整数据目录。
+`build` 构建 `rundesk-video-app:0.11.0`；`up` 只启动已有镜像。`smoke` 创建两秒中文标题与测试音视频，检查实际 MP4。`logs / status / stop` 提供日常运维入口。数据默认保存到 `.state/video`，升级须保留原完整数据目录。
 
 RunDesk 中的 `video-build` 是另一个 **Codex 工具镜像**，通过初始化向导准备一次并选给视频应用。它不包含本 App 的 HyperFrames 渲染服务。首次切换到 Docker，需要为该容器配置视频 MCP/Skill 和 Codex 认证，详见联调文档。
 

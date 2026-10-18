@@ -1,6 +1,6 @@
 # Video App 与 RunDesk：视频 Docker 与联调
 
-配套版本：RunDesk 0.48.1、Video App 0.10.0、news2douyin 0.15.0。RunDesk 0.48.0 已具备所需 API，可继续使用；0.48.1 增加入口、说明和通用错误措辞。
+配套版本：RunDesk 0.48.1、Video App 0.11.0、news2douyin 0.15.0。RunDesk 0.48.0 已具备所需 API，可继续使用；0.48.1 增加入口、说明和通用错误措辞。
 
 ## 两个镜像，各准备一次
 
@@ -8,7 +8,7 @@
 |---|---|---|---|
 | RunDesk | Linux 宿主机 | 应用注册、Codex 生命周期、会话、审批、轨迹 | 原 RunDesk data |
 | `rundesk-video-build` | RunDesk 托管 Docker | Codex、FFmpeg/Pillow 工具、视频制作 Skill；通过 `video_project` MCP 操作业务 | RunDesk 工作区、Codex home |
-| `rundesk-video-app:0.10.0` | 独立 Compose 容器 | WebUI、项目、HTTP MCP、HyperFrames 0.8.87、GSAP 3.15.0、Chromium、FFmpeg、Noto CJK、eSpeak NG | 宿主目录挂到 `/data` |
+| `rundesk-video-app:0.11.0` | 独立 Compose 容器 | WebUI、项目、HTTP MCP、HyperFrames 0.8.87、GSAP 3.15.0、Chromium、FFmpeg、Noto CJK、eSpeak NG | 宿主目录挂到 `/data` |
 
 Codex 发起 `video_render_start`，实际渲染由 App 容器执行。不是在 Codex 容器里启动第二个 App；不要向 App 挂载 Docker socket。App 数据与 Codex 工作目录不共用，素材由 App 按 assetId 读取。视频不要求 Exa/Agent-Reach；新闻搜索继续在 news2douyin 研究环境完成，已审核制作包携带素材交接。
 
@@ -16,7 +16,7 @@ Codex 发起 `video_render_start`，实际渲染由 App 容器执行。不是在
 
 1. 停止旧 RunDesk，备份 data；解压源码、`make build`，沿用原 `--data` 启动。不要清空 data 或创建第二份同名应用安装。
 2. 在 RunDesk 初始化/运行环境页选择 `video-build`，填写已安装 Codex 的精确版本，准备镜像一次。可以从已有本地镜像或受信仓库拉取；应用注册和任务开始不触发构建。
-3. 解压 Video App 0.10.0。若从 0.6.0 升级，先停旧 App、备份整个 data，在 Docker 配置中令 `VIDEO_HOST_DATA` 指向该目录。保留 access-token、config.json、rundesk-requests、projects，避免安装身份、会话和回执丢失。
+3. 解压 Video App 0.11.0。若从 0.6.0 升级，先停旧 App、备份整个 data，在 Docker 配置中令 `VIDEO_HOST_DATA` 指向该目录。保留 access-token、config.json、rundesk-requests、projects，避免安装身份、会话和回执丢失。
 4. 执行 App 包的 `bash scripts/docker.sh init`。编辑生成的 `docker/.env`：填 RunDesk Token，核对 UID/GID、数据目录、浏览器入口与 MCP 回调地址。
 5. `bash scripts/docker.sh build` 显式构建渲染镜像；`bash scripts/docker.sh up` 只启动已有镜像。镜像内已安装所有渲染依赖，启动不再执行 npm/apt 或浏览器下载。
 6. `bash scripts/docker.sh token` 获取 App 登录 Token，打开 `http://127.0.0.1:3220`。远程访问需把 `VIDEO_APP_PUBLIC_URL` 改为浏览器可访问地址。

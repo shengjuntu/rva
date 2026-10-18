@@ -96,7 +96,7 @@ func (a *App) capabilityEnvelope(ctx context.Context, probe bool) CapabilityEnve
 	for _, id := range []string{"image_generation", "video_generation", "text_media_alignment"} {
 		envelope.Capabilities = append(envelope.Capabilities, ProductionCapability{ID: id, Implemented: false, Ready: false, Providers: []ProviderCapability{}, Tools: []string{}, Notes: []string{"第四阶段接入；当前不会分配占位任务或假称已经可用"}})
 	}
-	envelope.Capabilities = append(envelope.Capabilities, ProductionCapability{ID: "editing", Implemented: true, Ready: true, Providers: []ProviderCapability{}, Tools: []string{"video_project_get", "video_project_update"}, Notes: []string{"当前是旧版镜头/音轨编辑；剪辑DSL、多轨片段与自由内容关系将在第二阶段实现"}})
+	envelope.Capabilities = append(envelope.Capabilities, ProductionCapability{ID: "editing", Implemented: true, Ready: true, Providers: []ProviderCapability{}, Tools: []string{"video_edit_get", "video_edit_validate", "video_edit_update", "video_edit_activate", "video_project_update"}, Notes: []string{"剪辑DSL v1：多轨、片段裁剪/速度、布局、淡入淡出、时间引用；内容通过素材引用自由组合", "旧镜头与DSL分别保存，渲染采用明确激活的模式"}})
 	renderer := ProviderCapability{ID: "hyperframes", Runtime: "local", State: "blocked", Verified: "dependency_check", Reasons: missingCommands("node", "ffmpeg", "ffprobe"), Supports: []string{"legacy_storyboard", "html_gsap", "vertical_1080x1920_30fps"}}
 	for name, path := range map[string]string{"HyperFrames CLI": hf, "字体": font, "GSAP": gsap} {
 		if path == "" || !regularFile(path) {
@@ -134,7 +134,13 @@ func (a *App) capabilityEnvelope(ctx context.Context, probe bool) CapabilityEnve
 	if renderer.Ready {
 		renderer.State = "available"
 	}
-	envelope.Capabilities = append(envelope.Capabilities, ProductionCapability{ID: "rendering", Implemented: true, Ready: renderer.Ready, Providers: []ProviderCapability{renderer}, Tools: []string{"video_job_start", "video_render_start"}, Notes: []string{"就绪表示依赖检查通过；实际合成由任务执行与MP4验证确认"}})
+	editRenderer := ProviderCapability{ID: "ffmpeg_edit", Runtime: "local", State: "blocked", Verified: "dependency_check", Reasons: missingCommands("ffmpeg", "ffprobe"), Supports: []string{"edit_dsl_v1", "multi_track", "source_trim", "source_speed", "layout", "fades", "audio_mix"}}
+	editRenderer.Ready = len(editRenderer.Reasons) == 0
+	editRenderer.Configured = editRenderer.Ready
+	if editRenderer.Ready {
+		editRenderer.State = "available"
+	}
+	envelope.Capabilities = append(envelope.Capabilities, ProductionCapability{ID: "rendering", Implemented: true, Ready: renderer.Ready || editRenderer.Ready, Providers: []ProviderCapability{renderer, editRenderer}, Tools: []string{"video_job_start", "video_render_start"}, Notes: []string{"激活DSL时使用FFmpeg，无需Node/浏览器；文字片段另需配置字体", "就绪表示依赖检查通过；实际合成由任务执行与MP4验证确认"}})
 	return envelope
 }
 func (a *App) capabilities(w http.ResponseWriter, r *http.Request) {

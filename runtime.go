@@ -7,7 +7,7 @@ import (
 	"net/http"
 )
 
-var videoTools = []string{"video_project_create", "video_production_text", "video_production_stage", "video_capabilities_get", "video_asset_list", "video_asset_import", "video_asset_inspect", "video_job_start", "video_job_get", "video_job_list", "video_job_cancel", "video_project_get", "video_news_get", "video_project_update", "video_news_audio_adopt", "video_subtitles_update", "video_speech_start", "video_speech_stop", "video_speech_adopt", "video_render_start", "video_render_stop"}
+var videoTools = []string{"video_edit_get", "video_edit_validate", "video_edit_update", "video_edit_activate", "video_project_create", "video_production_text", "video_production_stage", "video_capabilities_get", "video_asset_list", "video_asset_import", "video_asset_inspect", "video_job_start", "video_job_get", "video_job_list", "video_job_cancel", "video_project_get", "video_news_get", "video_project_update", "video_news_audio_adopt", "video_subtitles_update", "video_speech_start", "video_speech_stop", "video_speech_adopt", "video_render_start", "video_render_stop"}
 
 type runtimeView struct {
 	AppID         string `json:"appId"`

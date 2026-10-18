@@ -1,3 +1,16 @@
+# 升级到 v0.11.0
+
+保留完整data，停服务后替换二进制或重建Docker。已连接项目更新工具至v0.11.0（共25个MCP工具）。旧项目仍默认旧镜头模式，不自动迁移正文或音轨。
+
+上传素材后在“剪辑时间线”创建示例或让Codex编写，校验、保存并启用。启用后渲染只读剪辑DSL，旧正文/音轨/字幕不自动混入；点击“使用旧镜头”可切回，DSL继续保留。
+
+剪辑渲染只需FFmpeg/FFprobe；文字另需字体。可直接bin/video-app --data ./data --font <字体绝对路径>。旧模式继续依赖HyperFrames、GSAP、Node与浏览器。Docker镜像标签为0.11.0，保留原数据挂载与Token。
+
+详见EDIT-DSL.md与VALIDATION-0.11.md。Windows仅交叉编译。降级请恢复完整备份。
+
+---
+以下为历史说明。
+
 # 升级到 v0.10.0
 
 1. 停止App并备份完整data，替换二进制或重建Docker镜像；保留项目、素材、Token、RunDesk身份和TTS配置。

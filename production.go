@@ -38,6 +38,10 @@ func productionNarrationCurrent(p Project) bool {
 	return b.AssetID == n.AssetID && b.TextHash == hashBytes([]byte(storyboardText(p))) && b.ScriptHash == speechScriptHash(p) && b.Start == n.Start && b.SourceStart == n.SourceStart && b.SHA256 != ""
 }
 func productionHash(p Project) string {
+	if usesEditDSL(p) {
+		b, _ := json.Marshal(p.EditDSL)
+		return hashBytes(b)
+	}
 	b, _ := json.Marshal(struct {
 		Shots     []Shot
 		Audio     *AudioMix
@@ -164,6 +168,10 @@ func (a *App) production(w http.ResponseWriter, r *http.Request) {
 			q.Production.FinalHash = ""
 			q.Production.FinalRenderID = ""
 		case "final":
+			if usesEditDSL(q) {
+				fail(w, 409, errors.New("当前终稿确认仅用于旧正文模式，剪辑模式请先检查渲染结果"))
+				return
+			}
 			if e := validateTextProjection(q.Production, q.Shots); e != nil {
 				fail(w, 409, e)
 				return

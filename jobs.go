@@ -89,10 +89,19 @@ func speechJobView(pid string, j SpeechJob) ProductionJob {
 	}
 	return v
 }
+func renderProvider(j Render) string {
+	if j.Engine == "ffmpeg_edit" {
+		return "ffmpeg_edit"
+	}
+	return "hyperframes"
+}
 func renderJobView(pid string, j Render) ProductionJob {
-	v := ProductionJob{ID: "render:" + j.ID, NativeID: j.ID, ProjectID: pid, Type: "render", Provider: "hyperframes", State: unifiedState(j.State), NativeState: j.State, Revision: j.Revision, RequestID: j.RequestID, Created: j.Created, Error: j.Error, Artifacts: []JobArtifact{}}
+	v := ProductionJob{ID: "render:" + j.ID, NativeID: j.ID, ProjectID: pid, Type: "render", Provider: renderProvider(j), State: unifiedState(j.State), NativeState: j.State, Revision: j.Revision, RequestID: j.RequestID, Created: j.Created, Error: j.Error, Artifacts: []JobArtifact{}}
 	if j.State == "completed" {
 		v.Artifacts = append(v.Artifacts, JobArtifact{Name: "final.mp4", URL: "/api/projects/" + pid + "/renders/" + j.ID + "/final.mp4"}, JobArtifact{Name: "snapshot.json", URL: "/api/projects/" + pid + "/renders/" + j.ID + "/snapshot.json"}, JobArtifact{Name: "validation.json", URL: "/api/projects/" + pid + "/renders/" + j.ID + "/validation.json"})
+	}
+	if j.State == "completed" && j.Engine == "ffmpeg_edit" {
+		v.Artifacts = append(v.Artifacts, JobArtifact{Name: "edit-ir.json", URL: "/api/projects/" + pid + "/renders/" + j.ID + "/edit-ir.json"})
 	}
 	return v
 }

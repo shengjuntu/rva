@@ -1,0 +1,58 @@
+{
+  "version": "0.11.0",
+  "phase": 2,
+  "goRaceTests": {
+    "passed": 127,
+    "failed": 0,
+    "skipped": [
+      "TestSpeechSnapshotGenerationAndAdoption"
+    ]
+  },
+  "nodeTests": 6,
+  "domAndHTTP": {
+    "passed": true,
+    "environment": "JSDOM + real Go HTTP API, not a graphical browser",
+    "checks": [
+      "load embedded UI",
+      "save narration text",
+      "build paragraph alignment table",
+      "protect canonical text",
+      "assign actual uploaded image",
+      "preserve mapping after new lead",
+      "persist text",
+      "return actual MCP image content",
+      "capability status panel",
+      "actual HTTP import deduplication",
+      "unsupported generation rejection",
+      "unified task panel",
+      "create and save editing DSL",
+      "activate DSL render mode",
+      "show compiled multi-track timeline",
+      "switch back without deleting DSL"
+    ]
+  },
+  "schema": {
+    "validSchema": true,
+    "draft": "2020-12",
+    "sampleDocumentValid": true
+  },
+  "realFFmpegChecks": [
+    "multi-track MP4 encoding",
+    "source in/out and 2x speed verified by changing source colors",
+    "after and clip-edge anchor ordering",
+    "inset position and 50% opacity verified by pixels",
+    "literal text glyph pixels",
+    "silent prefix before delayed audio",
+    "nonzero audio after placement",
+    "immutable compiled render snapshot",
+    "output dimension/fps/audio/duration validation"
+  ],
+  "notTested": [
+    "graphical browser playback/layout",
+    "real Codex production orchestration",
+    "real IndexTTS model",
+    "Chinese font visual quality",
+    "Docker image build",
+    "Windows runtime"
+  ]
+}

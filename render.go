@@ -69,13 +69,13 @@ func (a *App) startRender(w http.ResponseWriter, r *http.Request) {
 		fail(w, 409, errors.New("项目版本冲突，请重新载入"))
 		return
 	}
-	if len(p.Shots) == 0 {
+	if !usesEditDSL(*p) && len(p.Shots) == 0 {
 		a.mu.Unlock()
 		fail(w, 409, errors.New("请先保存至少一个镜头"))
 		return
 	}
 	refreshSubtitleState(p)
-	if p.Subtitles != nil && p.Subtitles.Enabled && p.Subtitles.Status != "ready" && !(request.Kind == "draft" && draftSubtitlePreviewAllowed(*p)) {
+	if !usesEditDSL(*p) && p.Subtitles != nil && p.Subtitles.Enabled && p.Subtitles.Status != "ready" && !(request.Kind == "draft" && draftSubtitlePreviewAllowed(*p)) {
 		reason := p.Subtitles.Reason
 		a.mu.Unlock()
 		fail(w, 409, errors.New(reason))
@@ -86,17 +86,49 @@ func (a *App) startRender(w http.ResponseWriter, r *http.Request) {
 		fail(w, 409, errors.New("已有渲染任务运行，原型版一次渲染一个任务"))
 		return
 	}
-	for _, path := range []string{a.hf, a.font, a.gsap} {
-		if info, e := os.Stat(path); e != nil || info.IsDir() {
+	ir := EditIR{}
+	if usesEditDSL(*p) {
+		var e error
+		ir, e = compileEdit(*p.EditDSL, p.Assets)
+		if e != nil {
 			a.mu.Unlock()
-			fail(w, 409, errors.New("请先配置 HyperFrames CLI、中文字体和 GSAP 文件"))
+			editErrorResponse(w, e)
 			return
+		}
+		for _, name := range []string{"ffmpeg", "ffprobe"} {
+			if _, e := exec.LookPath(name); e != nil {
+				a.mu.Unlock()
+				fail(w, 409, fmt.Errorf("缺少%s", name))
+				return
+			}
+		}
+		if ir.HasText && !regularFile(a.font) {
+			a.mu.Unlock()
+			fail(w, 409, errors.New("文字片段需要配置字体文件"))
+			return
+		}
+	}
+	if !usesEditDSL(*p) {
+		for _, path := range []string{a.hf, a.font, a.gsap} {
+			if info, e := os.Stat(path); e != nil || info.IsDir() {
+				a.mu.Unlock()
+				fail(w, 409, errors.New("请先配置 HyperFrames CLI、中文字体和 GSAP 文件"))
+				return
+			}
 		}
 	}
 	q := clone(p)
 	job := Render{RequestID: request.RequestID, RequestHash: requestHash, Kind: request.Kind, ContentHash: productionHash(*p), HasSubtitles: p.Subtitles != nil && p.Subtitles.Enabled, HasAudio: len(audioTracks(p.Audio)) > 0, ID: uid(), Revision: p.Revision, State: "running", Created: time.Now().UTC().Format(time.RFC3339Nano)}
-	for _, s := range p.Shots {
-		job.Duration += s.Duration
+	if usesEditDSL(*p) {
+		job.Engine = "ffmpeg_edit"
+		job.Duration = ir.Duration
+		job.HasAudio = ir.HasAudio
+		job.HasSubtitles = false
+	} else {
+		job.Engine = "hyperframes"
+		for _, s := range p.Shots {
+			job.Duration += s.Duration
+		}
 	}
 	q.Renders = append(q.Renders, job)
 	if e := a.save(&q); e != nil {
@@ -246,6 +278,10 @@ func (a *App) compose(p Project, dir string) error {
 	return atomicJSON(filepath.Join(dir, "snapshot.json"), p)
 }
 func (a *App) render(ctx context.Context, p Project, job Render) {
+	if usesEditDSL(p) {
+		a.renderEditDSL(ctx, p, job)
+		return
+	}
 	dir := filepath.Join(a.dir(p.ID), "renders", job.ID)
 	e := os.MkdirAll(dir, 0700)
 	var logfile *os.File
@@ -323,26 +359,7 @@ func (a *App) render(ctx context.Context, p Project, job Render) {
 	if e != nil && logfile != nil {
 		fmt.Fprintln(logfile, "FAILED:", e)
 	}
-	a.mu.Lock()
-	defer a.mu.Unlock()
-	delete(a.jobs, job.ID)
-	current := a.projects[p.ID]
-	for i := range current.Renders {
-		j := &current.Renders[i]
-		if j.ID == job.ID {
-			j.State = "completed"
-			if e != nil {
-				j.State = "failed"
-				j.Error = e.Error()
-			}
-			if ctx.Err() != nil {
-				j.State = "interrupted"
-				j.Error = "渲染已取消"
-			}
-			break
-		}
-	}
-	_ = a.save(current)
+	a.finishRender(ctx, p.ID, job.ID, e)
 }
 func (a *App) renderFile(w http.ResponseWriter, r *http.Request) {
 	p, e := a.get(r.PathValue("id"))
@@ -361,7 +378,7 @@ func (a *App) renderFile(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if !found || (file != "final.mp4" && file != "render.log" && file != "snapshot.json" && file != "validation.json" && file != "subtitles.srt") {
+	if !found || (file != "final.mp4" && file != "render.log" && file != "snapshot.json" && file != "validation.json" && file != "subtitles.srt" && file != "edit-ir.json" && file != "filter.ffscript") {
 		fail(w, 404, errors.New("文件不存在"))
 		return
 	}
