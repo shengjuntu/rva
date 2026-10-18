@@ -64,7 +64,7 @@ func TestStartupFailureReleasesLock(t *testing.T) {
 			case "token":
 				t.Setenv("VIDEO_APP_TOKEN", "bad")
 			case "url":
-				opts.RunDesk = "https://example.com"
+				opts.RunDesk = "file:///invalid"
 			case "port":
 				l, e := net.Listen("tcp", "127.0.0.1:0")
 				if e != nil {

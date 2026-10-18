@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -57,60 +56,74 @@ func (a *App) connect(w http.ResponseWriter, r *http.Request) {
 		fail(w, 500, e)
 		return
 	}
-	if p.SessionID != "" && p.ToolsVersion == version && a.cfg.SkillPath != "" && r.URL.Query().Get("refresh") != "1" {
-		writeJSON(w, 200, p)
+	a.mu.Lock()
+	if a.cfg.InstallationID == "" {
+		a.cfg.InstallationID = uid()
+		e = atomicJSON(filepath.Join(a.data, "config.json"), a.cfg)
+	}
+	installationID, iid := a.cfg.InstallationID, a.cfg.InstanceID
+	a.mu.Unlock()
+	if e != nil {
+		fail(w, 500, e)
 		return
 	}
-	a.mu.Lock()
-	iid := a.cfg.InstanceID
-	a.mu.Unlock()
-	if iid == "" {
-		var inst struct {
-			ID string `json:"id"`
+	// Migrating an old app must not change capabilities during an active turn.
+	if iid != "" && !a.cfg.ManagedByRunDesk {
+		var sessions []struct {
+			InstanceID string `json:"instanceId"`
+			Status     string `json:"status"`
 		}
-		e = a.rdOperation(r.Context(), "instance", "/instances", map[string]any{"name": "视频制作 App", "description": "RunDesk Video App 专用配置"}, &inst, false, true)
-		if e != nil {
+		if e = a.rdCall(r.Context(), "GET", "/sessions", nil, &sessions); e != nil {
 			fail(w, 502, e)
 			return
 		}
-		iid = inst.ID
-		a.mu.Lock()
-		a.cfg.InstanceID = iid
-		e = atomicJSON(filepath.Join(a.data, "config.json"), a.cfg)
-		a.mu.Unlock()
-		if e != nil {
-			fail(w, 500, e)
-			return
+		for _, ss := range sessions {
+			if ss.InstanceID == iid && (ss.Status == "running" || ss.Status == "waiting" || ss.Status == "starting" || ss.Status == "stopping") {
+				fail(w, 409, errors.New("请等待旧应用当前任务结束后迁移连接"))
+				return
+			}
 		}
 	}
-	// Configuration belongs to the shared video instance. Do not reload it
-	// while another project is running through this App.
-	var sessions []struct {
-		InstanceID string `json:"instanceId"`
-		Status     string `json:"status"`
+	base := a.public
+	if base == "" {
+		scheme := "http"
+		if r.TLS != nil {
+			scheme = "https"
+		}
+		base = scheme + "://" + r.Host
 	}
-	if e = a.rdCall(r.Context(), "GET", "/sessions", nil, &sessions); e != nil {
+	var binding struct {
+		Application struct {
+			InstanceID  string `json:"instanceId"`
+			WorkspaceID string `json:"workspaceId"`
+		} `json:"application"`
+		Status  string `json:"status"`
+		Message string `json:"message"`
+	}
+	e = a.rdCall(r.Context(), "POST", "/applications/rundesk-video-app/connect", map[string]any{
+		"name": "视频制作", "description": "读取视频项目与素材，编写脚本、分镜并保存项目；按用户要求制作视频。任务须提供 projectId。",
+		"installationId": installationID, "instanceId": iid, "workspaceId": p.WorkspaceID, "entryUrl": base,
+		"defaults": map[string]any{"skills": map[string]any{"video-project": map[string]string{"SKILL.md": projectSkill}}, "mcp": map[string]any{"video_project": map[string]any{"url": base + "/api/mcp", "http_headers": map[string]string{"Authorization": "Bearer " + a.token}, "enabled": true}}},
+	}, &binding)
+	if e != nil {
 		fail(w, 502, e)
 		return
 	}
-	for _, ss := range sessions {
-		if ss.InstanceID == iid && (ss.Status == "running" || ss.Status == "waiting" || ss.Status == "starting" || ss.Status == "stopping") {
-			fail(w, 409, errors.New("视频实例还有运行中的任务，请结束后再更新工具配置"))
-			return
-		}
+	iid = binding.Application.InstanceID
+	a.mu.Lock()
+	a.cfg.InstanceID = iid
+	a.cfg.SkillPath = ""
+	a.cfg.ManagedByRunDesk = true
+	e = atomicJSON(filepath.Join(a.data, "config.json"), a.cfg)
+	a.mu.Unlock()
+	if e != nil {
+		fail(w, 500, e)
+		return
 	}
 	if p.WorkspaceID == "" {
-		var ws struct {
-			ID string `json:"id"`
-		}
-		e = a.rdOperation(r.Context(), "workspace:"+p.ID, "/workspaces", map[string]string{"name": "视频 · " + p.Name, "path": filepath.Join(a.dir(id), "workspace")}, &ws, false, true)
-		if e != nil {
-			fail(w, 502, e)
-			return
-		}
 		a.mu.Lock()
 		q := clone(a.projects[id])
-		q.WorkspaceID = ws.ID
+		q.WorkspaceID = binding.Application.WorkspaceID
 		e = a.save(&q)
 		if e == nil {
 			a.projects[id] = &q
@@ -122,73 +135,8 @@ func (a *App) connect(w http.ResponseWriter, r *http.Request) {
 		}
 		p = q
 	}
-	suffix := "?instanceId=" + url.QueryEscape(iid)
-	e = a.rdCall(r.Context(), "PUT", "/workspaces/"+p.WorkspaceID+"/skills/video-project"+suffix+"&scope=instance", map[string]string{"content": projectSkill}, nil)
-	if e != nil {
-		fail(w, 502, e)
-		return
-	}
-	var inventory struct {
-		Skills []struct {
-			Name    string `json:"name"`
-			Path    string `json:"path"`
-			Scope   string `json:"sourceScope"`
-			Enabled bool   `json:"enabled"`
-		} `json:"skills"`
-	}
-	if e = a.rdCall(r.Context(), "GET", "/instances/"+iid+"/configuration?workspaceId="+url.QueryEscape(p.WorkspaceID)+"&probe=1", nil, &inventory); e != nil {
-		fail(w, 502, e)
-		return
-	}
-	skillPath := ""
-	for _, sk := range inventory.Skills {
-		if sk.Name == "video-project" && sk.Scope == "instance" {
-			skillPath = sk.Path
-			if !sk.Enabled {
-				e = a.rdCall(r.Context(), "POST", "/workspaces/"+p.WorkspaceID+"/skills/toggle"+suffix, map[string]any{"path": sk.Path, "enabled": true}, nil)
-				if e != nil {
-					fail(w, 502, e)
-					return
-				}
-			}
-			break
-		}
-	}
-	if skillPath == "" {
-		fail(w, 409, errors.New("实例 Skill 已写入，但 Codex 尚未发现，请检查实例环境"))
-		return
-	}
-	a.mu.Lock()
-	a.cfg.SkillPath = skillPath
-	e = atomicJSON(filepath.Join(a.data, "config.json"), a.cfg)
-	a.mu.Unlock()
-	if e != nil {
-		fail(w, 500, e)
-		return
-	}
-	var mcp struct {
-		Version string `json:"version"`
-	}
-	e = a.rdCall(r.Context(), "GET", "/workspaces/"+p.WorkspaceID+"/mcp"+suffix, nil, &mcp)
-	if e != nil {
-		fail(w, 502, e)
-		return
-	}
-	binary, e := os.Executable()
-	if e != nil {
-		fail(w, 500, e)
-		return
-	}
-	var mcpSaved struct {
-		ReloadError string `json:"reloadError"`
-	}
-	e = a.rdCall(r.Context(), "PUT", "/workspaces/"+p.WorkspaceID+"/mcp/video_project"+suffix, map[string]any{"version": mcp.Version, "config": map[string]any{"command": binary, "args": []string{"mcp", "--url", a.public}, "env": map[string]string{"VIDEO_APP_TOKEN": a.token}, "enabled": true}}, &mcpSaved)
-	if e != nil {
-		fail(w, 502, e)
-		return
-	}
-	if mcpSaved.ReloadError != "" {
-		fail(w, 409, errors.New("MCP 配置已保存但重载失败，请检查实例环境后重新配置"))
+	if binding.Status != "connected" {
+		fail(w, 409, errors.New(binding.Message))
 		return
 	}
 	if p.SessionID == "" {

@@ -815,7 +815,7 @@ $("#environment").onclick = action(async () => {
   $("#env-dialog").showModal();
   $("#env-info").textContent = "检查中…";
   const env = await api("/api/environment");
-  $("#open-rundesk").href = env.rundeskURL;
+  $("#open-rundesk").href = env.rundeskURL + (project?.sessionId ? "/?session="+encodeURIComponent(project.sessionId) : "/#application/rundesk-video-app");
   const box = $("#env-info");
   box.replaceChildren();
   box.append(
@@ -866,7 +866,7 @@ async function boot() {
   showApp();
   api("/api/environment")
     .then((e) => {
-      $("#open-rundesk").href = e.rundeskURL;
+      $("#open-rundesk").href = e.rundeskURL + (project?.sessionId ? "/?session="+encodeURIComponent(project.sessionId) : "/#application/rundesk-video-app");
     })
     .catch(() => {});
   if (list.length) await openProject(list[0].id);

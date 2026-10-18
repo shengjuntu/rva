@@ -16,11 +16,14 @@ func mcpMain(args []string) {
 	flags := flag.NewFlagSet("mcp", flag.ExitOnError)
 	base := flags.String("url", "http://127.0.0.1:3220", "video app URL")
 	_ = flags.Parse(args)
-	scanner := bufio.NewScanner(os.Stdin)
-	scanner.Buffer(make([]byte, 4096), 2<<20)
 	client := &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(r *http.Request, v []*http.Request) error { return http.ErrUseLastResponse }}
+	runMCP(os.Stdin, os.Stdout, *base, os.Getenv("VIDEO_APP_TOKEN"), client)
+}
+func runMCP(input io.Reader, output io.Writer, base, token string, client *http.Client) {
+	scanner := bufio.NewScanner(input)
+	scanner.Buffer(make([]byte, 4096), 2<<20)
 	send := func(id json.RawMessage, result any) {
-		_ = json.NewEncoder(os.Stdout).Encode(map[string]any{"jsonrpc": "2.0", "id": id, "result": result})
+		_ = json.NewEncoder(output).Encode(map[string]any{"jsonrpc": "2.0", "id": id, "result": result})
 	}
 	for scanner.Scan() {
 		var msg struct {
@@ -36,7 +39,7 @@ func mcpMain(args []string) {
 		}
 		switch msg.Method {
 		case "initialize":
-			send(msg.ID, map[string]any{"protocolVersion": "2024-11-05", "capabilities": map[string]any{"tools": map[string]any{}}, "serverInfo": map[string]string{"name": "video-project", "version": version}})
+			send(msg.ID, map[string]any{"protocolVersion": mcpProtocol(msg.Params), "capabilities": map[string]any{"tools": map[string]any{}}, "serverInfo": map[string]string{"name": "video-project", "version": version}})
 		case "ping":
 			send(msg.ID, map[string]any{})
 		case "tools/list":
@@ -145,10 +148,10 @@ func mcpMain(args []string) {
 			}
 			var raw []byte
 			if e == nil {
-				req, err := http.NewRequest(method, *base+path, bytes.NewReader(body))
+				req, err := http.NewRequest(method, base+path, bytes.NewReader(body))
 				e = err
 				if e == nil {
-					req.Header.Set("Authorization", "Bearer "+os.Getenv("VIDEO_APP_TOKEN"))
+					req.Header.Set("Authorization", "Bearer "+token)
 					req.Header.Set("Content-Type", "application/json")
 					resp, err := client.Do(req)
 					e = err
@@ -170,7 +173,19 @@ func mcpMain(args []string) {
 				send(msg.ID, map[string]any{"content": []any{map[string]string{"type": "text", "text": string(raw)}}})
 			}
 		default:
-			_ = json.NewEncoder(os.Stdout).Encode(map[string]any{"jsonrpc": "2.0", "id": msg.ID, "error": map[string]any{"code": -32601, "message": "Method not found"}})
+			_ = json.NewEncoder(output).Encode(map[string]any{"jsonrpc": "2.0", "id": msg.ID, "error": map[string]any{"code": -32601, "message": "Method not found"}})
 		}
 	}
+}
+
+func mcpProtocol(raw json.RawMessage) string {
+	var v struct {
+		Version string `json:"protocolVersion"`
+	}
+	_ = json.Unmarshal(raw, &v)
+	switch v.Version {
+	case "2024-11-05", "2025-03-26", "2025-06-18", "2025-11-25":
+		return v.Version
+	}
+	return "2025-03-26"
 }

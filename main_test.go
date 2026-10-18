@@ -157,6 +157,13 @@ func TestRunDeskConfigurationAndSteer(t *testing.T) {
 				t.Error("missing application source")
 			}
 			writeJSON(w, 200, map[string]string{"id": sid})
+		case "/api/v1/applications/rundesk-video-app/connect":
+			defaults := body["defaults"].(map[string]any)
+			mcp := defaults["mcp"].(map[string]any)["video_project"].(map[string]any)
+			if mcp["url"] != "http://127.0.0.1:3220/api/mcp" {
+				t.Fatal(mcp)
+			}
+			writeJSON(w, 200, map[string]any{"application": map[string]string{"instanceId": iid, "workspaceId": wid}, "status": "connected"})
 		case "/api/v1/instances":
 			writeJSON(w, 200, map[string]string{"id": iid})
 		case "/api/v1/workspaces":
@@ -207,7 +214,7 @@ func TestRunDeskConfigurationAndSteer(t *testing.T) {
 	}
 	before := len(seen)
 	call(a, "POST", "/api/projects/"+p.ID+"/connect", map[string]any{})
-	if len(seen) != before+1 || seen[len(seen)-1] != "GET /api/v1/meta" {
+	if len(seen) != before+2 || seen[len(seen)-1] != "POST /api/v1/applications/rundesk-video-app/connect" {
 		t.Fatal("connect not idempotent")
 	}
 	a.saveAgent(p.ID, func(q *Project) { q.AgentRunID = "run-1" })

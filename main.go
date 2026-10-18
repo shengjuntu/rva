@@ -28,7 +28,7 @@ import (
 	"time"
 )
 
-const version = "0.5.1"
+const version = "0.6.0"
 
 //go:embed web/*
 var ui embed.FS
@@ -87,9 +87,11 @@ type Project struct {
 	ToolsVersion    string           `json:"toolsVersion,omitempty"`
 }
 type Config struct {
-	RunDeskURL string `json:"rundeskURL,omitempty"`
-	SkillPath  string `json:"skillPath,omitempty"`
-	InstanceID string `json:"instanceId"`
+	InstallationID   string `json:"installationId,omitempty"`
+	ManagedByRunDesk bool   `json:"managedByRunDesk,omitempty"`
+	RunDeskURL       string `json:"rundeskURL,omitempty"`
+	SkillPath        string `json:"skillPath,omitempty"`
+	InstanceID       string `json:"instanceId"`
 }
 type App struct {
 	espeak                                           string
@@ -311,8 +313,9 @@ func (a *App) auth(next http.Handler) http.Handler {
 		if host == "" {
 			host = r.Host
 		}
-		if !net.ParseIP(host).IsLoopback() && host != "localhost" {
-			fail(w, 403, errors.New("仅接受本机 Host"))
+		publicURL, _ := url.Parse(a.public)
+		if !net.ParseIP(host).IsLoopback() && host != "localhost" && (publicURL == nil || r.Host != publicURL.Host) {
+			fail(w, 403, errors.New("请求 Host 与配置的应用地址不一致"))
 			return
 		}
 		if origin := r.Header.Get("Origin"); origin != "" {
@@ -337,6 +340,7 @@ func (a *App) auth(next http.Handler) http.Handler {
 }
 func (a *App) routes() http.Handler {
 	m := http.NewServeMux()
+	m.HandleFunc("POST /api/mcp", a.mcpHTTP)
 	m.HandleFunc("GET /api/speech/capabilities", a.speechCapabilities)
 	m.HandleFunc("POST /api/projects/{id}/speech", a.startSpeech)
 	m.HandleFunc("POST /api/projects/{id}/speech/{sid}/stop", a.stopSpeech)
@@ -578,8 +582,8 @@ type serverOptions struct{ Data, Listen, RunDesk, HyperFrames, Font, GSAP, ESpea
 
 func serve(opts serverOptions) error {
 	host, _, e := net.SplitHostPort(opts.Listen)
-	if e != nil || !net.ParseIP(host).IsLoopback() {
-		return errors.New("--listen must use a loopback IP; use SSH port forwarding for remote access")
+	if e != nil || net.ParseIP(host) == nil {
+		return errors.New("--listen must use an IP address and port")
 	}
 	if e = os.MkdirAll(opts.Data, 0700); e != nil {
 		return e
@@ -598,8 +602,8 @@ func serve(opts serverOptions) error {
 	}
 	a.rd = strings.TrimSuffix(strings.TrimSuffix(strings.TrimRight(opts.RunDesk, "/"), "/api/v1"), "/api")
 	u, e := url.Parse(a.rd)
-	if e != nil || u.Scheme != "http" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (!net.ParseIP(u.Hostname()).IsLoopback() && u.Hostname() != "localhost") {
-		return errors.New("requires same-machine RunDesk at a loopback HTTP URL")
+	if e != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+		return errors.New("RunDesk 需要有效的 HTTP(S) 地址")
 	}
 	a.rdToken = os.Getenv("RUNDESK_TOKEN")
 	a.token = os.Getenv("VIDEO_APP_TOKEN")
@@ -629,6 +633,13 @@ func serve(opts serverOptions) error {
 		return e
 	}
 	a.public = "http://" + opts.Listen
+	if override := os.Getenv("VIDEO_APP_PUBLIC_URL"); override != "" {
+		u, err := url.Parse(override)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+			return errors.New("VIDEO_APP_PUBLIC_URL 无效")
+		}
+		a.public = strings.TrimRight(override, "/")
+	}
 	srv := &http.Server{Addr: opts.Listen, Handler: a.routes(), ReadHeaderTimeout: 10 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

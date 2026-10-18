@@ -256,8 +256,8 @@ func (a *App) recoverAgent(ctx context.Context, p Project, allowSend bool) (any,
 		return nil, nil
 	}
 	suffix := "/turns"
-	body := map[string]any{"text": fmt.Sprintf("[Video App projectId=%s requestId=%s] 使用 video-project Skill 和 video_project MCP。先读取项目当前 revision。\n用户要求：\n%s", p.ID, pending.ID, pending.Text), "files": []string{}, "skills": []any{}}
-	if a.cfg.SkillPath != "" {
+	body := map[string]any{"text": fmt.Sprintf("[Video App projectId=%s requestId=%s] 按 RunDesk 配置的视频制作能力执行，并通过业务工具保存结果。先读取项目当前 revision。\n用户要求：\n%s", p.ID, pending.ID, pending.Text), "files": []string{}, "skills": []any{}}
+	if !a.cfg.ManagedByRunDesk && a.cfg.SkillPath != "" {
 		body["skills"] = []map[string]string{{"name": "video-project", "path": a.cfg.SkillPath}}
 	}
 	if pending.TurnID != "" {

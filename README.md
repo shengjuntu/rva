@@ -1,10 +1,10 @@
-# RunDesk Video App · v0.5.1
+# RunDesk Video App · v0.6.0
 
 一个使用 **Go + HTML/CSS/原生 JavaScript** 的本地视频工作台。通过 RunDesk HTTP API 使用 Codex；项目、素材、分镜和渲染任务由视频 App 管理。
 
 本仓库是独立 App 原型，不改变 RunDesk 的通用定位。暂用工作名称“视频工作台”。主程序只使用 Go 标准库，页面嵌入二进制。渲染器是独立安装的 HyperFrames CLI；它需要 Node.js、Chrome 和 FFmpeg。
 
-v0.5.1 适配 RunDesk API v1，要求 RunDesk 0.6.0+，已与 0.6.1 联调。提交前保存原请求，连接中断或刷新后继续确认；停止绑定原运行编号。在“环境准备”查看实例模型、Skill、MCP。参见 [升级步骤](docs/UPGRADING.md) 和 [验证记录](docs/VALIDATION-0.5.1.md)。
+v0.6.0 要求 RunDesk 0.15.0+。连接时自动登记应用，复用旧实例和会话，初始能力由 RunDesk 安装；重连不重写后台配置。新增 HTTP MCP，模型、Skills、MCP、Docker 在 RunDesk 中管理。参见 [本次升级](docs/APPLICATION-CONNECT.md)。
 
 ![界面截图](docs/preview.png)
 
