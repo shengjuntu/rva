@@ -1,5 +1,5 @@
 "use strict";
-const TOOL_VERSION = "0.5.0";
+const TOOL_VERSION = "0.5.1";
 const $ = (s) => document.querySelector(s),
   el = (tag, text, cls) => {
     const n = document.createElement(tag);
@@ -32,6 +32,9 @@ const api = async (path, body, method) => {
   if (!r.ok) {
     const e = new Error(data.error || r.statusText);
     e.status = r.status;
+    e.code = data.code;
+    e.uncertain = data.uncertain;
+    e.requestId = data.requestId;
     throw e;
   }
   return data;
@@ -62,6 +65,36 @@ function id() {
   return [...crypto.getRandomValues(new Uint8Array(12))]
     .map((x) => x.toString(16).padStart(2, "0"))
     .join("");
+}
+// Save before sending. A refresh or unknown response must reuse the same input.
+function pendingMessage(pid) {
+  try { return JSON.parse(sessionStorage.getItem("video-message:" + pid) || "null"); }
+  catch { return null; }
+}
+function rememberMessage(pid, body) {
+  if (body) sessionStorage.setItem("video-message:" + pid, JSON.stringify(body));
+  else sessionStorage.removeItem("video-message:" + pid);
+}
+function reconcileMessage(submission) {
+  if (!project) return;
+  let pending = pendingMessage(project.id);
+  if (!pending && submission?.state === "pending") {
+    pending = {text: submission.text, requestId: submission.id};
+    if (submission.turnId) pending.expectedTurnId = submission.turnId;
+    rememberMessage(project.id, pending);
+  }
+  if (pending && submission?.id === pending.requestId && ["accepted", "failed", "canceled"].includes(submission.state)) {
+    rememberMessage(project.id, null);
+    if (submission.state === "accepted" && $("#prompt").value.trim() === pending.text) $("#prompt").value = "";
+    $("#send-state").textContent = submission.state === "accepted" ? "指令已接收" : submission.error || "原提交已结束";
+    pending = null;
+  }
+  if (pending) {
+    if (!$("#prompt").value) $("#prompt").value = pending.text;
+    $("#send-state").textContent = submission?.cancelRequested ? "正在确认停止；不会重新启动任务" : "原指令待确认；重试会沿用原请求编号和内容";
+    $("#send").textContent = "确认原提交";
+  }
+  return pending;
 }
 function showApp() {
   $("#login").hidden = true;
@@ -109,6 +142,7 @@ async function openProject(pid) {
   $("#player").hidden = true;
   $("#poster").hidden = false;
   drawProject();
+  reconcileMessage(p.agentSubmission);
 }
 function drawProject() {
   if (!project) return;
@@ -124,7 +158,7 @@ function drawProject() {
       ? "重新配置工具"
       : "升级项目工具至 v" + TOOL_VERSION;
   $("#connect").textContent = project.sessionId
-    ? "已配置项目 Skill 与 MCP"
+    ? "已配置实例 Skill 与 MCP"
     : "连接 RunDesk 并配置工具";
   $("#send").disabled = !project.sessionId || sending;
   $("#agent-status").textContent = project.sessionId ? "待命" : "未连接";
@@ -539,6 +573,8 @@ async function poll() {
       ]);
       if (gen !== epoch) return;
       session = s;
+      project.agentSubmission = s.appSubmission;
+      project.agentRunId = s.appRunId;
       $("#agent-status").textContent =
         {
           running: "正在创作",
@@ -558,6 +594,8 @@ async function poll() {
         s.turnId && ["running", "waiting"].includes(s.status)
           ? "补充指令"
           : "发送";
+      const pending = reconcileMessage(s.appSubmission);
+      if (pending) $("#agent-stop").hidden = false;
       consume(events);
       drawApprovals(approvals);
     }
@@ -718,7 +756,7 @@ $("#connect").onclick = action(async () => {
       project.toolsVersion = p.toolsVersion;
       drawProject();
     }
-    toast("已配置专用实例、项目 Skill 和 MCP");
+    toast("已配置专用实例、实例 Skill 和 MCP");
   } finally {
     $("#connect").disabled = !!project?.sessionId;
   }
@@ -729,23 +767,31 @@ $("#composer").onsubmit = action(async (e) => {
   if (sending || !project?.sessionId) return;
   const text = $("#prompt").value.trim();
   if (!text) return;
+  const pid = project.id, gen = epoch;
+  let body = pendingMessage(pid);
+  if (body && text !== body.text) {
+    toast("上一条消息仍待确认；请先确认原提交，再发送新内容"); return;
+  }
   await save();
-  const pid = project.id,
-    gen = epoch;
-  const previous = session;
+  if (gen !== epoch) return;
+  if (!body) {
+    body = {text, requestId: id()};
+    if (session?.turnId && ["running", "waiting"].includes(session.status)) body.expectedTurnId = session.turnId;
+    rememberMessage(pid, body);
+  }
   sending = true;
   $("#send").disabled = true;
   try {
-    const body = { text, requestId: id() };
-    if (previous?.turnId && ["running", "waiting"].includes(previous.status))
-      body.expectedTurnId = previous.turnId;
     await api("/api/projects/" + pid + "/messages", body);
+    rememberMessage(pid, null);
     if (gen === epoch) {
-      $("#prompt").value = "";
-      $("#send-state").textContent = body.expectedTurnId
-        ? "补充指令已接收"
-        : "指令已发送";
+      if ($("#prompt").value.trim() === body.text) $("#prompt").value = "";
+      $("#send-state").textContent = "指令已接收";
     }
+  } catch (err) {
+    if (err.status >= 400 && err.status < 500 && !err.uncertain) rememberMessage(pid, null);
+    if (gen === epoch) $("#send-state").textContent = pendingMessage(pid) ? "接收情况待确认，已保留原指令，可刷新后继续确认" : err.message;
+    throw err;
   } finally {
     sending = false;
     $("#send").disabled = !project?.sessionId;
@@ -759,7 +805,9 @@ $("#prompt").onkeydown = (e) => {
   }
 };
 $("#agent-stop").onclick = action(async () => {
-  await api(path("/agent/stop"), {});
+  const pending = project.agentSubmission;
+  const expectedRunId = pending?.state === "pending" && !pending.turnId ? "" : (project.agentRunId || session?.runId || "");
+  await api(path("/agent/stop"), {expectedRunId});
   $("#send-state").textContent = "已请求停止 Agent；渲染任务需单独取消";
   await poll();
 });
@@ -779,6 +827,15 @@ $("#environment").onclick = action(async () => {
       "check",
     ),
   );
+  if (project?.sessionId) {
+    try {
+      const config = await api(path("/agent/configuration"));
+      box.append(el("div", "模型 · " + (config.session?.model || config.instance?.defaultModel || "运行环境默认"), "check"));
+      for (const skill of config.skills || []) box.append(el("div", "Skill · " + skill.name + " · " + ({instance:"实例",project:"项目",other:"其他"}[skill.sourceScope] || skill.sourceScope) + (skill.enabled ? " · 已启用" : " · 未启用"), "check"));
+      for (const server of config.mcp?.servers || []) box.append(el("div", "MCP · " + server.name + (server.enabled ? " · 已启用" : " · 未启用"), "check"));
+      for (const error of Object.values(config.errors || {})) box.append(el("div", "配置检查 · " + (typeof error === "string" ? error : JSON.stringify(error)), "check"));
+    } catch (err) { box.append(el("div", "配置检查 · " + err.message, "check")); }
+  }
   for (const [name, c] of Object.entries(env.checks)) {
     box.append(
       el(

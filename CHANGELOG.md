@@ -1,5 +1,13 @@
 # 更新记录
 
+## v0.5.1
+
+- 使用 RunDesk API v1 与能力检查，保留结构化错误。
+- 创建实例、工作区、会话及消息提交使用持久请求日志，丢失响应后查询原回执；追加指令保留原 requestId/expectedTurnId。
+- 浏览器刷新保留待确认指令；停止使用保存的 expectedRunId，并拒绝操作其他运行。
+- 通用 video-project Skill 配置在实例，消息显式引用实例 Skill；旧项目 Skill 保留。
+- 环境面板显示模型、Skill、MCP；旧项目、媒体、字幕和渲染数据兼容。
+
 ## v0.5.0
 
 - 本机 eSpeak NG 自动配音，支持语音/语速选择、工具检查与配置可执行路径；不新增 Go 模块或 Python 运行依赖。

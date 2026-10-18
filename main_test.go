@@ -134,28 +134,47 @@ func TestRunDeskConfigurationAndSteer(t *testing.T) {
 		seen = append(seen, r.Method+" "+r.URL.Path)
 		var body map[string]any
 		json.NewDecoder(r.Body).Decode(&body)
+		if strings.HasPrefix(r.URL.Path, "/api/v1/requests/") {
+			writeJSON(w, 404, map[string]string{"code": "request_not_found"})
+			return
+		}
+		if r.Method == "POST" && (r.URL.Path == "/api/v1/instances" || r.URL.Path == "/api/v1/workspaces" || r.URL.Path == "/api/v1/sessions") && r.Header.Get("Idempotency-Key") == "" {
+			t.Error("missing operation key")
+		}
 		switch r.URL.Path {
-		case "/api/sessions":
+		case "/api/v1/meta":
+			writeJSON(w, 200, v1Meta())
+		case "/api/v1/instances/" + iid + "/configuration":
+			writeJSON(w, 200, map[string]any{"skills": []any{map[string]any{"name": "video-project", "path": "/instance/video-project/SKILL.md", "sourceScope": "instance", "enabled": true}}})
+		case "/api/v1/sessions/" + sid:
+			writeJSON(w, 200, map[string]string{"runId": "run-1", "turnId": "turn-1"})
+		case "/api/v1/sessions":
 			if r.Method == "GET" {
 				writeJSON(w, 200, []any{})
 				return
 			}
+			if body["source"].(map[string]any)["taskId"] != p.ID {
+				t.Error("missing application source")
+			}
 			writeJSON(w, 200, map[string]string{"id": sid})
-		case "/api/instances":
+		case "/api/v1/instances":
 			writeJSON(w, 200, map[string]string{"id": iid})
-		case "/api/workspaces":
+		case "/api/v1/workspaces":
 			if body["path"] != filepath.Join(a.dir(p.ID), "workspace") {
 				t.Error(body)
 			}
 			writeJSON(w, 200, map[string]string{"id": wid})
-		case "/api/workspaces/" + wid + "/skills/video-project":
+		case "/api/v1/workspaces/" + wid + "/skills/video-project":
+			if r.URL.Query().Get("scope") != "instance" {
+				t.Error("skill not instance scoped")
+			}
 			if !strings.Contains(body["content"].(string), "name: video-project") {
 				t.Error(body)
 			}
 			writeJSON(w, 200, map[string]bool{"ok": true})
-		case "/api/workspaces/" + wid + "/mcp":
+		case "/api/v1/workspaces/" + wid + "/mcp":
 			writeJSON(w, 200, map[string]string{"version": "v1"})
-		case "/api/workspaces/" + wid + "/mcp/video_project":
+		case "/api/v1/workspaces/" + wid + "/mcp/video_project":
 			if body["version"] != "v1" {
 				t.Error(body)
 			}
@@ -165,7 +184,7 @@ func TestRunDeskConfigurationAndSteer(t *testing.T) {
 			}
 			writeJSON(w, 200, map[string]bool{"ok": true})
 
-		case "/api/sessions/" + sid + "/steer":
+		case "/api/v1/sessions/" + sid + "/steer":
 			if body["expectedTurnId"] != "turn-1" || body["requestId"] != "request-1" || !strings.Contains(body["text"].(string), p.ID) {
 				t.Error(body)
 			}
@@ -188,9 +207,10 @@ func TestRunDeskConfigurationAndSteer(t *testing.T) {
 	}
 	before := len(seen)
 	call(a, "POST", "/api/projects/"+p.ID+"/connect", map[string]any{})
-	if len(seen) != before {
+	if len(seen) != before+1 || seen[len(seen)-1] != "GET /api/v1/meta" {
 		t.Fatal("connect not idempotent")
 	}
+	a.saveAgent(p.ID, func(q *Project) { q.AgentRunID = "run-1" })
 	w = call(a, "POST", "/api/projects/"+p.ID+"/messages", map[string]string{"text": "继续", "expectedTurnId": "turn-1", "requestId": "request-1"})
 	if w.Code != 200 {
 		t.Fatal(w.Code, w.Body.String())

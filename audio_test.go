@@ -187,7 +187,11 @@ func TestLegacyProjectAndBusyToolUpgrade(t *testing.T) {
 	}
 	a.projects[p.ID] = &p
 	rd := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "GET" || r.URL.Path != "/api/sessions" {
+		if r.Method == "GET" && r.URL.Path == "/api/v1/meta" {
+			writeJSON(w, 200, v1Meta())
+			return
+		}
+		if r.Method != "GET" || r.URL.Path != "/api/v1/sessions" {
 			t.Errorf("configuration changed during active turn: %s %s", r.Method, r.URL.Path)
 			http.Error(w, "unexpected", 500)
 			return
@@ -200,8 +204,8 @@ func TestLegacyProjectAndBusyToolUpgrade(t *testing.T) {
 	if w.Code != 409 {
 		t.Fatal(w.Code, w.Body.String())
 	}
-	w = call(a, "POST", "/api/projects/"+p.ID+"/messages", map[string]string{"text": "继续"})
-	if w.Code != 409 || !strings.Contains(w.Body.String(), "更新项目工具") {
+	w = call(a, "POST", "/api/projects/"+p.ID+"/messages", map[string]string{"text": "继续", "requestId": "upgrade-test"})
+	if w.Code != 409 || !strings.Contains(w.Body.String(), "升级项目工具") {
 		t.Fatal(w.Code, w.Body.String())
 	}
 }

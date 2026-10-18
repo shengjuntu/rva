@@ -1,12 +1,8 @@
 package main
 
 import (
-	"bytes"
-	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
 	"net/url"
 	"os"
@@ -14,48 +10,6 @@ import (
 	"strconv"
 	"strings"
 )
-
-func (a *App) rdCall(ctx context.Context, method, path string, body, out any) error {
-	var b io.Reader
-	if body != nil {
-		x, e := json.Marshal(body)
-		if e != nil {
-			return e
-		}
-		b = bytes.NewReader(x)
-	}
-	req, e := http.NewRequestWithContext(ctx, method, a.rd+"/api"+path, b)
-	if e != nil {
-		return e
-	}
-	req.Header.Set("Content-Type", "application/json")
-	if a.rdToken != "" {
-		req.Header.Set("Authorization", "Bearer "+a.rdToken)
-	}
-	resp, e := a.client.Do(req)
-	if e != nil {
-		return e
-	}
-	defer resp.Body.Close()
-	raw, e := io.ReadAll(io.LimitReader(resp.Body, 16<<20))
-	if e != nil {
-		return e
-	}
-	if resp.StatusCode >= 300 {
-		var v struct {
-			Error string `json:"error"`
-		}
-		_ = json.Unmarshal(raw, &v)
-		if v.Error == "" {
-			v.Error = resp.Status
-		}
-		return errors.New(v.Error)
-	}
-	if out != nil {
-		return json.Unmarshal(raw, out)
-	}
-	return nil
-}
 
 const projectSkill = `---
 name: video-project
@@ -85,7 +39,25 @@ func (a *App) connect(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, e)
 		return
 	}
-	if p.SessionID != "" && p.ToolsVersion == version && r.URL.Query().Get("refresh") != "1" {
+	if e = a.requireV1(r.Context()); e != nil {
+		fail(w, 409, e)
+		return
+	}
+	a.mu.Lock()
+	if a.cfg.RunDeskURL == "" {
+		next := a.cfg
+		next.RunDeskURL = a.rd
+		e = atomicJSON(filepath.Join(a.data, "config.json"), next)
+		if e == nil {
+			a.cfg = next
+		}
+	}
+	a.mu.Unlock()
+	if e != nil {
+		fail(w, 500, e)
+		return
+	}
+	if p.SessionID != "" && p.ToolsVersion == version && a.cfg.SkillPath != "" && r.URL.Query().Get("refresh") != "1" {
 		writeJSON(w, 200, p)
 		return
 	}
@@ -96,7 +68,7 @@ func (a *App) connect(w http.ResponseWriter, r *http.Request) {
 		var inst struct {
 			ID string `json:"id"`
 		}
-		e = a.rdCall(r.Context(), "POST", "/instances", map[string]any{"name": "视频制作 App", "description": "RunDesk Video App 专用配置"}, &inst)
+		e = a.rdOperation(r.Context(), "instance", "/instances", map[string]any{"name": "视频制作 App", "description": "RunDesk Video App 专用配置"}, &inst, false, true)
 		if e != nil {
 			fail(w, 502, e)
 			return
@@ -131,7 +103,7 @@ func (a *App) connect(w http.ResponseWriter, r *http.Request) {
 		var ws struct {
 			ID string `json:"id"`
 		}
-		e = a.rdCall(r.Context(), "POST", "/workspaces", map[string]string{"name": "视频 · " + p.Name, "path": filepath.Join(a.dir(id), "workspace")}, &ws)
+		e = a.rdOperation(r.Context(), "workspace:"+p.ID, "/workspaces", map[string]string{"name": "视频 · " + p.Name, "path": filepath.Join(a.dir(id), "workspace")}, &ws, false, true)
 		if e != nil {
 			fail(w, 502, e)
 			return
@@ -151,9 +123,47 @@ func (a *App) connect(w http.ResponseWriter, r *http.Request) {
 		p = q
 	}
 	suffix := "?instanceId=" + url.QueryEscape(iid)
-	e = a.rdCall(r.Context(), "PUT", "/workspaces/"+p.WorkspaceID+"/skills/video-project"+suffix, map[string]string{"content": projectSkill}, nil)
+	e = a.rdCall(r.Context(), "PUT", "/workspaces/"+p.WorkspaceID+"/skills/video-project"+suffix+"&scope=instance", map[string]string{"content": projectSkill}, nil)
 	if e != nil {
 		fail(w, 502, e)
+		return
+	}
+	var inventory struct {
+		Skills []struct {
+			Name    string `json:"name"`
+			Path    string `json:"path"`
+			Scope   string `json:"sourceScope"`
+			Enabled bool   `json:"enabled"`
+		} `json:"skills"`
+	}
+	if e = a.rdCall(r.Context(), "GET", "/instances/"+iid+"/configuration?workspaceId="+url.QueryEscape(p.WorkspaceID)+"&probe=1", nil, &inventory); e != nil {
+		fail(w, 502, e)
+		return
+	}
+	skillPath := ""
+	for _, sk := range inventory.Skills {
+		if sk.Name == "video-project" && sk.Scope == "instance" {
+			skillPath = sk.Path
+			if !sk.Enabled {
+				e = a.rdCall(r.Context(), "POST", "/workspaces/"+p.WorkspaceID+"/skills/toggle"+suffix, map[string]any{"path": sk.Path, "enabled": true}, nil)
+				if e != nil {
+					fail(w, 502, e)
+					return
+				}
+			}
+			break
+		}
+	}
+	if skillPath == "" {
+		fail(w, 409, errors.New("实例 Skill 已写入，但 Codex 尚未发现，请检查实例环境"))
+		return
+	}
+	a.mu.Lock()
+	a.cfg.SkillPath = skillPath
+	e = atomicJSON(filepath.Join(a.data, "config.json"), a.cfg)
+	a.mu.Unlock()
+	if e != nil {
+		fail(w, 500, e)
 		return
 	}
 	var mcp struct {
@@ -169,16 +179,23 @@ func (a *App) connect(w http.ResponseWriter, r *http.Request) {
 		fail(w, 500, e)
 		return
 	}
-	e = a.rdCall(r.Context(), "PUT", "/workspaces/"+p.WorkspaceID+"/mcp/video_project"+suffix, map[string]any{"version": mcp.Version, "config": map[string]any{"command": binary, "args": []string{"mcp", "--url", a.public}, "env": map[string]string{"VIDEO_APP_TOKEN": a.token}, "enabled": true}}, nil)
+	var mcpSaved struct {
+		ReloadError string `json:"reloadError"`
+	}
+	e = a.rdCall(r.Context(), "PUT", "/workspaces/"+p.WorkspaceID+"/mcp/video_project"+suffix, map[string]any{"version": mcp.Version, "config": map[string]any{"command": binary, "args": []string{"mcp", "--url", a.public}, "env": map[string]string{"VIDEO_APP_TOKEN": a.token}, "enabled": true}}, &mcpSaved)
 	if e != nil {
 		fail(w, 502, e)
+		return
+	}
+	if mcpSaved.ReloadError != "" {
+		fail(w, 409, errors.New("MCP 配置已保存但重载失败，请检查实例环境后重新配置"))
 		return
 	}
 	if p.SessionID == "" {
 		var ss struct {
 			ID string `json:"id"`
 		}
-		e = a.rdCall(r.Context(), "POST", "/sessions", map[string]string{"workspaceId": p.WorkspaceID, "instanceId": iid, "title": "视频 · " + p.Name}, &ss)
+		e = a.rdOperation(r.Context(), "session:"+p.ID, "/sessions", map[string]any{"workspaceId": p.WorkspaceID, "instanceId": iid, "title": "视频 · " + p.Name, "source": map[string]string{"kind": "application", "appId": "rundesk-video-app", "taskId": p.ID}}, &ss, false, true)
 		if e != nil {
 			fail(w, 502, e)
 			return
@@ -222,29 +239,63 @@ func (a *App) message(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	if strings.TrimSpace(in.Text) == "" || len(in.Text) > 128<<10 {
-		fail(w, 400, errors.New("消息为空或过长"))
+	if strings.TrimSpace(in.Text) == "" || len(in.Text) > 128<<10 || !requestIdentifier.MatchString(in.RequestID) {
+		fail(w, 400, errors.New("需要消息内容和 8–128 位 requestId"))
 		return
 	}
-	p, e := a.get(r.PathValue("id"))
-	if e != nil || p.SessionID == "" {
-		fail(w, 409, errors.New("请先连接 RunDesk"))
+	p, e := a.session(r)
+	if e != nil {
+		fail(w, 409, e)
 		return
 	}
 	if p.ToolsVersion != version {
-		fail(w, 409, errors.New("请先更新项目工具配置，再开始对话"))
+		fail(w, 409, errors.New("请先升级项目工具配置"))
 		return
 	}
-	text := fmt.Sprintf("[Video App projectId=%s] 使用 video-project Skill 和 video_project MCP。先读取项目当前 revision。\n用户要求：\n%s", p.ID, in.Text)
-	path := "/sessions/" + p.SessionID + "/turns"
-	body := map[string]any{"text": text, "files": []string{}, "skills": []any{}}
-	if in.ExpectedTurnID != "" {
-		path = "/sessions/" + p.SessionID + "/steer"
-		body["expectedTurnId"] = in.ExpectedTurnID
-		body["requestId"] = in.RequestID
+	if pending := p.AgentSubmission; pending != nil && pending.ID == in.RequestID {
+		if pending.Text != in.Text || pending.TurnID != in.ExpectedTurnID {
+			fail(w, 409, &RunDeskError{Status: 409, Code: "idempotency_conflict", Message: "同一 requestId 不能用于不同消息"})
+			return
+		}
+		if pending.State == "failed" || pending.State == "canceled" {
+			fail(w, 409, &RunDeskError{Status: 409, Code: "submission_rejected", Message: pending.Error})
+			return
+		}
+	} else {
+		if p.AgentSubmission != nil && p.AgentSubmission.State == "pending" {
+			fail(w, 409, uncertain("上一条消息仍待确认，请先恢复原请求"))
+			return
+		}
+		if _, err := os.Stat(a.operationFile("message:" + p.ID + ":" + in.RequestID)); err == nil {
+			fail(w, 409, &RunDeskError{Status: 409, Code: "request_obsolete", Message: "此消息已有历史提交记录，请先核对已有对话"})
+			return
+		} else if !errors.Is(err, os.ErrNotExist) {
+			fail(w, 500, err)
+			return
+		}
+		if in.ExpectedTurnID != "" {
+			var current struct {
+				RunID  string `json:"runId"`
+				TurnID string `json:"turnId"`
+			}
+			if e = a.rdCall(r.Context(), "GET", "/sessions/"+p.SessionID, nil, &current); e != nil {
+				fail(w, 502, e)
+				return
+			}
+			if p.AgentRunID == "" || current.RunID != p.AgentRunID || current.TurnID != in.ExpectedTurnID {
+				fail(w, 409, &RunDeskError{Status: 409, Code: "run_conflict", Message: "运行已改变，请刷新并核对当前任务"})
+				return
+			}
+		}
+		if e = a.saveAgent(p.ID, func(q *Project) {
+			q.AgentSubmission = &AgentSubmission{ID: in.RequestID, Text: in.Text, TurnID: in.ExpectedTurnID, RunID: q.AgentRunID, State: "pending"}
+		}); e != nil {
+			fail(w, 500, e)
+			return
+		}
+		p, _ = a.get(p.ID)
 	}
-	var out any
-	e = a.rdCall(r.Context(), "POST", path, body, &out)
+	out, e := a.recoverAgent(r.Context(), p, true)
 	if e != nil {
 		fail(w, 409, e)
 		return
@@ -259,31 +310,136 @@ func (a *App) session(r *http.Request) (Project, error) {
 	return p, e
 }
 func (a *App) agentState(w http.ResponseWriter, r *http.Request) {
+	a.bridgeMu.Lock()
+	defer a.bridgeMu.Unlock()
+	p, e := a.session(r)
+	if e != nil {
+		fail(w, 409, e)
+		return
+	}
+	if p.AgentSubmission != nil && p.AgentSubmission.State == "pending" {
+		_, _ = a.recoverAgent(r.Context(), p, true)
+		p, _ = a.get(p.ID)
+	}
+	if pending := p.AgentSubmission; pending != nil && pending.CancelRequested && (pending.State == "accepted" || pending.State == "pending" && pending.TurnID != "") && p.AgentRunID != "" {
+		err := a.rdCall(r.Context(), "POST", "/sessions/"+p.SessionID+"/stop", map[string]string{"expectedRunId": p.AgentRunID}, nil)
+		if e = a.finishAgentCancel(p.ID, err); e != nil {
+			fail(w, 409, e)
+			return
+		}
+		p, _ = a.get(p.ID)
+	}
+	var out map[string]any
+	if e = a.rdCall(r.Context(), "GET", "/sessions/"+p.SessionID, nil, &out); e != nil {
+		fail(w, 502, e)
+		return
+	}
+	out["appSubmission"] = p.AgentSubmission
+	out["appRunId"] = p.AgentRunID
+	writeJSON(w, 200, out)
+}
+func (a *App) agentStop(w http.ResponseWriter, r *http.Request) {
+	a.bridgeMu.Lock()
+	defer a.bridgeMu.Unlock()
+	p, e := a.session(r)
+	if e != nil {
+		fail(w, 409, e)
+		return
+	}
+	var in struct {
+		ExpectedRunID string `json:"expectedRunId"`
+	}
+	if !decode(w, r, &in) {
+		return
+	}
+	if p.AgentSubmission != nil && p.AgentSubmission.State == "pending" {
+		if e = a.saveAgent(p.ID, func(q *Project) { q.AgentSubmission.CancelRequested = true }); e != nil {
+			fail(w, 500, e)
+			return
+		}
+		p, _ = a.get(p.ID)
+		// For a pending steer, the enclosing run is already known; no re-send needed.
+		if p.AgentSubmission.TurnID == "" {
+			if _, e = a.recoverAgent(r.Context(), p, false); e != nil {
+				fail(w, 409, e)
+				return
+			}
+			p, _ = a.get(p.ID)
+		}
+	}
+	target := in.ExpectedRunID
+	if target == "" {
+		target = p.AgentRunID
+	}
+	if p.AgentRunID == "" && target != "" {
+		// Upgrade path: only adopt an existing run proven to belong to this project.
+		var events []struct {
+			Method string `json:"method"`
+			Data   struct {
+				RunID string `json:"runId"`
+				Input struct {
+					Text string `json:"text"`
+				} `json:"input"`
+			} `json:"data"`
+		}
+		if e = a.rdCall(r.Context(), "GET", "/sessions/"+p.SessionID+"/events?method=run%2Finput&limit=1000", nil, &events); e != nil {
+			fail(w, 502, e)
+			return
+		}
+		for _, ev := range events {
+			if ev.Method == "run/input" && ev.Data.RunID == target && strings.Contains(ev.Data.Input.Text, "[Video App projectId="+p.ID+"]") {
+				if e = a.saveAgent(p.ID, func(q *Project) { q.AgentRunID = target }); e != nil {
+					fail(w, 500, e)
+					return
+				}
+				p.AgentRunID = target
+				break
+			}
+		}
+	}
+	if target == "" || target != p.AgentRunID {
+		fail(w, 409, errors.New("目标运行尚未确认属于此应用，请同步或在 RunDesk 中核对"))
+		return
+	}
+	e = a.rdCall(r.Context(), "POST", "/sessions/"+p.SessionID+"/stop", map[string]string{"expectedRunId": target}, nil)
+	if p.AgentSubmission != nil && p.AgentSubmission.CancelRequested {
+		e = a.finishAgentCancel(p.ID, e)
+	}
+	if e != nil {
+		fail(w, 409, e)
+		return
+	}
+
+	writeJSON(w, 200, map[string]bool{"ok": true})
+}
+func (a *App) finishAgentCancel(id string, remoteErr error) error {
+	var remote *RunDeskError
+	if remoteErr != nil && !(errors.As(remoteErr, &remote) && remote.Code == "run_conflict") {
+		return remoteErr
+	}
+	message := "已请求停止原运行，原指令不再重发"
+	if remoteErr != nil {
+		message = "会话已进入其他运行；未停止新的运行"
+	}
+	if e := a.saveAgent(id, func(q *Project) { q.AgentSubmission.State = "canceled"; q.AgentSubmission.Error = message }); e != nil {
+		return e
+	}
+	return remoteErr
+}
+
+func (a *App) agentConfiguration(w http.ResponseWriter, r *http.Request) {
 	p, e := a.session(r)
 	if e != nil {
 		fail(w, 409, e)
 		return
 	}
 	var out any
-	e = a.rdCall(r.Context(), "GET", "/sessions/"+p.SessionID, nil, &out)
+	e = a.rdCall(r.Context(), "GET", "/sessions/"+p.SessionID+"/configuration?probe=1", nil, &out)
 	if e != nil {
 		fail(w, 502, e)
 		return
 	}
 	writeJSON(w, 200, out)
-}
-func (a *App) agentStop(w http.ResponseWriter, r *http.Request) {
-	p, e := a.session(r)
-	if e != nil {
-		fail(w, 409, e)
-		return
-	}
-	e = a.rdCall(r.Context(), "POST", "/sessions/"+p.SessionID+"/stop", map[string]any{}, nil)
-	if e != nil {
-		fail(w, 409, e)
-		return
-	}
-	writeJSON(w, 200, map[string]bool{"ok": true})
 }
 func (a *App) events(w http.ResponseWriter, r *http.Request) {
 	p, e := a.session(r)

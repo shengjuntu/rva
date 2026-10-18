@@ -1,8 +1,10 @@
-# RunDesk Video App · v0.5.0
+# RunDesk Video App · v0.5.1
 
 一个使用 **Go + HTML/CSS/原生 JavaScript** 的本地视频工作台。通过 RunDesk HTTP API 使用 Codex；项目、素材、分镜和渲染任务由视频 App 管理。
 
 本仓库是独立 App 原型，不改变 RunDesk 的通用定位。暂用工作名称“视频工作台”。主程序只使用 Go 标准库，页面嵌入二进制。渲染器是独立安装的 HyperFrames CLI；它需要 Node.js、Chrome 和 FFmpeg。
+
+v0.5.1 适配 RunDesk API v1，要求 RunDesk 0.6.0+，已与 0.6.1 联调。提交前保存原请求，连接中断或刷新后继续确认；停止绑定原运行编号。在“环境准备”查看实例模型、Skill、MCP。参见 [升级步骤](docs/UPGRADING.md) 和 [验证记录](docs/VALIDATION-0.5.1.md)。
 
 ![界面截图](docs/preview.png)
 
@@ -36,7 +38,7 @@ v0.3.0 可导入 news2douyin 已审核脚本制作包，保留原稿、审核记
 
 - 项目管理、素材上传、分镜编辑、镜头排序、时长和画面素材选择。
 - 图片/视频/音频/文本/Markdown/PDF 上传；单文件 256 MiB。音频支持 WAV、MP3、M4A、FLAC、OGG。
-- 一键在 RunDesk 创建专用实例、项目工作区、项目 Skill 和 stdio MCP 配置。
+- 一键在 RunDesk 创建专用实例、项目工作区、实例 Skill 和 stdio MCP 配置。
 - 对话、运行中补充指令、停止 Agent、命令授权和可展开的工具记录。
 - 分镜修订号检查，发现 Agent 与界面并发编辑时保留本地草稿、拒绝覆盖。
 - 配音与背景音乐双音轨、视频起点、素材截取起点、0–200% 音量、背景音乐循环和素材试听。

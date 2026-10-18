@@ -28,10 +28,11 @@ import (
 	"time"
 )
 
-const version = "0.5.0"
+const version = "0.5.1"
 
 //go:embed web/*
 var ui embed.FS
+var requestIdentifier = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_.:-]{7,127}$`)
 var identifier = regexp.MustCompile(`^[a-f0-9]{24}$`)
 
 func uid() string {
@@ -67,23 +68,27 @@ type Render struct {
 	HasAudio     bool    `json:"hasAudio"`
 }
 type Project struct {
-	Speech       []SpeechJob    `json:"speech,omitempty"`
-	Subtitles    *SubtitleTrack `json:"subtitles,omitempty"`
-	News         *NewsOrigin    `json:"news,omitempty"`
-	ID           string         `json:"id"`
-	Name         string         `json:"name"`
-	Brief        string         `json:"brief"`
-	Revision     int            `json:"revision"`
-	Shots        []Shot         `json:"shots"`
-	Audio        *AudioMix      `json:"audio,omitempty"`
-	Assets       []Asset        `json:"assets"`
-	Renders      []Render       `json:"renders"`
-	WorkspaceID  string         `json:"workspaceId"`
-	SessionID    string         `json:"sessionId"`
-	Updated      string         `json:"updated"`
-	ToolsVersion string         `json:"toolsVersion,omitempty"`
+	AgentSubmission *AgentSubmission `json:"agentSubmission,omitempty"`
+	AgentRunID      string           `json:"agentRunId,omitempty"`
+	Speech          []SpeechJob      `json:"speech,omitempty"`
+	Subtitles       *SubtitleTrack   `json:"subtitles,omitempty"`
+	News            *NewsOrigin      `json:"news,omitempty"`
+	ID              string           `json:"id"`
+	Name            string           `json:"name"`
+	Brief           string           `json:"brief"`
+	Revision        int              `json:"revision"`
+	Shots           []Shot           `json:"shots"`
+	Audio           *AudioMix        `json:"audio,omitempty"`
+	Assets          []Asset          `json:"assets"`
+	Renders         []Render         `json:"renders"`
+	WorkspaceID     string           `json:"workspaceId"`
+	SessionID       string           `json:"sessionId"`
+	Updated         string           `json:"updated"`
+	ToolsVersion    string           `json:"toolsVersion,omitempty"`
 }
 type Config struct {
+	RunDeskURL string `json:"rundeskURL,omitempty"`
+	SkillPath  string `json:"skillPath,omitempty"`
 	InstanceID string `json:"instanceId"`
 }
 type App struct {
@@ -106,6 +111,14 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 func fail(w http.ResponseWriter, status int, e error) {
+	var remote *RunDeskError
+	if errors.As(e, &remote) {
+		if remote.Status >= 400 && remote.Status < 600 {
+			status = remote.Status
+		}
+		writeJSON(w, status, remote)
+		return
+	}
 	writeJSON(w, status, map[string]string{"error": e.Error()})
 }
 func decode(w http.ResponseWriter, r *http.Request, v any) bool {
@@ -123,7 +136,20 @@ func atomicJSON(path string, v any) error {
 		return e
 	}
 	tmp := path + "." + uid() + ".tmp"
-	if e = os.WriteFile(tmp, b, 0600); e != nil {
+	f, e := os.OpenFile(tmp, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	if e != nil {
+		return e
+	}
+	defer os.Remove(tmp)
+	_, e = f.Write(b)
+	if e == nil {
+		e = f.Sync()
+	}
+	closeErr := f.Close()
+	if e == nil {
+		e = closeErr
+	}
+	if e != nil {
 		return e
 	}
 	if e = os.Rename(tmp, path); e != nil {
@@ -394,6 +420,7 @@ func (a *App) routes() http.Handler {
 	m.HandleFunc("POST /api/projects/{id}/connect", a.connect)
 	m.HandleFunc("POST /api/projects/{id}/messages", a.message)
 	m.HandleFunc("GET /api/projects/{id}/agent", a.agentState)
+	m.HandleFunc("GET /api/projects/{id}/agent/configuration", a.agentConfiguration)
 	m.HandleFunc("POST /api/projects/{id}/agent/stop", a.agentStop)
 	m.HandleFunc("GET /api/projects/{id}/events", a.events)
 	m.HandleFunc("GET /api/projects/{id}/approvals", a.approvals)
@@ -569,7 +596,7 @@ func serve(opts serverOptions) error {
 	if e != nil {
 		return e
 	}
-	a.rd = strings.TrimRight(opts.RunDesk, "/")
+	a.rd = strings.TrimSuffix(strings.TrimSuffix(strings.TrimRight(opts.RunDesk, "/"), "/api/v1"), "/api")
 	u, e := url.Parse(a.rd)
 	if e != nil || u.Scheme != "http" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || (!net.ParseIP(u.Hostname()).IsLoopback() && u.Hostname() != "localhost") {
 		return errors.New("requires same-machine RunDesk at a loopback HTTP URL")
