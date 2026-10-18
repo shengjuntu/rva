@@ -1,0 +1,51 @@
+{
+  "browser_media": {
+    "status": "passed",
+    "checks": [
+      "browser_import_original_video_and_adopt_audio_srt",
+      "subtitle_scrub_and_live_preview",
+      "real_hyperframes_ffmpeg_1080x1920_30fps_audio_captions",
+      "render_snapshot_srt_preserved",
+      "edited_script_blocks_render_and_restore_recovers_binding",
+      "srt_edits_require_explicit_human_review",
+      "concurrent_agent_edit_keeps_unsaved_srt_and_rejects_stale_save",
+      "source_package_unchanged",
+      "no_browser_javascript_errors"
+    ],
+    "duration": 7.833333333333334,
+    "browser": "154.0.8037.57",
+    "limitations": [
+      "RunDesk/real Codex model not exercised by this test",
+      "Caption review confirmation is exercised mechanically, not an ASR accuracy test"
+    ]
+  },
+  "handoff_mcp": {
+    "status": "passed",
+    "checks": [
+      "python_script_import",
+      "exact_narration_and_provenance",
+      "idempotent_import",
+      "real_video_bundle_ffprobe",
+      "artifact_bytes_preserved",
+      "mp4_range",
+      "real_rundesk_demo_skill_mcp_setup",
+      "stdio_mcp_catalog",
+      "stdio_mcp_source_evidence",
+      "stdio_mcp_audio_adoption",
+      "stdio_mcp_subtitles_update",
+      "mcp_edits_preserve_approved_source",
+      "rundesk_demo_turn_events"
+    ],
+    "video": 7.833333,
+    "limitations": [
+      "RunDesk demo only; no real Codex model/tool execution",
+      "Go HyperFrames re-render not exercised in this handoff test"
+    ]
+  },
+  "go": {
+    "race": "passed",
+    "vet": "passed",
+    "top_level_tests": 23,
+    "examples": 1
+  }
+}

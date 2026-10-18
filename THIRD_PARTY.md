@@ -2,6 +2,7 @@
 
 本仓库自有 Go/HTML/JS 代码采用 MIT。未将 Sandbox Agent 或其他管理项目源码打包。
 
+- [eSpeak NG](https://github.com/espeak-ng/espeak-ng)：可选本机 TTS 工具与语音数据，单独安装，遵循其自身许可；本发行包未包含其二进制、动态库或语音数据。
 - RunDesk：独立运行，按其发行包安装。此包不包含 RunDesk/Codex 二进制或凭据。
 - [HyperFrames](https://github.com/heygen-com/hyperframes)：固定 npm 版本 0.8.87，独立渲染工具。通过 `runtime/package-lock.json` 安装。
 - [GSAP](https://gsap.com/)：固定 npm 版本 3.15.0，遵循其发行包许可；不因为被本项目调用而变为 MIT。

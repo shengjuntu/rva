@@ -25,7 +25,7 @@
     </div>
     <div id="app" hidden>
       <header>
-        <div class="brand">视频工作台 <span>v0.3.0</span></div>
+        <div class="brand">视频工作台 <span>v0.5.0</span></div>
         <div class="top-actions">
           <button id="environment">环境准备</button
           ><button id="toggle-assets">素材栏</button
@@ -85,12 +85,13 @@
           <section id="news-panel" hidden>
             <div class="section-head"><h2>新闻来源与交接</h2><button id="news-details">查看审核稿与证据</button></div>
             <p id="news-summary" class="muted small"></p>
-            <p class="muted small">当前分镜是制作草稿，时长为估算值；修改后需重新核稿。下方原始成片保留新闻工作台交付版本，不随分镜编辑更新。</p>
+            <p class="muted small">当前分镜是制作草稿；采用配音可调整总长，镜头切点仍需核对。修改后需重新核稿。下方原始成片保留新闻工作台交付版本，不随分镜编辑更新。</p>
             <div class="row"><button id="import-news-video">接收原始成片 ZIP</button><input id="news-video-package" type="file" accept=".zip,application/zip" hidden /><a id="news-source-download">下载原始脚本包</a></div>
             <div id="news-video" hidden>
               <p id="news-video-meta"></p>
               <video id="news-player" controls preload="none" playsinline></video>
               <div id="news-video-downloads" class="row"></div>
+              <button id="adopt-news-audio">采用原片配音与字幕</button>
             </div>
           </section>
           <div class="preview-shell">
@@ -159,6 +160,14 @@
                 placeholder="受众、主题、风格与希望表达的重点"
               ></textarea>
             </label>
+          </section>
+          <section id="speech-section">
+            <div class="section-head"><h2>自动配音</h2><button id="speech-check">检查配音环境</button></div>
+            <p class="muted small">使用本机 eSpeak NG 逐句合成镜头正文；机械音适合流程验证。无正文镜头保留静音。生成后先试听，再采用配音、字幕与实测镜头时长。</p>
+            <p id="speech-environment" class="muted small">需安装 eSpeak NG、FFmpeg 与 FFprobe。</p>
+            <div class="speech-options"><label>语音<select id="speech-voice"><option value="cmn">中文 · cmn</option><option value="en-us">英语 · en-us</option></select></label><label>语速 / 词每分钟<input id="speech-rate" type="number" min="80" max="300" step="10" value="170" /></label><button id="speech-start">生成配音与字幕</button></div>
+            <p id="speech-state" role="status" class="muted small"></p>
+            <div id="speech-jobs"></div>
           </section>
           <section id="sound-section">
             <div class="section-head">
@@ -265,6 +274,17 @@
             <p class="muted small">
               上方播放器用于素材试听，完整混音请在生成后播放成片检查。视频素材原声仍为静音。
             </p>
+          </section>
+          <section id="subtitle-section">
+            <div class="section-head"><h2>字幕时间轴</h2><button id="load-srt">导入 SRT</button><input id="srt-file" type="file" accept=".srt,text/plain,application/x-subrip" hidden /></div>
+            <label class="check-label"><input id="subtitles-enabled" type="checkbox" />在成片中显示字幕</label>
+            <p id="subtitle-state" role="status" class="muted small">未设置字幕</p>
+            <label>字幕 / SRT<textarea id="subtitle-srt" rows="10" spellcheck="false" placeholder="1&#10;00:00:00,000 --> 00:00:02,000&#10;第一句字幕"></textarea></label>
+            <p class="muted small">时间从视频起点计算，支持毫秒；最多 300 段，每段 120 字、最多 3 行。修改后请试听配音，核对文字和起止时间。系统不自动转写或重新配音。</p>
+            <div class="row subtitle-actions"><button id="save-subtitles">保存字幕草稿</button><button id="review-subtitles">已试听核对当前字幕</button><a id="download-subtitles" hidden>下载 SRT</a></div>
+            <label>已保存字幕预览 · <span id="subtitle-time">0.000 秒</span><input id="subtitle-seek" type="range" min="0" max="1" step="0.001" value="0" /></label>
+            <div id="subtitle-live" aria-live="off">此处无字幕</div>
+            <p class="muted small">拖动时间轴定位上方配音播放器；播放时字幕跟随。完整混音与画面请在生成后检查。</p>
           </section>
           <section>
             <div class="section-head">

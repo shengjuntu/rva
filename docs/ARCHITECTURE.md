@@ -20,7 +20,7 @@ Go 服务与嵌入式页面同源，通过 Cookie 登录。App 后端持有 RunD
 - `projects/<id>/workspace/.agents/skills/video-project/SKILL.md`：通过 RunDesk 写入。
 - `projects/<id>/renders/<renderId>/`：独立 index.html、GSAP、字体、素材副本、snapshot.json、render.log、validation.json、final.mp4；有音轨时还保留 silent.mp4 和解码后的 audio-N.wav。
 
-项目包含 revision、name、brief、shots、audio、assets、renders、workspaceId、sessionId。界面与 MCP 修改分镜都必须携带当前 revision，旧版本写入返回 409。Agent 回写后，未编辑的界面自动刷新；存在草稿时显示冲突提醒，等待用户合并，绝不无声覆盖。
+项目包含 revision、name、brief、shots、audio、subtitles、speech、news、assets、renders、workspaceId、sessionId。界面与 MCP 修改分镜都必须携带当前 revision，旧版本写入返回 409。Agent 回写后，未编辑的界面自动刷新；存在草稿时显示冲突提醒，等待用户合并，绝不无声覆盖。
 
 镜头结构为 `{id,title,text,duration,assetId}`。新增镜头可不提供 id，由服务器生成。修改使用完整 shots 数组，保留未修改镜头。音轨和分镜共用修订号；省略 audio 保留原音轨，audio:{} 清空音轨。assets/renders/绑定字段由服务维护，PUT 请求不能覆盖它们。
 
@@ -47,7 +47,7 @@ API 使用 `Authorization: Bearer <VIDEO_APP_TOKEN>`，浏览器使用登录 Coo
 | POST /api/projects/{id}/approvals/{approvalId} | 转发 RunDesk 决策对象 |
 | POST /api/projects/{id}/render | 新建独立后台渲染任务 |
 | POST /api/projects/{id}/renders/{renderId}/stop | 取消对应渲染任务 |
-| GET /api/projects/{id}/renders/{renderId}/{file} | final.mp4、snapshot.json、render.log、validation.json |
+| GET /api/projects/{id}/renders/{renderId}/{file} | final.mp4、snapshot.json、render.log、validation.json、subtitles.srt |
 
 运行中补充指令使用 `expectedTurnId` 作为前置条件、`requestId` 作为 RunDesk 幂等键。拒绝后不自动转成新一轮对话。事件界面按 turnId/itemId 维护 DOM 节点，刷新不会重建已有 details，因此保留展开状态。
 
@@ -56,7 +56,13 @@ API 使用 `Authorization: Bearer <VIDEO_APP_TOKEN>`，浏览器使用登录 Coo
 ## MCP
 
 - `video_project_get(projectId)`
+- `video_news_get(projectId)`
+- `video_news_audio_adopt(projectId, revision)`
+- `video_subtitles_update(projectId, revision, srt, enabled, reviewed)`
 - `video_project_update(projectId, project)`
+- `video_speech_start(projectId, revision, requestId, voice?, rate?)`
+- `video_speech_stop(projectId, speechId)`
+- `video_speech_adopt(projectId, speechId, revision)`
 - `video_render_start(projectId)`
 - `video_render_stop(projectId, renderId)`
 
@@ -73,3 +79,11 @@ API 使用 `Authorization: Bearer <VIDEO_APP_TOKEN>`，浏览器使用登录 Coo
 news2douyin 通过版本化 ZIP 交接，不共享数据库。项目新增只由导入接口维护的 news 来源记录；分镜仍是制作草稿。来源文件独立保存在 Agent 工作区之外，MCP 新增 video_news_get 读取原稿、审核与证据。
 
 原始交接成片与 APP 渲染列表分开，独立保存哈希和版本。完整接口、存储及限制见 [NEWS-HANDOFF.md](NEWS-HANDOFF.md)。
+
+## v0.4 字幕时间轴
+
+字幕为独立绝对时间轨，与配音/正文绑定。普通项目 PUT 保留服务端字幕；专用接口保存草稿或人工核对。已启用但失效的字幕阻止渲染；快照同时保存 SRT、音频副本和绑定元数据，并复核音频哈希。画面模板留出底部字幕区域。详细模型、接口、版本冲突和限制见 [SUBTITLES.md](SUBTITLES.md)。
+
+## v0.5 本机配音
+
+SpeechJob 独立保存到项目，生成使用固定修订快照，任务进度不改变编辑 revision。eSpeak NG 子进程逐段输出后，FFmpeg 转为标准 PCM，Go 按真实样本拼接音频、生成字幕和帧对齐的逐镜头时长。任务与渲染各有独立取消句柄；启动时恢复为中断态。结果由用户显式采用，并重新检查当前修订、正文/结构和音频哈希。完整接口、限制及恢复行为见 [SPEECH.md](SPEECH.md)。

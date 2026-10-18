@@ -1,5 +1,5 @@
 "use strict";
-const TOOL_VERSION = "0.3.0";
+const TOOL_VERSION = "0.5.0";
 const $ = (s) => document.querySelector(s),
   el = (tag, text, cls) => {
     const n = document.createElement(tag);
@@ -7,6 +7,7 @@ const $ = (s) => document.querySelector(s),
     if (cls) n.className = cls;
     return n;
   };
+let captionDraft = null, savePromise = null, speechKey = "", startingSpeech = false;
 let project = null,
   selected = 0,
   dirty = false,
@@ -55,6 +56,7 @@ function changed() {
   dirty = true;
   editSerial++;
   $("#save-state").textContent = "有未保存的编辑";
+  drawSubtitleState();
 }
 function id() {
   return [...crypto.getRandomValues(new Uint8Array(12))]
@@ -83,12 +85,14 @@ async function openProject(pid) {
   epoch++;
   for (const k of ["narration", "music"]) $("#" + k + "-preview").pause();
   project = p;
+  captionDraft = null;
   selected = 0;
   dirty = false;
   after = 0;
   session = null;
   rows = new Map();
   renderKey = "";
+  speechKey = "";
   approvalKey = "";
   $("#conversation").replaceChildren(
     el(
@@ -129,6 +133,8 @@ function drawProject() {
   drawAudio();
   drawRenders();
   drawNews();
+  drawSubtitles();
+  drawSpeech();
 }
 function assetURL(a) {
   return path("/assets/" + a.id);
@@ -234,27 +240,40 @@ function showPoster() {
   $("#poster").hidden = false;
   $("#preview-label").textContent = "镜头预览";
 }
-async function save() {
+function save() {
+  if (savePromise) return savePromise;
+  savePromise = saveChanges().finally(() => { savePromise = null; });
+  return savePromise;
+}
+async function saveChanges() {
   if (!project) return;
   if (!dirty) return project;
-  const pid = project.id,
-    serial = editSerial;
+  const pid = project.id, gen = epoch, serial = editSerial;
+  const captions = captionDraft ? {...captionDraft} : null;
   try {
-    const p = await api(path(), project, "PUT");
-    if (project.id !== pid) return p;
+    let p = await api('/api/projects/' + pid, project, "PUT");
+    if (gen === epoch) project.revision = p.revision;
+    if (captions) {
+      p = await api('/api/projects/' + pid + '/subtitles', {...captions, revision:p.revision, reviewed:false}, 'PUT');
+    }
+    if (gen !== epoch) return p;
     if (serial === editSerial) {
       project = p;
+      captionDraft = null;
       dirty = false;
       drawProject();
     } else {
       project.revision = p.revision;
       project.assets = p.assets;
       project.renders = p.renders;
+      project.speech = p.speech;
+      project.subtitles = p.subtitles;
+      drawSubtitleState();
     }
     $("#conflict").hidden = true;
     return p;
   } catch (e) {
-    if (e.status === 409) $("#conflict").hidden = false;
+    if (gen === epoch && e.status === 409) $("#conflict").hidden = false;
     throw e;
   }
 }
@@ -305,6 +324,9 @@ function drawRenders() {
       const dl = el("a", "下载 MP4");
       dl.href = base + "final.mp4?download";
       links.append(dl);
+      if (r.hasSubtitles) {
+        const sub = el('a','字幕 SRT'); sub.href = base + 'subtitles.srt?download'; links.append(sub);
+      }
     }
     if (r.state === "running") {
       const stop = el("button", "取消");
@@ -506,6 +528,8 @@ async function poll() {
       project.sessionId = p.sessionId;
       project.workspaceId = p.workspaceId;
     }
+    project.speech = p.speech;
+    drawSpeech();
     drawRenders();
     if (project.sessionId) {
       const [s, events, approvals] = await Promise.all([
@@ -1067,4 +1091,139 @@ $('#news-details').onclick = action(async () => {
   }
   const reviews = el('details'); reviews.append(el('summary', '原稿审核记录'), el('pre', JSON.stringify(data.manifest.review_history, null, 2))); box.append(reviews);
   $('#news-dialog').showModal();
+});
+
+function srtTime(seconds) {
+  const ms = Math.round(seconds * 1000);
+  const pad = (x, n=2) => String(x).padStart(n,'0');
+  return pad(Math.floor(ms/3600000)) + ':' + pad(Math.floor(ms/60000)%60) + ':' + pad(Math.floor(ms/1000)%60) + ',' + pad(ms%1000,3);
+}
+function currentSRT() {
+  return (project?.subtitles?.cues || []).map((c,i) => `${i+1}\n${srtTime(c.start)} --> ${srtTime(c.end)}\n${c.text}\n`).join('\n');
+}
+function drawSubtitleState() {
+  const t = project?.subtitles;
+  const states = {ready:'可渲染', stale:'需要重新核对', unreviewed:'待核对', disabled:'已关闭'};
+  $('#subtitle-state').textContent = dirty ? '有未保存的编辑；保存后会重新检查字幕与配音绑定。' : t ? (states[t.status] || t.status) + ' · ' + t.reason : '未设置字幕';
+  $('#subtitle-state').dataset.state = dirty ? 'unreviewed' : t?.status || 'disabled';
+}
+function drawSubtitles() {
+  if (!project) return;
+  $('#subtitle-srt').value = captionDraft?.srt ?? currentSRT();
+  $('#subtitles-enabled').checked = captionDraft?.enabled ?? !!project.subtitles?.enabled;
+  $('#download-subtitles').hidden = !project.subtitles;
+  $('#download-subtitles').href = path('/subtitles.srt');
+  $('#subtitle-seek').max = project.shots.reduce((n,s)=>n+s.duration,0) || 1;
+  showSubtitleAt(Number($('#subtitle-seek').value));
+  drawSubtitleState();
+}
+function showSubtitleAt(time) {
+  $('#subtitle-seek').value = time;
+  $('#subtitle-time').textContent = time.toFixed(3) + ' 秒';
+  const cue = project?.subtitles?.cues.find(c => time >= c.start && time < c.end);
+  $('#subtitle-live').textContent = cue?.text || '此处无字幕';
+}
+function captionChanged() {
+  if (!project) return;
+  captionDraft = {srt:$('#subtitle-srt').value, enabled:$('#subtitles-enabled').checked};
+  changed();
+}
+$('#subtitle-srt').oninput = captionChanged;
+$('#subtitles-enabled').onchange = captionChanged;
+$('#save-subtitles').onclick = action(save);
+$('#load-srt').onclick = () => { if (project) $('#srt-file').click(); };
+$('#srt-file').onchange = action(async () => {
+  const file = $('#srt-file').files[0]; $('#srt-file').value = '';
+  if (!file || !project) return;
+  if (file.size > 128*1024) throw new Error('SRT 最大 128 KiB');
+  const gen = epoch, serial = editSerial, text = new TextDecoder('utf-8', {fatal:true}).decode(await file.arrayBuffer());
+  if (gen !== epoch || serial !== editSerial) return;
+  $('#subtitle-srt').value = text; $('#subtitles-enabled').checked = true; captionChanged();
+});
+async function subtitleMutation(tail, body, method) {
+  if (!project) return;
+  const gen = epoch;
+  await save();
+  if (gen !== epoch || dirty) throw new Error('项目仍有新编辑，请先保存后重试');
+  const serial = editSerial, pid = project.id;
+  const payload = {...body, revision:project.revision};
+  if (tail === '/subtitles') payload.srt = currentSRT();
+  const p = await api('/api/projects/' + pid + tail, payload, method);
+  if (gen !== epoch) return;
+  if (serial !== editSerial || dirty) { $('#conflict').hidden = false; return; }
+  project = p; drawProject();
+}
+$('#review-subtitles').onclick = action(async () => {
+  if (!project) return;
+  if (!confirm('确认已经试听当前配音，并逐段核对字幕文字和时间？此操作记录人工核对，不会生成新配音。')) return;
+  await subtitleMutation('/subtitles', {enabled:true, reviewed:true}, 'PUT');
+});
+$('#adopt-news-audio').onclick = action(async () => {
+  if (!project?.news?.video) return;
+  if (!confirm('将替换当前配音与字幕，并按原片配音总长缩放镜头。镜头文字和素材保留，切点仍需检查。继续？')) return;
+  await subtitleMutation('/news/audio', {}, 'POST');
+});
+$('#subtitle-seek').oninput = () => {
+  const time = Number($('#subtitle-seek').value); showSubtitleAt(time);
+  const audio = $('#narration-preview'), track = project?.audio?.narration;
+  if (track?.assetId && Number.isFinite(audio.duration)) audio.currentTime = Math.max(0, Math.min(audio.duration, time-track.start+track.sourceStart));
+};
+$('#narration-preview').addEventListener('timeupdate', () => {
+  const track = project?.audio?.narration;
+  if (track?.assetId) showSubtitleAt(Math.max(0,$('#narration-preview').currentTime - track.sourceStart + track.start));
+});
+
+function drawSpeech() {
+  if (!project) return;
+  const jobs = project.speech || [];
+  const active = jobs.find(j => ['running','stopping'].includes(j.state));
+  $('#speech-start').disabled = startingSpeech || !!active;
+  $('#speech-state').textContent = active ? `配音 ${active.progress}/${active.total} 段 · ${states[active.state] || active.state}` : '生成结果不会自动替换当前音轨。';
+  const key = project.id + ':' + JSON.stringify(jobs) + ':' + project.audio?.narration?.assetId;
+  if (key === speechKey) return;
+  speechKey = key;
+  const box = $('#speech-jobs'); for (const audio of box.querySelectorAll('audio')) audio.pause(); box.replaceChildren();
+  if (!jobs.length) { box.append(el('p','尚无自动配音任务。','muted small')); return; }
+  for (const j of [...jobs].reverse()) {
+    const row = el('article',undefined,'speech-job'), head = el('div'), links = el('div',undefined,'row subtitle-actions');
+    head.append(el('strong', `修订 ${j.revision} · ${states[j.state] || j.state} · ${j.voice} / ${j.rate}`));
+    head.append(el('p', `${j.progress}/${j.total} 段` + (j.duration ? ` · ${j.duration.toFixed(3)} 秒` : ''),'muted small'));
+    if (j.error) head.append(el('p',j.error,'render-error'));
+    const pid = project.id, gen = epoch, base = '/api/projects/' + pid + '/speech/' + j.id;
+    if (j.state === 'completed') {
+      const audio = el('audio'); audio.controls = true; audio.preload = 'none'; audio.src = base + '/files/narration.wav'; head.append(audio);
+      const use = el('button', project.audio?.narration?.assetId === j.id ? '重新采用此配音' : '采用配音与字幕');
+      use.onclick = action(async () => {
+        if (gen !== epoch) return;
+        if (!confirm('采用此任务会替换当前配音和字幕，并按实测音频调整各镜头时长。已试听并继续？')) return;
+        use.disabled = true;
+        try { await subtitleMutation('/speech/' + j.id + '/adopt',{},'POST'); }
+        finally { use.disabled = false; }
+      }); links.append(use);
+      for (const [file,label] of [['narration.wav','WAV'],['subtitles.srt','SRT'],['manifest.json','配音清单']]) {
+        const a = el('a',label); a.href = base + '/files/' + file + '?download'; links.append(a);
+      }
+    }
+    if (j.state === 'running') {
+      const stop = el('button','取消配音');
+      stop.onclick = action(async()=>{stop.disabled=true;try{await api(base+'/stop',{});await poll();}finally{stop.disabled=false;}}); links.append(stop);
+    }
+    const log = el('a','日志'); log.href = base + '/files/speech.log'; log.target='_blank'; log.rel='noopener'; links.append(log);
+    row.append(head,links);box.append(row);
+  }
+}
+$('#speech-check').onclick = action(async()=>{
+  const c = await api('/api/speech/capabilities');
+  $('#speech-environment').textContent = c.ready ? '本机配音工具已找到；不会上传正文。语音数据可用性在实际合成时检查。' : '尚缺：' + [!c.espeakReady && 'eSpeak NG（可用 --espeak 指定）',!c.ffmpegReady && 'FFmpeg',!c.ffprobeReady && 'FFprobe'].filter(Boolean).join('、');
+});
+$('#speech-start').onclick = action(async()=>{
+  if (!project || startingSpeech) return;
+  const gen = epoch, pid = project.id, voice = $('#speech-voice').value, rate = Number($('#speech-rate').value);
+  startingSpeech = true; drawSpeech();
+  try {
+    await save();
+    if (gen !== epoch || dirty) throw new Error('项目仍有新编辑，请保存后重试');
+    await api('/api/projects/' + pid + '/speech',{revision:project.revision, requestId:id(), voice, rate});
+    if (gen === epoch) {toast('配音任务已创建，完成后可试听并采用。');await poll();}
+  } finally { startingSpeech = false; drawSpeech(); }
 });

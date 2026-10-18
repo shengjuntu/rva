@@ -11,4 +11,5 @@ exec "$app_dir/bin/video-app" \
   --rundesk "${RUNDESK_URL:-http://127.0.0.1:3210}" \
   --hyperframes "$app_dir/runtime/node_modules/hyperframes/bin/hyperframes.mjs" \
   --gsap "$app_dir/runtime/node_modules/gsap/dist/gsap.min.js" \
-  --font "$font_file"
+  --font "$font_file" \
+  --espeak "${VIDEO_ESPEAK:-}"

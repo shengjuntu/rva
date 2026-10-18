@@ -715,3 +715,15 @@ dialog p {
 #news-evidence article { margin: 14px 0; padding-top: 12px; border-top: 1px solid #dbe5df; overflow-wrap: anywhere; }
 #news-video-downloads { flex-wrap: wrap; gap: 14px; }
 #import-news { margin-top: 10px; }
+
+#subtitle-srt { font-family: ui-monospace, monospace; line-height: 1.5; }
+.subtitle-actions { flex-wrap: wrap; margin: 12px 0 22px; }
+#subtitle-live { white-space: pre-wrap; overflow-wrap: anywhere; padding: 20px; min-height: 75px; border-radius: 10px; background: #17271f; color: #fff; text-align: center; }
+#subtitle-state[data-state="stale"], #subtitle-state[data-state="unreviewed"] { color: #945a19; }
+#subtitle-state[data-state="ready"] { color: #246445; }
+#adopt-news-audio { margin-top: 12px; }
+
+.speech-options { display:flex; gap:14px; flex-wrap:wrap; align-items:flex-end; }
+.speech-options label { flex:1; min-width:160px; }
+.speech-job { border-top:1px solid #dbe5df; margin-top:14px; padding-top:14px; }
+.speech-job audio { display:block; max-width:100%; height:38px; }

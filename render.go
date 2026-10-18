@@ -34,6 +34,13 @@ func (a *App) startRender(w http.ResponseWriter, r *http.Request) {
 		fail(w, 409, errors.New("请先保存至少一个镜头"))
 		return
 	}
+	refreshSubtitleState(p)
+	if p.Subtitles != nil && p.Subtitles.Enabled && p.Subtitles.Status != "ready" {
+		reason := p.Subtitles.Reason
+		a.mu.Unlock()
+		fail(w, 409, errors.New(reason))
+		return
+	}
 	if len(a.jobs) > 0 {
 		a.mu.Unlock()
 		fail(w, 409, errors.New("已有渲染任务运行，原型版一次渲染一个任务"))
@@ -47,7 +54,7 @@ func (a *App) startRender(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	q := clone(p)
-	job := Render{HasAudio: len(audioTracks(p.Audio)) > 0, ID: uid(), Revision: p.Revision, State: "running", Created: time.Now().UTC().Format(time.RFC3339Nano)}
+	job := Render{HasSubtitles: p.Subtitles != nil && p.Subtitles.Enabled, HasAudio: len(audioTracks(p.Audio)) > 0, ID: uid(), Revision: p.Revision, State: "running", Created: time.Now().UTC().Format(time.RFC3339Nano)}
 	for _, s := range p.Shots {
 		job.Duration += s.Duration
 	}
@@ -169,11 +176,26 @@ func (a *App) compose(p Project, dir string) error {
 		fmt.Fprintf(&anim, `tl.fromTo("#content%d",{opacity:0,y:36},{opacity:1,y:0,duration:0.35},%.3f);`, i, start)
 		start += s.Duration
 	}
-	body := fmt.Sprintf(`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><style>@font-face{font-family:VideoFont;src:url('font%s')}*{box-sizing:border-box}body{margin:0;background:#11182a}#root{width:100%%;height:100%%;position:relative;overflow:hidden;background:#11182a;color:#ffffff;font-family:VideoFont,sans-serif}.media{position:absolute;inset:0;width:100%%;height:100%%;object-fit:cover}.scene{position:absolute;inset:0;padding:130px 88px;display:flex;align-items:flex-end;background:linear-gradient(transparent 15%%,rgba(6,13,29,.94) 65%%)}.content{width:100%%;padding:32px;background:#11182a;border-radius:24px}.kicker{font-size:24px;letter-spacing:8px;color:#bac8f8}h1{font-size:62px;line-height:1.24;margin:30px 0;overflow-wrap:anywhere;white-space:pre-wrap}p{font-size:34px;line-height:1.6;color:#e3e9ff;margin:0;overflow-wrap:anywhere;white-space:pre-wrap}.no-media{align-items:center;background:radial-gradient(ellipse at 20%% 20%%,#253754,#11182a 70%%)}.no-media .content{background:transparent}.no-media h1{font-size:96px;line-height:1.3}.no-media p{font-size:44px}.dense h1,.dense.no-media h1{font-size:52px}.dense p,.dense.no-media p{font-size:30px}.rule{height:8px;background:#91abff;width:100px;margin-top:42px}</style><script src="gsap.min.js"></script></head><body><div id="root" data-composition-id="video" data-start="0" data-duration="%.3f" data-width="1080" data-height="1920" data-fps="30">%s</div><script>const tl=gsap.timeline({paused:true});%s window.__timelines=window.__timelines||{};window.__timelines.video=tl;</script></body></html>`, filepath.Ext(a.font), start, clips.String(), anim.String())
+	if p.Subtitles != nil && p.Subtitles.Enabled {
+		for _, c := range p.Subtitles.Cues {
+			fontSize := 44
+			if len([]rune(c.Text)) > 100 {
+				fontSize = 32
+			}
+			fmt.Fprintf(&clips, `<div class="clip subtitle" data-start="%.3f" data-duration="%.3f" data-track-index="3" style="font-size:%dpx"><span>%s</span></div>`, c.Start, c.End-c.Start, fontSize, html.EscapeString(c.Text))
+		}
+		if e := os.WriteFile(filepath.Join(dir, "subtitles.srt"), []byte(subtitleSRT(p.Subtitles.Cues)), 0600); e != nil {
+			return e
+		}
+	}
+	body := fmt.Sprintf(`<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><style>@font-face{font-family:VideoFont;src:url('font%s')}*{box-sizing:border-box}body{margin:0;background:#11182a}#root{width:100%%;height:100%%;position:relative;overflow:hidden;background:#11182a;color:#ffffff;font-family:VideoFont,sans-serif}.media{position:absolute;inset:0;width:100%%;height:100%%;object-fit:cover}.scene{position:absolute;inset:0;padding:130px 88px;display:flex;align-items:flex-end;background:linear-gradient(transparent 15%%,rgba(6,13,29,.94) 65%%)}.content{width:100%%;padding:32px;background:#11182a;border-radius:24px}.kicker{font-size:24px;letter-spacing:8px;color:#bac8f8}h1{font-size:62px;line-height:1.24;margin:30px 0;overflow-wrap:anywhere;white-space:pre-wrap}p{font-size:34px;line-height:1.6;color:#e3e9ff;margin:0;overflow-wrap:anywhere;white-space:pre-wrap}.no-media{align-items:center;background:radial-gradient(ellipse at 20%% 20%%,#253754,#11182a 70%%)}.no-media .content{background:transparent}.no-media h1{font-size:96px;line-height:1.3}.no-media p{font-size:44px}.dense h1,.dense.no-media h1{font-size:52px}.dense p,.dense.no-media p{font-size:30px}.subtitle{position:absolute;left:88px;right:88px;bottom:145px;text-align:center;line-height:1.5;white-space:pre-wrap;overflow-wrap:anywhere;z-index:3}.subtitle span{background:rgba(6,13,29,.95);box-decoration-break:clone;padding:8px 18px;border-radius:12px}.scene:has(~.subtitle){padding-bottom:510px}.rule{height:8px;background:#91abff;width:100px;margin-top:42px}</style><script src="gsap.min.js"></script></head><body><div id="root" data-composition-id="video" data-start="0" data-duration="%.3f" data-width="1080" data-height="1920" data-fps="30">%s</div><script>const tl=gsap.timeline({paused:true});%s window.__timelines=window.__timelines||{};window.__timelines.video=tl;</script></body></html>`, filepath.Ext(a.font), start, clips.String(), anim.String())
 	if e := os.WriteFile(filepath.Join(dir, "index.html"), []byte(body), 0600); e != nil {
 		return e
 	}
 	if e := a.snapshotAudio(p, dir); e != nil {
+		return e
+	}
+	if e := verifySubtitleSnapshot(p, dir); e != nil {
 		return e
 	}
 	return atomicJSON(filepath.Join(dir, "snapshot.json"), p)
@@ -294,7 +316,7 @@ func (a *App) renderFile(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if !found || (file != "final.mp4" && file != "render.log" && file != "snapshot.json" && file != "validation.json") {
+	if !found || (file != "final.mp4" && file != "render.log" && file != "snapshot.json" && file != "validation.json" && file != "subtitles.srt") {
 		fail(w, 404, errors.New("文件不存在"))
 		return
 	}

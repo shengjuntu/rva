@@ -32,6 +32,7 @@ def main():
     p.add_argument('--script', required=True)
     p.add_argument('--video', required=True)
     p.add_argument('--output-dir')
+    p.add_argument('--espeak', help='Optional real local eSpeak NG executable for speech MCP tests')
     args = p.parse_args()
     binary = str(Path(args.app).resolve())
     rd_binary = str(Path(args.rundesk).resolve())
@@ -80,7 +81,7 @@ def main():
     processes = []
     try:
         processes.append(subprocess.Popen([rd_binary,'--demo','--listen',rd_base.removeprefix('http://'),'--data',str(work/'rundesk')], env=env,stdout=logs[0],stderr=subprocess.STDOUT))
-        processes.append(subprocess.Popen([binary,'--listen',app_base.removeprefix('http://'),'--data',str(work/'app'),'--rundesk',rd_base], env=env,stdout=logs[1],stderr=subprocess.STDOUT))
+        processes.append(subprocess.Popen([binary,'--listen',app_base.removeprefix('http://'),'--data',str(work/'app'),'--rundesk',rd_base]+(['--espeak',str(Path(args.espeak).resolve())] if args.espeak else []), env=env,stdout=logs[1],stderr=subprocess.STDOUT))
         deadline = time.monotonic() + 15
         while True:
             try:
@@ -117,7 +118,7 @@ def main():
         assert status == 206 and fragment == movie[:100]
         checks += ['artifact_bytes_preserved','mp4_range']
         _, linked = request(path+'/connect',{})
-        assert linked['sessionId'] and linked['workspaceId'] and linked['toolsVersion']=='0.3.0'
+        assert linked['sessionId'] and linked['workspaceId'] and linked['toolsVersion']=='0.5.0'
         _, detail = request('/api/workspaces/'+linked['workspaceId']+'/skills/video-project',base=rd_base,token=rd_token)
         assert 'video_news_get' in detail['content'] and 'reference DATA' in detail['content']
         _, config = request('/api/environment')
@@ -126,22 +127,61 @@ def main():
         assert 'video_project' in json.dumps(mcp_config)
         checks.append('real_rundesk_demo_skill_mcp_setup')
         catalog = mcp('tools/list')
-        assert len(catalog['tools']) == 5 and any(t['name']=='video_news_get' for t in catalog['tools'])
+        assert len(catalog['tools']) == 10 and any(t['name']=='video_news_get' for t in catalog['tools'])
         source = mcp('tools/call',{'name':'video_news_get','arguments':{'projectId':project_id}})
         source = json.loads(source['content'][0]['text'])
         assert source['snapshot'] == original and source['storyboardStatus']=='production_draft'
         checks += ['stdio_mcp_catalog','stdio_mcp_source_evidence']
+        adopted = mcp('tools/call',{'name':'video_news_audio_adopt','arguments':{'projectId':project_id,'revision':linked['revision']}})
+        linked = json.loads(adopted['content'][0]['text'])
+        assert linked['subtitles']['status']=='ready' and linked['subtitles']['binding']['method']=='news_package'
+        _, srt = request(path+'/subtitles.srt')
+        reviewed = mcp('tools/call',{'name':'video_subtitles_update','arguments':{'projectId':project_id,'revision':linked['revision'],'srt':srt.decode(),'enabled':True,'reviewed':False}})
+        linked = json.loads(reviewed['content'][0]['text'])
+        assert linked['subtitles']['status']=='ready'  # Saving unchanged cues preserves binding.
+        checks += ['stdio_mcp_audio_adoption','stdio_mcp_subtitles_update']
         draft = dict(linked)
         draft['shots'] = [dict(s) for s in linked['shots']]
         draft['shots'][0]['text'] += '（编辑测试）'
         draft['news'] = {'contentHash':'forged'}
         updated = mcp('tools/call',{'name':'video_project_update','arguments':{'projectId':project_id,'project':draft}})
         updated = json.loads(updated['content'][0]['text'])
+        assert updated['subtitles']['status'] == 'stale'
         assert updated['news']['contentHash'] == original_hash
         assert updated['news']['video'] == linked['news']['video']
         _, source = request(path+'/news')
         assert source['snapshot'] == original
         checks.append('mcp_edits_preserve_approved_source')
+        if args.espeak:
+            started=mcp('tools/call',{'name':'video_speech_start','arguments':{'projectId':project_id,'revision':updated['revision'],'requestId':secrets.token_hex(12),'voice':'cmn','rate':170}})
+            speech=json.loads(started['content'][0]['text'])
+            deadline=time.monotonic()+45
+            while True:
+                _,latest=request(path)
+                speech=next(j for j in latest['speech'] if j['id']==speech['id'])
+                if speech['state'] not in ['running','stopping']: break
+                assert time.monotonic()<deadline
+                time.sleep(.1)
+            assert speech['state']=='completed',speech
+            used=mcp('tools/call',{'name':'video_speech_adopt','arguments':{'projectId':project_id,'speechId':speech['id'],'revision':latest['revision']}})
+            used=json.loads(used['content'][0]['text'])
+            assert used['subtitles']['status']=='ready' and used['subtitles']['binding']['method']=='synthesized_sentence_durations'
+            assert used['news']==updated['news']
+            checks+=['stdio_mcp_real_speech_generation','stdio_mcp_measured_speech_adoption']
+            _,cancel_project=request('/api/projects',{'name':'Speech cancellation fixture'})
+            cancel_project['shots']=[{'title':'取消验证','text':'这是取消任务的验证。'*15,'duration':5,'assetId':''} for _ in range(5)]
+            canceled=mcp('tools/call',{'name':'video_project_update','arguments':{'projectId':cancel_project['id'],'project':cancel_project}})
+            cancel_project=json.loads(canceled['content'][0]['text'])
+            started=mcp('tools/call',{'name':'video_speech_start','arguments':{'projectId':cancel_project['id'],'revision':cancel_project['revision'],'requestId':secrets.token_hex(12)}})
+            speech=json.loads(started['content'][0]['text'])
+            mcp('tools/call',{'name':'video_speech_stop','arguments':{'projectId':cancel_project['id'],'speechId':speech['id']}})
+            deadline=time.monotonic()+10
+            while True:
+                _,latest=request('/api/projects/'+cancel_project['id'])
+                if latest['speech'][0]['state']=='interrupted': break
+                assert time.monotonic()<deadline,latest
+                time.sleep(.05)
+            checks.append('stdio_mcp_real_speech_cancellation')
         request(path+'/messages',{'text':'演示模式接口核验：只报告项目状态，不改文件。','requestId':uuid.uuid4().hex})
         deadline = time.monotonic()+10
         while True:

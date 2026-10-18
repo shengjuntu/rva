@@ -28,7 +28,7 @@ import (
 	"time"
 )
 
-const version = "0.3.0"
+const version = "0.5.0"
 
 //go:embed web/*
 var ui embed.FS
@@ -57,33 +57,38 @@ type Asset struct {
 	MIME string `json:"mime"`
 }
 type Render struct {
-	ID       string  `json:"id"`
-	Revision int     `json:"revision"`
-	State    string  `json:"state"`
-	Created  string  `json:"created"`
-	Error    string  `json:"error,omitempty"`
-	Duration float64 `json:"duration"`
-	HasAudio bool    `json:"hasAudio"`
+	HasSubtitles bool    `json:"hasSubtitles,omitempty"`
+	ID           string  `json:"id"`
+	Revision     int     `json:"revision"`
+	State        string  `json:"state"`
+	Created      string  `json:"created"`
+	Error        string  `json:"error,omitempty"`
+	Duration     float64 `json:"duration"`
+	HasAudio     bool    `json:"hasAudio"`
 }
 type Project struct {
-	News         *NewsOrigin `json:"news,omitempty"`
-	ID           string      `json:"id"`
-	Name         string      `json:"name"`
-	Brief        string      `json:"brief"`
-	Revision     int         `json:"revision"`
-	Shots        []Shot      `json:"shots"`
-	Audio        *AudioMix   `json:"audio,omitempty"`
-	Assets       []Asset     `json:"assets"`
-	Renders      []Render    `json:"renders"`
-	WorkspaceID  string      `json:"workspaceId"`
-	SessionID    string      `json:"sessionId"`
-	Updated      string      `json:"updated"`
-	ToolsVersion string      `json:"toolsVersion,omitempty"`
+	Speech       []SpeechJob    `json:"speech,omitempty"`
+	Subtitles    *SubtitleTrack `json:"subtitles,omitempty"`
+	News         *NewsOrigin    `json:"news,omitempty"`
+	ID           string         `json:"id"`
+	Name         string         `json:"name"`
+	Brief        string         `json:"brief"`
+	Revision     int            `json:"revision"`
+	Shots        []Shot         `json:"shots"`
+	Audio        *AudioMix      `json:"audio,omitempty"`
+	Assets       []Asset        `json:"assets"`
+	Renders      []Render       `json:"renders"`
+	WorkspaceID  string         `json:"workspaceId"`
+	SessionID    string         `json:"sessionId"`
+	Updated      string         `json:"updated"`
+	ToolsVersion string         `json:"toolsVersion,omitempty"`
 }
 type Config struct {
 	InstanceID string `json:"instanceId"`
 }
 type App struct {
+	espeak                                           string
+	speechJobs                                       map[string]context.CancelFunc
 	mu                                               sync.Mutex
 	data, rd, token, rdToken, hf, font, gsap, public string
 	cfg                                              Config
@@ -130,10 +135,12 @@ func clone(p *Project) Project {
 	b, _ := json.Marshal(p)
 	var q Project
 	_ = json.Unmarshal(b, &q)
+	refreshSubtitleState(&q)
 	return q
 }
 func (a *App) dir(id string) string { return filepath.Join(a.data, "projects", id) }
 func (a *App) save(p *Project) error {
+	refreshSubtitleState(p)
 	p.Updated = time.Now().UTC().Format(time.RFC3339Nano)
 	return atomicJSON(filepath.Join(a.dir(p.ID), "project.json"), p)
 }
@@ -145,7 +152,7 @@ func newApp(data string) (*App, error) {
 	if e = os.MkdirAll(filepath.Join(d, "projects"), 0700); e != nil {
 		return nil, e
 	}
-	a := &App{data: d, projects: map[string]*Project{}, jobs: map[string]context.CancelFunc{}, client: &http.Client{Timeout: 25 * time.Second, CheckRedirect: func(r *http.Request, via []*http.Request) error { return http.ErrUseLastResponse }}}
+	a := &App{data: d, projects: map[string]*Project{}, jobs: map[string]context.CancelFunc{}, speechJobs: map[string]context.CancelFunc{}, client: &http.Client{Timeout: 25 * time.Second, CheckRedirect: func(r *http.Request, via []*http.Request) error { return http.ErrUseLastResponse }}}
 	b, _ := os.ReadFile(filepath.Join(d, "config.json"))
 	_ = json.Unmarshal(b, &a.cfg)
 	entries, _ := os.ReadDir(filepath.Join(d, "projects"))
@@ -163,6 +170,12 @@ func newApp(data string) (*App, error) {
 		}
 		if p.ID != entry.Name() {
 			return nil, errors.New("project ID mismatch")
+		}
+		for i := range p.Speech {
+			if p.Speech[i].State == "running" || p.Speech[i].State == "stopping" {
+				p.Speech[i].State = "interrupted"
+				p.Speech[i].Error = "服务重启，配音未完成；可重新生成"
+			}
 		}
 		for i := range p.Renders {
 			if p.Renders[i].State == "running" || p.Renders[i].State == "stopping" {
@@ -230,7 +243,7 @@ func (a *App) edit(id string, in Project) (Project, error) {
 		if s.ID == "" {
 			s.ID = uid()
 		}
-		if !identifier.MatchString(s.ID) || seen[s.ID] || s.Duration < 1 || s.Duration > 60 || len([]rune(s.Title)) > 80 || len([]rune(s.Text)) > 220 {
+		if !identifier.MatchString(s.ID) || seen[s.ID] || !finite(s.Duration) || s.Duration < 1 || s.Duration > 60 || len([]rune(s.Title)) > 80 || len([]rune(s.Text)) > 220 {
 			return clone(p), errors.New("镜头 ID、时长或文字长度不合法（标题80字，正文220字，1–60秒）")
 		}
 		if s.AssetID != "" && !assets[s.AssetID] {
@@ -298,9 +311,17 @@ func (a *App) auth(next http.Handler) http.Handler {
 }
 func (a *App) routes() http.Handler {
 	m := http.NewServeMux()
+	m.HandleFunc("GET /api/speech/capabilities", a.speechCapabilities)
+	m.HandleFunc("POST /api/projects/{id}/speech", a.startSpeech)
+	m.HandleFunc("POST /api/projects/{id}/speech/{sid}/stop", a.stopSpeech)
+	m.HandleFunc("POST /api/projects/{id}/speech/{sid}/adopt", a.adoptSpeech)
+	m.HandleFunc("GET /api/projects/{id}/speech/{sid}/files/{file}", a.speechFile)
 	m.HandleFunc("POST /api/news/import", a.importNews)
 	m.HandleFunc("GET /api/projects/{id}/news", a.newsDetail)
 	m.HandleFunc("POST /api/projects/{id}/news/video", a.importNewsVideo)
+	m.HandleFunc("POST /api/projects/{id}/news/audio", a.adoptNewsAudio)
+	m.HandleFunc("PUT /api/projects/{id}/subtitles", a.updateSubtitles)
+	m.HandleFunc("GET /api/projects/{id}/subtitles.srt", a.subtitleFile)
 	m.HandleFunc("GET /api/projects/{id}/news/{group}/files/{file}", a.newsFile)
 	m.HandleFunc("POST /login", func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
@@ -519,13 +540,14 @@ func main() {
 	hf := flag.String("hyperframes", "", "absolute HyperFrames CLI path")
 	font := flag.String("font", "", "local Chinese font file")
 	gsap := flag.String("gsap", "", "local gsap.min.js file")
+	espeak := flag.String("espeak", "", "local espeak-ng executable (defaults to PATH)")
 	flag.Parse()
-	if e := serve(serverOptions{Data: *data, Listen: *listen, RunDesk: *rd, HyperFrames: *hf, Font: *font, GSAP: *gsap}); e != nil {
+	if e := serve(serverOptions{Data: *data, Listen: *listen, RunDesk: *rd, HyperFrames: *hf, Font: *font, GSAP: *gsap, ESpeak: *espeak}); e != nil {
 		log.Fatal(e)
 	}
 }
 
-type serverOptions struct{ Data, Listen, RunDesk, HyperFrames, Font, GSAP string }
+type serverOptions struct{ Data, Listen, RunDesk, HyperFrames, Font, GSAP, ESpeak string }
 
 func serve(opts serverOptions) error {
 	host, _, e := net.SplitHostPort(opts.Listen)
@@ -576,6 +598,9 @@ func serve(opts serverOptions) error {
 	if a.gsap, e = absoluteOrEmpty(opts.GSAP); e != nil {
 		return e
 	}
+	if a.espeak, e = absoluteOrEmpty(opts.ESpeak); e != nil {
+		return e
+	}
 	a.public = "http://" + opts.Listen
 	srv := &http.Server{Addr: opts.Listen, Handler: a.routes(), ReadHeaderTimeout: 10 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -585,6 +610,9 @@ func serve(opts serverOptions) error {
 		a.mu.Lock()
 		a.closing = true
 		for _, cancel := range a.jobs {
+			cancel()
+		}
+		for _, cancel := range a.speechJobs {
 			cancel()
 		}
 		a.mu.Unlock()

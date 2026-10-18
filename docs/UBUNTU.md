@@ -5,13 +5,13 @@
 ## 1. 解压程序
 
 ```bash
-unzip rundesk-video-app-v0.3.0.zip
+unzip rundesk-video-app-v0.5.0.zip
 cd rundesk-video-app
 chmod +x bin/video-app scripts/*.sh
 ./bin/video-app --version
 ```
 
-应输出 `RunDesk Video App 0.3.0`。`bin/video-app` 是 Linux amd64 二进制。其他架构可用 Go 1.25+ 运行 `./scripts/build.sh` 从源码构建。包内 Windows amd64 二进制仅经过交叉编译，未实机验证。
+应输出 `RunDesk Video App 0.5.0`。`bin/video-app` 是 Linux amd64 二进制。其他架构可用 Go 1.25+ 运行 `./scripts/build.sh` 从源码构建。包内 Windows amd64 二进制仅经过交叉编译，未实机验证。
 
 ## 2. 准备运行环境
 
@@ -22,6 +22,8 @@ node --version
 npm --version
 sudo apt update
 sudo apt install -y ffmpeg fonts-noto-cjk
+# 可选：自动生成本机预览配音
+sudo apt install -y espeak-ng
 ```
 
 Chrome Headless Shell 还需要 Linux 动态库。Ubuntu 24.04 可安装：
@@ -81,6 +83,7 @@ cat "$HOME/rundesk-video-data/access-token"
 | VIDEO_LISTEN | 127.0.0.1:3220，仅回环地址 |
 | VIDEO_APP_TOKEN | 缺省自动创建并持久保存 |
 | VIDEO_FONT | 上述 Noto CJK 字体文件 |
+| VIDEO_ESPEAK | 可选，eSpeak NG 可执行文件绝对路径；默认从 PATH 查找 |
 | RUNDESK_URL | http://127.0.0.1:3210 |
 | RUNDESK_TOKEN | RunDesk 的后端 API 令牌 |
 | HYPERFRAMES_BROWSER_PATH | 可选，已有浏览器绝对路径 |
@@ -101,7 +104,7 @@ ssh -L 3220:127.0.0.1:3220 -L 3210:127.0.0.1:3210 jx@你的服务器
 4. 如果你使用自定义模型提供方，在该实例配置模型与凭据；新实例不会自动复制默认实例的设置。
 5. 在 RunDesk 重新加载空闲连接，检查账号、项目 Skill 和 MCP 的运行状态。
 6. 回到视频 App，输入：“根据项目说明规划 4 个镜头，先不要生成视频。”
-7. 上传配音或背景音乐后，在“声音”区选择音频、设置起点与音量，点击“保存分镜”和“生成视频”。也可以明确让 Agent 调用渲染工具。
+7. 可在“自动配音”生成并试听采用，也可上传配音或背景音乐；之后，在“声音”区选择音频、设置起点与音量，点击“保存分镜”和“生成视频”。也可以明确让 Agent 调用渲染工具。
 
 手动创建、编辑分镜并渲染不依赖 Codex 登录，适合先单独检查渲染环境。环境弹窗只做程序/文件存在性与 RunDesk 连通检查，不代替真实渲染验证。
 
@@ -156,4 +159,4 @@ journalctl --user -u rundesk-video -f
 - MCP 启动失败：RunDesk 和 App 必须在同一台机器、同一可访问文件环境；App 二进制绝对路径必须可执行；App 服务应保持运行。
 - 令牌/路径变更：更换 App 令牌、端口或程序路径后，在项目里点击“重新配置工具”。此操作保留原会话，更新应用管理的 Skill/MCP。专用实例还有运行中的任务时会拒绝更新。
 - 更新前停止服务、备份视频 App 整个数据目录，同时保留 RunDesk 数据及专用实例。替换二进制时保持程序绝对路径；之后重新启动。
-- 停止 Agent 与取消渲染是两个不同操作。关闭页面不会停止渲染；正常停止 App 会取消当前渲染；服务重启后将未完成任务标记为已中断，不自动续跑。
+- 停止 Agent、取消配音与取消渲染分别控制。关闭页面不会停止后台任务；正常停止 App 会取消当前配音与渲染；服务重启后将未完成任务标记为已中断，不自动续跑。
