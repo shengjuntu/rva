@@ -104,7 +104,7 @@ func renderJobView(pid string, j Render) ProductionJob {
 		v.Artifacts = append(v.Artifacts, JobArtifact{Name: "final.mp4", URL: "/api/projects/" + pid + "/renders/" + j.ID + "/final.mp4"}, JobArtifact{Name: "snapshot.json", URL: "/api/projects/" + pid + "/renders/" + j.ID + "/snapshot.json"}, JobArtifact{Name: "validation.json", URL: "/api/projects/" + pid + "/renders/" + j.ID + "/validation.json"})
 	}
 	if j.State == "completed" && j.Engine == "ffmpeg_edit" {
-		v.Artifacts = append(v.Artifacts, JobArtifact{Name: "edit-ir.json", URL: "/api/projects/" + pid + "/renders/" + j.ID + "/edit-ir.json"})
+		v.Artifacts = append(v.Artifacts, JobArtifact{Name: "render-proof.json", URL: "/api/projects/" + pid + "/renders/" + j.ID + "/render-proof.json"}, JobArtifact{Name: "edit-ir.json", URL: "/api/projects/" + pid + "/renders/" + j.ID + "/edit-ir.json"})
 	}
 	return v
 }

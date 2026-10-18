@@ -174,7 +174,14 @@ func (a *App) renderEditDSL(ctx context.Context, p Project, job Render) {
 		}
 		args = append(args, "-c:v", "libx264", "-preset", "veryfast", "-threads", "2", "-crf", "23", "-r", strconv.Itoa(ir.Canvas.FPS), "-t", decimal(outputDuration), "-movflags", "+faststart", "final.mp4")
 	}
+	key, reused := "", ""
 	if e == nil {
+		key, e = renderInputKey(ctx, filepath.Join(dir, "assets"), ir, p.Assets, filepath.Join(dir, "font.ttf"), job.Range)
+	}
+	if e == nil {
+		reused, e = a.reuseRender(ctx, p, job, key, dir)
+	}
+	if e == nil && reused == "" {
 		fmt.Fprintln(log, "ffmpeg editing DSL", strings.Join(args, " "))
 		cmd := exec.CommandContext(ctx, "ffmpeg", args...)
 		cmd.Dir = dir
@@ -190,6 +197,12 @@ func (a *App) renderEditDSL(ctx context.Context, p Project, job Render) {
 			expected.Duration = job.Range.End - job.Range.Start
 		}
 		e = verifyEditOutput(ctx, dir, expected)
+	}
+	if e == nil {
+		e = a.saveRenderProof(p.ID, job.ID, dir, key, reused)
+	}
+	if reused != "" && log != nil {
+		fmt.Fprintln(log, "Verified cache reuse:", reused)
 	}
 	if e != nil && log != nil {
 		fmt.Fprintln(log, "FAILED:", e)

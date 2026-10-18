@@ -1,5 +1,5 @@
 "use strict";
-const TOOL_VERSION = "0.18.0";
+const TOOL_VERSION = "0.19.0";
 const $ = (s) => document.querySelector(s),
   el = (tag, text, cls) => {
     const n = document.createElement(tag);
@@ -371,7 +371,7 @@ function drawRenders() {
       info = el("div"),
       links = el("div");
     info.append(
-      el("strong", (project.production?.finalRenderId === r.id ? "终稿 · " : r.kind === "draft" ? "初稿预览 · " : "成片 · ") + "修订 " + r.revision + " · " + (states[r.state] || r.state)),
+      el("strong", (project.final?.renderId===r.id ? "终稿记录 · " : project.production?.finalRenderId === r.id ? "终稿 · " : r.range ? "局部预览 · " : r.kind === "draft" ? "初稿预览 · " : "成片 · ") + "修订 " + r.revision + " · " + (states[r.state] || r.state)),
       el(
         "small",
         new Date(r.created).toLocaleString() +
@@ -381,7 +381,8 @@ function drawRenders() {
           (r.hasAudio ? " · 含音轨" : " · 无声"),
       ),
     );
-    if (r.error) info.append(el("div", r.error, "render-error"));
+    info.append(el("small","ID："+r.id+(r.reusedFrom?" · 复用已校验渲染："+r.reusedFrom:"")));
+ if (r.error) info.append(el("div", r.error, "render-error"));
     const base = path("/renders/" + r.id + "/");
     if (r.state === "completed") {
       const play = el("button", "播放");
@@ -1660,3 +1661,5 @@ $('#final-designate').onclick=action(async()=>{
  const result=await api('/api/projects/'+pid+'/final',{revision:project.revision,renderId:$('#final-render-id').value.trim(),reviewed:$('#final-reviewed').checked});if(gen!==epoch)return;
  const refreshed=await api('/api/projects/'+pid);if(gen!==epoch)return;project=refreshed;drawProject();$('#final-reviewed').checked=false;$('#final-status').textContent='已保存终稿快照：'+result.final.id;
 });
+
+$('#final-verify').onclick=action(async()=>{const pid=project.id,gen=epoch;$('#final-status').textContent='正在读取素材和成片进行复核…';const result=await api('/api/projects/'+pid+'/final/verify');if(gen!==epoch)return;$('#final-status').textContent='输入仍有效：'+(result.inputsCurrent?'是':'否')+'；成片与快照完整：'+(result.outputIntact?'是':'否');});

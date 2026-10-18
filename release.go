@@ -101,6 +101,21 @@ func (a *App) finalSave(w http.ResponseWriter, r *http.Request) {
 		fail(w, 409, errors.New("渲染快照与当前内容不一致"))
 		return
 	}
+	proof, err := readRenderProof(filepath.Join(a.dir(p.ID), "renders", found.ID))
+	if err != nil || proof.VideoHash != vh || proof.VideoBytes != size || proof.SnapshotHash != sh {
+		fail(w, 409, errors.New("渲染校验记录缺失或产物已改变，请重新渲染"))
+		return
+	}
+	ir, err := compileEdit(*p.EditDSL, p.Assets)
+	if err != nil {
+		fail(w, 409, err)
+		return
+	}
+	key, err := renderInputKey(r.Context(), filepath.Join(a.dir(p.ID), "workspace", "assets"), ir, p.Assets, a.font, nil)
+	if err != nil || key != proof.Key {
+		fail(w, 409, errors.New("素材、字体或渲染环境已改变，请重新渲染"))
+		return
+	}
 	record := FinalSnapshot{ID: uid(), RenderID: found.ID, Created: time.Now().UTC().Format(time.RFC3339Nano), Revision: p.Revision, ContentHash: productionHash(p), NarrationHash: hashBytes([]byte(p.NarrationText)), VideoHash: vh, SnapshotHash: sh, VideoBytes: size, Reviewed: true}
 	a.mu.Lock()
 	defer a.mu.Unlock()

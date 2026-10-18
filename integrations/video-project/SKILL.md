@@ -4,6 +4,10 @@ description: Manage this video app project through video_project MCP tools. Use 
 ---
 # Video project workflow
 
+## Render reuse and byte verification (v0.19)
+DSL rendering computes a key from compiled IR, range, actual referenced asset/font hashes, FFmpeg version, App version and encoding settings. Identical output may be copied from a completed project render after output hash verification, then probed again; no segment cache or cross-project reuse. Read render-proof.json for key/hash/reusedFrom. This still copies/hashes inputs, so do not promise zero-cost or incremental rendering. Final designation now requires matching current input key and intact output/snapshot proof. video_final_verify rehashes inputs and final artifacts; inputsCurrent and outputIntact are separate, verified requires both. Old renders without proof require rerendering for new final designation. Concurrent external file edits are not locked, so verification reflects bytes observed at check time.
+
+
 ## Partial previews and final snapshots (v0.18)
 For DSL-only preview call video_job_start(type=render,options={kind:"draft",range:{start,end}}); range must fit timeline and span at most60 seconds. Output starts at zero; stored IR keeps original times. This renders through the original filter graph; it is not a cache or guaranteed faster. Partial outputs cannot be designated final. video_final_get reports current designation versus DSL/narration. video_final_save requires revision, a completed full DSL renderId and reviewed=true ONLY after explicit human review of that exact complete output. Never infer review from compiler success. It records output/snapshot hashes and retains an immutable final record; changed DSL or narration makes designation stale. Actual file byte validation is done at designation; get does not rehash files.
 

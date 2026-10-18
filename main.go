@@ -28,7 +28,7 @@ import (
 	"time"
 )
 
-const version = "0.18.0"
+const version = "0.19.0"
 
 //go:embed web/*
 var ui embed.FS
@@ -64,6 +64,8 @@ type Asset struct {
 	MIME            string            `json:"mime"`
 }
 type Render struct {
+	CacheKey     string       `json:"cacheKey,omitempty"`
+	ReusedFrom   string       `json:"reusedFrom,omitempty"`
 	Range        *RenderRange `json:"range,omitempty"`
 	Engine       string       `json:"engine,omitempty"`
 	RequestID    string       `json:"requestId,omitempty"`
@@ -518,6 +520,7 @@ func (a *App) routes() http.Handler {
 	m.HandleFunc("POST /api/projects/{id}/edit/patch/{action}", a.editPatch)
 	m.HandleFunc("POST /api/projects/{id}/edit/undo", a.editUndo)
 	m.HandleFunc("POST /api/projects/{id}/edit/redo", a.editRedo)
+	m.HandleFunc("GET /api/projects/{id}/final/verify", a.verifyFinal)
 	m.HandleFunc("GET /api/projects/{id}/final", a.finalGet)
 	m.HandleFunc("POST /api/projects/{id}/final", a.finalSave)
 	m.HandleFunc("GET /api/projects/{id}/workflow", a.workflowGet)

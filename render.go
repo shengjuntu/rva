@@ -390,7 +390,7 @@ func (a *App) renderFile(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if !found || (file != "final.mp4" && file != "render.log" && file != "snapshot.json" && file != "validation.json" && file != "subtitles.srt" && file != "edit-ir.json" && file != "filter.ffscript") {
+	if !found || (file != "final.mp4" && file != "render.log" && file != "snapshot.json" && file != "validation.json" && file != "subtitles.srt" && file != "edit-ir.json" && file != "filter.ffscript" && file != "render-proof.json") {
 		fail(w, 404, errors.New("文件不存在"))
 		return
 	}
