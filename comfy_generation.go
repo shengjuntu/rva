@@ -4,6 +4,8 @@ import (
 	"context"
 	"errors"
 	"net/url"
+	"os"
+	"os/exec"
 	"time"
 
 	"rundesk-video-app/comfyh3"
@@ -68,7 +70,43 @@ func fetchComfyGenerated(ctx context.Context, j GenerationJob, target Generation
 	if e != nil {
 		return nil, e
 	}
+	// H3 native audio is very quiet (mean ~-39 dB); normalize with ffmpeg.
+	// Falls back to the raw bytes if ffmpeg is unavailable or fails.
+	if data, e := normalizeAudio(ctx, res.Bytes); e == nil {
+		return data, nil
+	}
 	return res.Bytes, nil
+}
+
+// normalizeAudio boosts quiet audio tracks with ffmpeg (+18 dB, copy video).
+func normalizeAudio(ctx context.Context, mp4 []byte) ([]byte, error) {
+	in, e := os.CreateTemp("", "h3-in-*.mp4")
+	if e != nil {
+		return nil, e
+	}
+	defer os.Remove(in.Name())
+	if _, e := in.Write(mp4); e != nil {
+		in.Close()
+		return nil, e
+	}
+	in.Close()
+	out, e := os.CreateTemp("", "h3-out-*.mp4")
+	if e != nil {
+		return nil, e
+	}
+	outName := out.Name()
+	out.Close()
+	defer os.Remove(outName)
+	cmd := exec.CommandContext(ctx, "ffmpeg", "-y", "-i", in.Name(),
+		"-af", "volume=18dB", "-c:v", "copy", "-movflags", "+faststart", outName)
+	if b, e := cmd.CombinedOutput(); e != nil {
+		return nil, errors.New("ffmpeg audio normalize failed: " + string(b))
+	}
+	data, e := os.ReadFile(outName)
+	if e != nil || len(data) == 0 {
+		return nil, errors.New("normalized audio output empty")
+	}
+	return data, nil
 }
 
 func requestPrefix(id string) string {
