@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>视频工作台 · RunDesk App</title>
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body>
+    <div id="login">
+      <form id="login-form">
+        <div class="eyebrow">RUNDESK VIDEO APP</div>
+        <h1>视频工作台</h1>
+        <p>输入本机服务的访问令牌。</p>
+        <input
+          id="token"
+          type="password"
+          autocomplete="current-password"
+          placeholder="VIDEO_APP_TOKEN / access-token"
+          required
+        /><button class="primary">进入工作台</button>
+        <p id="login-error"></p>
+      </form>
+    </div>
+    <div id="app" hidden>
+      <header>
+        <div class="brand">视频工作台 <span>v0.2.0</span></div>
+        <div class="top-actions">
+          <button id="environment">环境准备</button
+          ><button id="toggle-assets">素材栏</button
+          ><button id="toggle-chat">对话栏</button
+          ><button id="logout">退出</button>
+        </div>
+      </header>
+      <div class="layout">
+        <aside id="library">
+          <div class="section-head">
+            <h2>项目</h2>
+            <button id="new-project" aria-label="新建项目">＋</button>
+          </div>
+          <select id="projects" aria-label="选择项目"></select>
+          <div class="section-head">
+            <h2>素材库</h2>
+            <button id="upload-button">＋ 上传</button
+            ><input
+              id="upload"
+              type="file"
+              multiple
+              hidden
+              accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,audio/wav,audio/mpeg,audio/mp4,audio/flac,audio/ogg,.m4a,.flac,.ogg,.txt,.md,.pdf"
+            />
+          </div>
+          <p class="muted small">图片、视频、音频或文章 · 单文件 256 MiB</p>
+          <div id="assets"></div>
+          <div class="library-footer">
+            Go + HTML · 本地项目<br />Agent 由 RunDesk 管理
+          </div>
+        </aside>
+        <main>
+          <div class="project-head">
+            <div>
+              <div class="eyebrow">VIDEO PROJECT</div>
+              <h1 id="project-name">开始一个视频项目</h1>
+              <span id="save-state" class="muted"
+                >上传素材，再组织你的分镜</span
+              >
+            </div>
+            <div class="row">
+              <button id="save">保存分镜</button
+              ><button id="render" class="primary">生成视频</button>
+            </div>
+          </div>
+          <div id="conflict" hidden>
+            项目已被 Agent
+            更新。你的编辑仍保留，请先复制需要保留的内容，再<button
+              id="reload-project"
+            >
+              重新载入</button
+            >。
+          </div>
+          <div class="preview-shell">
+            <div class="preview-top">
+              <span id="preview-label">镜头预览</span
+              ><span>9:16 · 1080 × 1920 · 30 fps</span>
+            </div>
+            <div id="preview">
+              <video id="player" controls playsinline hidden></video>
+              <div id="poster">
+                <img id="poster-image" alt="镜头素材" hidden />
+                <div class="poster-copy">
+                  <span id="shot-number">01 / 01</span>
+                  <h2 id="poster-title">让想法<br />成为下一条视频</h2>
+                  <p id="poster-text">
+                    上传文章与素材，和 Agent 一起完成脚本、分镜与成片。
+                  </p>
+                  <div class="accent-rule"></div>
+                </div>
+              </div>
+            </div>
+            <div class="preview-bottom">
+              <button id="show-storyboard">查看当前分镜</button
+              ><span id="duration">0 秒</span
+              ><span class="muted small">预览草图以成片为准</span>
+            </div>
+          </div>
+          <section class="storyboard">
+            <div class="section-head">
+              <h2>分镜 <span id="shot-count">0</span></h2>
+              <div class="row">
+                <button id="add-shot">＋ 新镜头</button
+                ><button id="shot-up">前移</button
+                ><button id="shot-down">后移</button
+                ><button id="delete-shot">删除</button>
+              </div>
+            </div>
+            <div id="shots"></div>
+            <div id="editor" hidden>
+              <label
+                >镜头标题<input
+                  id="shot-title"
+                  maxlength="80"
+                  placeholder="镜头标题" /></label
+              ><label
+                >时长 / 秒<input
+                  id="shot-duration"
+                  type="number"
+                  min="1"
+                  max="60"
+                  step="0.5" /></label
+              ><label>画面素材<select id="shot-asset"></select></label
+              ><label class="wide"
+                >画面文字<textarea
+                  id="shot-text"
+                  maxlength="220"
+                  rows="3"
+                  placeholder="保持简洁，让字幕易于阅读"
+                ></textarea>
+              </label>
+            </div>
+            <label class="brief-label"
+              >项目说明<textarea
+                id="brief"
+                rows="3"
+                placeholder="受众、主题、风格与希望表达的重点"
+              ></textarea>
+            </label>
+          </section>
+          <section id="sound-section">
+            <div class="section-head">
+              <h2>声音</h2>
+              <button id="upload-audio">＋ 上传音频</button>
+            </div>
+            <p class="muted small">
+              配音播放一次；背景音乐可循环。成片长度由分镜决定，超出部分自动截断。
+            </p>
+            <svg
+              id="audio-timeline"
+              viewBox="0 0 640 115"
+              role="img"
+              aria-label="音轨时间示意"
+            ></svg>
+            <div class="audio-tracks">
+              <div class="audio-track">
+                <h3>配音</h3>
+                <label>音频素材<select id="narration-asset"></select></label>
+                <div class="audio-fields">
+                  <label
+                    >视频起点 / 秒<input
+                      id="narration-start"
+                      type="number"
+                      min="0"
+                      max="600"
+                      step="0.1"
+                      value="0"
+                  /></label>
+                  <label
+                    >截取起点 / 秒<input
+                      id="narration-sourceStart"
+                      type="number"
+                      min="0"
+                      max="86400"
+                      step="0.1"
+                      value="0"
+                  /></label>
+                  <label
+                    >音量 / %<input
+                      id="narration-volume"
+                      type="number"
+                      min="0"
+                      max="200"
+                      step="5"
+                      value="100"
+                  /></label>
+                </div>
+                <audio
+                  id="narration-preview"
+                  controls
+                  preload="metadata"
+                  hidden
+                ></audio>
+                <p class="muted small" id="narration-info">未选择音频</p>
+              </div>
+              <div class="audio-track">
+                <h3>背景音乐</h3>
+                <label>音频素材<select id="music-asset"></select></label>
+                <div class="audio-fields">
+                  <label
+                    >视频起点 / 秒<input
+                      id="music-start"
+                      type="number"
+                      min="0"
+                      max="600"
+                      step="0.1"
+                      value="0"
+                  /></label>
+                  <label
+                    >截取起点 / 秒<input
+                      id="music-sourceStart"
+                      type="number"
+                      min="0"
+                      max="86400"
+                      step="0.1"
+                      value="0"
+                  /></label>
+                  <label
+                    >音量 / %<input
+                      id="music-volume"
+                      type="number"
+                      min="0"
+                      max="200"
+                      step="5"
+                      value="20"
+                  /></label>
+                </div>
+                <label class="check-label"
+                  ><input
+                    id="music-loop"
+                    type="checkbox"
+                    checked
+                  />循环截取后的音乐</label
+                ><audio
+                  id="music-preview"
+                  controls
+                  preload="metadata"
+                  hidden
+                ></audio>
+                <p class="muted small" id="music-info">未选择音频</p>
+              </div>
+            </div>
+            <p class="muted small">
+              上方播放器用于素材试听，完整混音请在生成后播放成片检查。视频素材原声仍为静音。
+            </p>
+          </section>
+          <section>
+            <div class="section-head">
+              <h2>成片版本</h2>
+              <span class="muted small">每次渲染保留独立工程快照</span>
+            </div>
+            <div id="renders"></div>
+          </section>
+        </main>
+        <aside id="chat">
+          <div class="section-head">
+            <h2>创作助手</h2>
+            <span id="agent-status" class="badge">未连接</span>
+          </div>
+          <p class="muted small">创建脚本、修改镜头，或运行中补充要求。</p>
+          <button id="connect" class="connect">连接 RunDesk 并配置工具</button>
+          <p class="muted small">
+            首次连接后，请在专用实例完成 Codex 登录与模型配置。<a
+              id="open-rundesk"
+              href="http://127.0.0.1:3210"
+              target="_blank"
+              rel="noopener"
+              >打开 RunDesk</a
+            >
+          </p>
+          <button id="refresh-tools" hidden>更新工具配置</button>
+          <div id="conversation">
+            <p class="chat-empty">
+              先写下你想做的视频。连接后，Agent
+              可通过项目工具读取素材、编辑分镜和发起渲染。
+            </p>
+          </div>
+          <div id="approvals"></div>
+          <form id="composer">
+            <textarea
+              id="prompt"
+              rows="4"
+              placeholder="例如：根据项目说明规划 6 个镜头，先不要渲染。"
+            ></textarea>
+            <div class="row">
+              <button id="agent-stop" type="button" hidden>停止 Agent</button
+              ><button id="send" class="primary">发送</button>
+            </div>
+          </form>
+          <div id="send-state" class="muted small" role="status"></div>
+          <p class="muted small">
+            Enter 发送 · Shift + Enter 换行<br />停止 Agent 不会自动取消渲染
+          </p>
+        </aside>
+      </div>
+      <div id="toast" role="status" hidden></div>
+    </div>
+    <dialog id="env-dialog">
+      <div class="section-head">
+        <h2>环境准备</h2>
+        <button id="close-env">关闭</button>
+      </div>
+      <div id="env-info"></div>
+      <p>
+        首次运行请按包内 Ubuntu 指南准备 HyperFrames、GSAP、FFmpeg
+        和中文字体。连接项目时会自动创建专用实例、工作区，并配置项目 Skill 与
+        MCP。新实例需要单独登录 Codex；不会复制其他实例的凭据。
+      </p>
+      <p class="muted">
+        这里检查文件和程序是否存在；实际渲染仍需可用的浏览器和依赖。原型版为同机部署。渲染使用本地工具，界面不需要
+        Node.js 服务。
+      </p>
+    </dialog>
+    <dialog id="new-dialog">
+      <form id="new-form">
+        <h2>新建视频项目</h2>
+        <label
+          >项目名称<input
+            id="new-name"
+            required
+            maxlength="80"
+            placeholder="例如：RunDesk 45 秒介绍"
+        /></label>
+        <div class="row">
+          <button id="cancel-new" type="button">取消</button
+          ><button class="primary">创建项目</button>
+        </div>
+      </form>
+    </dialog>
+  </body>
+</html>
