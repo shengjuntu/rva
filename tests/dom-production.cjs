@@ -1,4 +1,5 @@
 const {JSDOM}=require('jsdom');
+const {File}=require('node:buffer');
 const {spawn}=require('child_process');const fs=require('fs'),vm=require('vm');
 const root=require('path').resolve(__dirname,'..'), testData=fs.mkdtempSync(require('path').join(require('os').tmpdir(),'video-dom-')), base='http://127.0.0.1:3321',token='dom-test-token-not-secret';
 (async()=>{
@@ -55,15 +56,67 @@ const root=require('path').resolve(__dirname,'..'), testData=fs.mkdtempSync(requ
   const revert=await realFetch('/api/projects/'+p.id+'/edit/undo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:redoResult.revision})});if(revert.status!==200)throw Error('second undo failed');
   if(!w.document.querySelector('#patch-redo'))throw Error('redo button missing');
   await vm.runInContext('openProject('+JSON.stringify(p.id)+')',ctx);
-  const narration=w.document.querySelector('#narration-text');narration.value='独立口播正文。';narration.dispatchEvent(new w.Event('input'));
+  const narration=w.document.querySelector('#narration-text');
+  const beforeAdopt=await(await realFetch('/api/projects/'+p.id)).json();
+  if(w.document.querySelector('#narration-use-existing').hidden)throw Error('saved canonical news text not discoverable');
+  w.document.querySelector('#narration-use-existing').click();
+  const afterAdopt=await(await realFetch('/api/projects/'+p.id)).json();
+  if(narration.value!==beforeAdopt.production.text||afterAdopt.revision!==beforeAdopt.revision||afterAdopt.narrationText)throw Error('using existing text silently persisted or changed source');
+  narration.value='独立口播正文。';narration.dispatchEvent(new w.Event('input'));
   await vm.runInContext('drawProject()',ctx);if(narration.value!=='独立口播正文。')throw Error('unsaved narration lost');
   w.document.querySelector('#narration-save').click();await new Promise(r=>setTimeout(r,100));
   w.document.querySelector('#workflow-instructions').value='保持原意';w.document.querySelector('#workflow-instructions').dispatchEvent(new w.Event('input'));
   await vm.runInContext('saveWorkflow()',ctx);
   const workflowSaved=await(await realFetch('/api/projects/'+p.id)).json();if(workflowSaved.workflow.instructions!=='保持原意')throw Error('workflow not persisted');
   const instruction=await(await realFetch('/api/projects/'+p.id+'/draft/instruction',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:workflowSaved.revision})})).json();if(!instruction.text?.includes('保持原意'))throw Error('draft instruction missing');
-  if(!w.document.querySelector('#draft-start').disabled)throw Error('disconnected draft button enabled');
-  fs.writeFileSync(root+'/docs/dom-validation-0.17.json' ,JSON.stringify({passed:true,environment:'JSDOM + real Go HTTP API, not a graphical browser',checks:['load embedded UI','save narration text','build paragraph alignment table','protect canonical text','assign actual uploaded image','preserve mapping after new lead','persist text','return actual MCP image content','capability status panel','actual HTTP import deduplication','unsupported generation rejection','unified task panel','create and save editing DSL','activate DSL render mode','show compiled multi-track timeline','switch back without deleting DSL']},null,2));
+  if(w.document.querySelector('#draft-start').disabled)throw Error('one-click production requires manual connection');
+  const advanced=w.document.querySelector('#advanced-workspace');if(advanced.open)throw Error('manual workspace expanded by default');
+  for(const selector of ['#edit-panel','#speech-section','#render','#production-panel','#workflow-save'])if(!advanced.contains(w.document.querySelector(selector)))throw Error('manual operation leaked into primary workbench: '+selector);
+  if(advanced.contains(narration)||advanced.contains(w.document.querySelector('#draft-start')))throw Error('primary text production buried in advanced tools');
+  await vm.runInContext(`drawProductionBoard({projectId:project.id,stages:[{id:'script',title:'正文',state:'ready',text:'<img src=x onerror=alert(1)>'},{id:'render',title:'视频',state:'empty',summary:'尚未渲染',items:[{id:'unsafe',title:'unsafe',kind:'video',url:'javascript:alert(1)'}]}]})`,ctx);
+  if(w.document.querySelectorAll('#production-board .stage-card').length!==2||w.document.querySelector('#production-board img')||w.document.querySelector('#production-board video'))throw Error('stage cards unsafe or missing');
+  if(!w.document.querySelector('[data-stage="render"]').textContent.includes('待制作'))throw Error('empty stage falsely marked complete');
+  w.document.querySelector('#prompt').value='尚未发送的修改';
+  let blocked=false;try{await vm.runInContext('startProduction()',ctx)}catch(e){blocked=true}
+  if(!blocked||w.document.querySelector('#prompt').value!=='尚未发送的修改')throw Error('one-click lost unsent correction');
+  w.document.querySelector('#prompt').value='';
+  narration.value='第一条自由正文。素材必须服从这段文字。';narration.dispatchEvent(new w.Event('input'));
+  const requirements=w.document.querySelector('#workflow-instructions');requirements.value='保留正文，先做初稿';requirements.dispatchEvent(new w.Event('input'));
+  const beforePrimaryUpload=await(await realFetch('/api/projects/'+p.id)).json();
+  Object.defineProperty(w.document.querySelector('#folder-files'),'files',{configurable:true,value:[new File([fs.readFileSync(root+'/docs/preview.png')],'primary-flow.png',{type:'image/png'})]});
+  await w.document.querySelector('#folder-files').onchange();
+  const afterPrimaryUpload=await(await realFetch('/api/projects/'+p.id)).json();
+  if(afterPrimaryUpload.assets.length!==beforePrimaryUpload.assets.length+1||narration.value!=='第一条自由正文。素材必须服从这段文字。'||requirements.value!=='保留正文，先做初稿')throw Error('material upload lost primary text draft');
+  let connections=0;const messages=[];
+  w.fetch=async(path,opts={})=>{
+   if(String(path).match(/\/connect(?:\?|$)/)){
+    connections++;const current=await(await realFetch('/api/projects/'+p.id)).json();
+    return new Response(JSON.stringify({...current,sessionId:'test-session',workspaceId:'test-workspace',toolsVersion:'0.20.0'}),{status:200,headers:{'Content-Type':'application/json'}});
+   }
+   if(String(path).endsWith('/messages')){
+    messages.push(JSON.parse(opts.body));
+    if(messages.length===1)throw new TypeError('simulated connection reset after submission');
+    return new Response('{}',{status:200,headers:{'Content-Type':'application/json'}});
+   }
+   return realFetch(path,opts);
+  };
+  let uncertain=false;try{await vm.runInContext('startProduction()',ctx)}catch(e){uncertain=true}
+  const automaticSaved=await(await realFetch('/api/projects/'+p.id)).json();
+  if(!uncertain||connections!==1||messages.length!==1||automaticSaved.narrationText!==narration.value||automaticSaved.workflow.instructions!==requirements.value)throw Error('one-click save and connect failed');
+  if(!messages[0].text.includes('保留正文，先做初稿'))throw Error('saved requirements missing from production instruction');
+  w.document.querySelector('#prompt').value='保留的下一条调整';
+  await vm.runInContext('startProduction()',ctx);
+  if(messages.length!==2||JSON.stringify(messages[0])!==JSON.stringify(messages[1])||connections!==1)throw Error('uncertain production was resubmitted as a new task');
+  if(w.document.querySelector('#prompt').value!=='保留的下一条调整')throw Error('receipt recovery erased unsent correction');
+  await vm.runInContext("project.sessionId='test-session';project.toolsVersion='0.20.0'",ctx);
+  narration.value='修订后的权威正文。';narration.dispatchEvent(new w.Event('input'));
+  requirements.value='修改配色但保留事实';requirements.dispatchEvent(new w.Event('input'));
+  await vm.runInContext('submitMessage({preventDefault(){}})',ctx);
+  const correctionSaved=await(await realFetch('/api/projects/'+p.id)).json();
+  if(correctionSaved.narrationText!=='修订后的权威正文。'||correctionSaved.workflow.instructions!=='修改配色但保留事实')throw Error('correction sent without saving primary inputs');
+  if(messages.length!==3||messages[2].text!=='保留的下一条调整')throw Error('correction request not delivered');
+  w.fetch=realFetch;
+  fs.writeFileSync(root+'/docs/dom-validation-0.20.json' ,JSON.stringify({passed:true,environment:'JSDOM + real Go HTTP API, not a graphical browser',checks:['one-click saves narration and requirements and connects automatically','upload materials after editing text without losing drafts or causing false revision conflict','uncertain production resumes original receipt','unsent correction survives receipt recovery','sending correction saves current authored text and requirements','manual tools collapsed by default','stage cards display actual states with safe text and media URLs','load embedded UI','save narration text','build paragraph alignment table','protect canonical text','assign actual uploaded image','preserve mapping after new lead','persist text','return actual MCP image content','capability status panel','actual HTTP import deduplication','unsupported generation rejection','unified task panel','create and save editing DSL','activate DSL render mode','show compiled multi-track timeline','switch back without deleting DSL']},null,2));
   console.log('DOM + HTTP workflow passed');
  }finally{dom?.window.close();proc.kill('SIGTERM')}
 })().catch(e=>{console.error(e);process.exitCode=1});

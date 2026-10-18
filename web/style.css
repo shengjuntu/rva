@@ -739,3 +739,49 @@ dialog p {
 .capability-row,.service-job {padding:12px 0;border-bottom:1px solid #344155} .capability-row strong {margin-right:16px} .capability-row small,.service-job small {display:block;margin:4px 0}.service-job a {display:inline-block;margin:8px 12px 0 0}
 
 #edit-json{width:100%;box-sizing:border-box;font-family:monospace;margin:12px 0} .edit-lane{margin:12px 0}.edit-strip{position:relative;height:40px;background:#151e30;margin-top:6px;border-radius:6px;overflow:hidden}.edit-block{position:absolute;top:3px;height:34px;border:1px solid #638696;background:#284c63;font-size:11px;overflow:hidden;white-space:nowrap;padding:2px}.edit-block.text{background:#6a4b78}.edit-block.audio{background:#315f46}
+
+/* Daily production stays text-led; manual controls live in the closed workspace. */
+.production-input { background:#fff; border:1px solid var(--line); border-radius:14px; padding:22px; }
+.production-input .section-head { margin-top:0; }
+#narration-text { margin-top:12px; font-size:15px; min-height:210px; }
+#narration-status { min-height:18px; margin:4px 0; }
+#production-requirements { margin:8px 0 18px; }
+#production-requirements summary,.advanced-workspace>summary,#connection-settings>summary { cursor:pointer; color:#5f776f; font-size:13px; }
+#production-requirements textarea { margin-top:10px; }
+.production-materials { border-top:1px solid var(--line); padding-top:16px; display:flex; align-items:center; justify-content:space-between; gap:14px; }
+.production-materials strong { font-size:13px; }
+.production-materials .row { flex-wrap:wrap; justify-content:flex-end; }
+.production-materials button { font-size:12px; padding:6px 10px; }
+.production-launch { display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-top:22px; }
+#draft-start { padding:12px 22px; font-weight:600; }
+#workflow-status { margin-top:9px; min-height:18px; }
+#production-results { margin-top:26px; }
+#production-board-status { min-height:20px; margin-bottom:10px; }
+.production-board { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+.stage-card { background:#fff; border:1px solid var(--line); border-radius:11px; padding:16px; min-width:0; }
+.stage-card-head { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:8px; }
+.stage-card h3 { font-size:14px; margin:0; }
+.stage-status { flex-shrink:0; font-size:11px; border-radius:20px; padding:2px 8px; background:#f0f3f2; color:#7d8b85; }
+.stage-card[data-state="ready"] .stage-status { background:#e8f3ed; color:#286a4c; }
+.stage-card[data-state="running"] .stage-status { background:#e9eff9; color:#4169a5; }
+.stage-card[data-state="failed"] .stage-status,.stage-card[data-state="blocked"] .stage-status { background:#fff0e9; color:#9d583f; }
+.stage-card[data-state="stale"] .stage-status { background:#fff6df; color:#967321; }
+.stage-card pre { margin:10px 0; padding:10px; border-radius:7px; background:#f5f7f6; max-height:240px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; font-size:12px; line-height:1.7; font-family:inherit; }
+.stage-card summary { font-size:12px; cursor:pointer; color:var(--green); }
+.stage-item { margin-top:12px; padding-top:10px; border-top:1px solid #edf1ef; }
+.stage-item strong { display:block; font-size:12px; margin-bottom:6px; }
+.stage-item audio,.stage-item video { display:block; width:100%; max-height:320px; margin:8px 0; }
+.stage-item img { display:block; max-width:100%; max-height:180px; object-fit:contain; margin:8px 0; }
+.stage-item a { color:var(--green); font-size:12px; }
+.advanced-workspace { margin:26px 0; padding-top:18px; border-top:1px solid var(--line); }
+.advanced-intro { margin:12px 0; }
+.advanced-save-actions { margin:16px 0; }
+.advanced-workspace .production-panel { border-color:var(--line); background:#fff; }
+.advanced-workspace .row { flex-wrap:wrap; }
+.workflow-skills { display:flex; gap:14px; flex-wrap:wrap; margin-top:12px; }
+.workflow-skills label { display:flex; align-items:center; gap:5px; }
+.workflow-skills input { width:auto; margin:0; }
+#connection-settings { margin:12px 0; }
+#connection-settings #connect { width:100%; }
+@media (max-width:1150px) { .production-materials { align-items:flex-start; flex-direction:column; } .production-materials .row { justify-content:flex-start; } }
+@media (max-width:850px) { .production-input { padding:17px; } .production-board { grid-template-columns:1fr; } }

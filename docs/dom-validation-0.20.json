@@ -1,0 +1,29 @@
+{
+  "passed": true,
+  "environment": "JSDOM + real Go HTTP API, not a graphical browser",
+  "checks": [
+    "one-click saves narration and requirements and connects automatically",
+    "upload materials after editing text without losing drafts or causing false revision conflict",
+    "uncertain production resumes original receipt",
+    "unsent correction survives receipt recovery",
+    "sending correction saves current authored text and requirements",
+    "manual tools collapsed by default",
+    "stage cards display actual states with safe text and media URLs",
+    "load embedded UI",
+    "save narration text",
+    "build paragraph alignment table",
+    "protect canonical text",
+    "assign actual uploaded image",
+    "preserve mapping after new lead",
+    "persist text",
+    "return actual MCP image content",
+    "capability status panel",
+    "actual HTTP import deduplication",
+    "unsupported generation rejection",
+    "unified task panel",
+    "create and save editing DSL",
+    "activate DSL render mode",
+    "show compiled multi-track timeline",
+    "switch back without deleting DSL"
+  ]
+}

@@ -26,7 +26,7 @@
     </div>
     <div id="app" hidden>
       <header>
-        <div class="brand">视频工作台 <span>v0.11.0</span></div>
+        <div class="brand">视频工作台 <span>v0.20.0</span></div>
         <div class="top-actions">
           <button id="environment">环境准备</button
           ><button id="toggle-assets">素材栏</button
@@ -44,18 +44,7 @@
           <button id="import-news">导入新闻制作包</button>
           <input id="news-package" type="file" accept=".zip,application/zip" hidden />
           <p class="muted small">导入 news2douyin 已审核脚本 ZIP，创建独立项目。</p>
-          <div class="section-head">
-            <h2>素材库</h2>
-            <button id="upload-folder">导入素材目录</button><input id="folder-files" type="file" webkitdirectory multiple hidden /><button id="upload-button">＋ 上传</button
-            ><input
-              id="upload"
-              type="file"
-              multiple
-              hidden
-              accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,audio/wav,audio/mpeg,audio/mp4,audio/flac,audio/ogg,.m4a,.flac,.ogg,.txt,.md,.pdf"
-            />
-          </div>
-          <p class="muted small">图片、视频、音频或文章 · 单文件 256 MiB</p>
+          <div class="section-head"><h2>项目素材</h2></div>
           <div id="assets"></div>
           <div class="library-footer">
             Go + HTML · 本地项目<br />Agent 由 RunDesk 管理
@@ -67,13 +56,10 @@
               <div class="eyebrow">VIDEO PROJECT</div>
               <h1 id="project-name">开始一个视频项目</h1>
               <span id="save-state" class="muted"
-                >上传素材，再组织你的分镜</span
+                >正文驱动制作，和 RunDesk 对话调整</span
               >
             </div>
-            <div class="row">
-              <button id="save">保存制作稿</button
-              ><button id="render" class="primary">生成初稿</button>
-            </div>
+
           </div>
           <div id="conflict" hidden>
             项目已被 Agent
@@ -83,6 +69,31 @@
               重新载入</button
             >。
           </div>
+          <section id="production-input" class="production-input">
+            <div class="section-head"><h2>正文</h2><div class="row"><button id="narration-use-existing" hidden>使用已有正文</button><button id="narration-import">导入文本</button></div><input id="narration-file" type="file" accept=".txt,.md,text/plain" hidden></div>
+            <p class="muted small">文字决定视频内容。已有图片、视频用于表达正文，制作和剪辑交给 RunDesk。</p>
+            <textarea id="narration-text" rows="9" placeholder="粘贴新闻正文，或写下希望表达的内容。"></textarea>
+            <p id="narration-status" class="muted small" role="status"></p>
+            <details id="production-requirements"><summary>制作要求（可选）</summary><textarea id="workflow-instructions" rows="3" placeholder="例如：保持原文，优先已有素材，节奏平稳，字幕两行以内。"></textarea></details>
+            <div class="production-materials"><div><strong>素材</strong><p id="primary-material-summary" class="muted small">可添加已有图片、视频和音频。</p></div><div class="row">            <button id="upload-folder">导入素材目录</button><input id="folder-files" type="file" webkitdirectory multiple hidden /><button id="upload-button">＋ 上传</button
+            ><input
+              id="upload"
+              type="file"
+              multiple
+              hidden
+              accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,audio/wav,audio/mpeg,audio/mp4,audio/flac,audio/ogg,.m4a,.flac,.ogg,.txt,.md,.pdf"
+            />
+</div></div>
+            <div class="production-launch"><button id="draft-start" class="primary">交给 RunDesk 制作</button><span class="muted small">自动保存正文和要求，连接项目后开始制作。</span></div>
+            <p id="workflow-status" class="muted small" role="status"></p>
+          </section>
+          <section id="production-results" aria-labelledby="production-results-title"><div class="section-head"><div><h2 id="production-results-title">制作产物</h2><p class="muted small">按实际保存的产物展示；后续修改直接发到右侧对话。</p></div><button id="refresh-board">刷新</button></div><p id="production-board-status" class="muted small" role="status">加载制作记录…</p><div id="production-board" class="production-board"></div></section>
+          <details id="advanced-workspace" class="advanced-workspace"><summary>高级工具与诊断</summary><p class="muted small advanced-intro">手动剪辑、服务配置和任务诊断。日常制作可直接使用上方按钮和右侧对话。</p>
+            <div class="advanced-save-actions">            <div class="row">
+              <button id="save">保存制作稿</button
+              ><button id="render" class="primary">生成初稿</button>
+            </div></div>
+            <section class="production-panel"><h2>正文与工作流设置</h2><div class="row"><button id="narration-save">保存正文</button><button id="workflow-save">保存制作要求</button></div><div class="workflow-skills"><label><input type="checkbox" id="skill-narration" checked>口播与时序</label><label><input type="checkbox" id="skill-editing" checked>素材与剪辑</label><label><input type="checkbox" id="skill-review" checked>初稿检查</label></div></section>
           <details id="production-services" class="production-panel">
             <summary>制作能力与任务</summary>
             <div class="section-head"><h2>制作能力</h2><button id="refresh-capabilities">检查已配置服务</button></div>
@@ -92,8 +103,6 @@
             <p class="muted small">配音、渲染和Agent对话各自运行。取消制作任务不会停止对话；远端模型是否停止由服务端决定。</p>
             <div id="production-jobs"></div>
           </details>
-          <section class="production-panel"><h2>独立口播正文</h2><p class="muted small">正文自由编写；由 Codex 调用配音、取得时序，再编排剪辑。</p><textarea id="narration-text" rows="6"></textarea><button id="narration-save">保存口播正文</button><span id="narration-status"></span></section>
-          <section class="production-panel"><h2>初稿制作</h2><p class="muted small">选择本项目的制作 Skills，保存后交给 RunDesk。自定义要求用于风格、节奏和素材取舍。</p><label><input type="checkbox" id="skill-narration" checked>口播与时序</label><label><input type="checkbox" id="skill-editing" checked>素材与剪辑</label><label><input type="checkbox" id="skill-review" checked>初稿检查</label><textarea id="workflow-instructions" rows="4" placeholder="例如：保留正文，优先已有素材，画面简洁，字幕两行以内。"></textarea><button id="workflow-save">保存制作要求</button><button id="draft-start" class="primary">交给 RunDesk 制作初稿</button><p id="workflow-status" class="muted small"></p></section>
           <section id="edit-panel" class="production-panel">
             <div class="section-head"><h2>剪辑时间线</h2><span id="edit-mode" class="stage-pill">旧镜头模式</span></div>
             <p class="muted small">图片、视频、声音和文字可以自由组成多轨剪辑。启用后，成片只使用这份剪辑结构；旧镜头、音轨和字幕仍保留。</p>
@@ -347,13 +356,15 @@
             </div>
             <div id="renders"></div>
           </section>
+          </details>
         </main>
         <aside id="chat">
           <div class="section-head">
             <h2>创作助手</h2>
             <span id="agent-status" class="badge">未连接</span>
           </div>
-          <p class="muted small">创建脚本、修改镜头，或运行中补充要求。</p>
+          <p class="muted small">直接描述修改要求，例如“第二段换成现场画面，配音不变”。</p>
+          <details id="connection-settings"><summary>RunDesk 连接与工具</summary>
           <button id="connect" class="connect">连接 RunDesk 并配置工具</button>
           <p class="muted small">
             首次连接后，请在专用实例完成 Codex 登录与模型配置。<a
@@ -366,10 +377,10 @@
           </p>
           <button id="refresh-tools" hidden>检查连接</button>
           <button id="new-session" hidden>新建当前环境对话</button>
+          </details>
           <div id="conversation">
             <p class="chat-empty">
-              先写下你想做的视频。连接后，Agent
-              可通过项目工具读取素材、编辑分镜和发起渲染。
+              在中间填入正文并发起制作，随后在这里继续调整。RunDesk 会读取素材、配音、剪辑并渲染。
             </p>
           </div>
           <div id="approvals"></div>
@@ -377,7 +388,7 @@
             <textarea
               id="prompt"
               rows="4"
-              placeholder="例如：根据项目说明规划 6 个镜头，先不要渲染。"
+              placeholder="例如：第二段换成现场画面；标题停留更久；保留原配音。"
             ></textarea>
             <div class="row">
               <button id="agent-stop" type="button" hidden>停止 Agent</button

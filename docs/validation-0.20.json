@@ -1,0 +1,28 @@
+{
+  "version": "0.20.0",
+  "goRace": {
+    "passed": 168,
+    "skipped": 1,
+    "failed": 0,
+    "includesSubtests": true
+  },
+  "nodeReceiptTests": 6,
+  "dom": "JSDOM + real Go HTTP with mocked RunDesk connection/message receipts",
+  "media": "real FFmpeg render and rendered PNG frames; mocked IndexTTS responses",
+  "covered": [
+    "text-first stage checkpoints and stale-source bindings",
+    "actual rendered PNG MCP image block",
+    "clip/track/anchor editing and render cache regressions",
+    "one-click save/connect/upgrade and original receipt recovery",
+    "new versioned Skills preserve older custom files",
+    "unsent correction retention and saved primary inputs",
+    "new news import original narration and explicit legacy-text adoption"
+  ],
+  "notVerified": [
+    "real Codex autonomous production",
+    "real IndexTTS model and audio quality",
+    "graphical browser layout",
+    "Docker runtime",
+    "Windows runtime"
+  ]
+}

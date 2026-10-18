@@ -431,7 +431,7 @@ func (a *App) importNews(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	m := pkg.Manifest
-	p := Project{ID: uid(), Name: shortTitle(snapshot.Document.Title), Brief: snapshot.Document.Visual + "\n" + snapshot.Document.Notes, Revision: 1, Shots: shots, Assets: []Asset{}, Renders: []Render{}, News: &NewsOrigin{OutputLanguage: m.OutputLanguage, PackageKey: m.PackageKey, EventKey: m.EventKey, ExportKey: m.ExportKey, Revision: m.Revision, StateVersion: m.StateVersion, ContentHash: m.ContentHash, ArchiveSHA256: pkg.ArchiveSHA256, ImportedAt: time.Now().UTC().Format(time.RFC3339Nano), TargetDuration: m.TargetDuration, Files: pkg.Files}}
+	p := Project{NarrationText: snapshot.Document.Text, ID: uid(), Name: shortTitle(snapshot.Document.Title), Brief: snapshot.Document.Visual + "\n" + snapshot.Document.Notes, Revision: 1, Shots: shots, Assets: []Asset{}, Renders: []Render{}, News: &NewsOrigin{OutputLanguage: m.OutputLanguage, PackageKey: m.PackageKey, EventKey: m.EventKey, ExportKey: m.ExportKey, Revision: m.Revision, StateVersion: m.StateVersion, ContentHash: m.ContentHash, ArchiveSHA256: pkg.ArchiveSHA256, ImportedAt: time.Now().UTC().Format(time.RFC3339Nano), TargetDuration: m.TargetDuration, Files: pkg.Files}}
 	// Stage the complete directory. The single rename publishes only a complete
 	// project; a crash before it leaves an ignored import directory, not a project.
 	staged, e := os.MkdirTemp(a.data, "news-project-")

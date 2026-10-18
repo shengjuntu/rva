@@ -52,7 +52,8 @@ func TestProjectWorkflowAndDraft(t *testing.T) {
 		case strings.HasSuffix(r.URL.Path, "/configuration"):
 			skills := []map[string]any{}
 			for _, id := range []string{"video-project", "video-editing", "video-review"} {
-				skills = append(skills, map[string]any{"name": id, "path": "/skills/" + id + "/SKILL.md", "enabled": true})
+				name := runtimeSkillName(id)
+				skills = append(skills, map[string]any{"name": name, "path": "/skills/" + name + "/SKILL.md", "enabled": true})
 			}
 			writeJSON(w, 200, map[string]any{"skills": skills})
 		case strings.HasSuffix(r.URL.Path, "/turns"):
@@ -95,5 +96,21 @@ func TestWorkflowValidation(t *testing.T) {
 	}
 	if len(installedProductionSkills()) != 4 {
 		t.Fatal("missing production skills")
+	}
+}
+
+func TestVersionedSkillsInstallWithoutOverwritingLegacy(t *testing.T) {
+	bundles := installedProductionSkills()
+	if len(bundles) != 4 {
+		t.Fatal(len(bundles))
+	}
+	if _, ok := bundles["video-project"]; ok {
+		t.Fatal("unversioned customized skill would collide")
+	}
+	for id, entry := range bundles {
+		files := entry.(map[string]string)
+		if !strings.Contains(id, "-v0-20-0") || !strings.Contains(files["SKILL.md"], "name: "+id+"\n") {
+			t.Fatal(id)
+		}
 	}
 }

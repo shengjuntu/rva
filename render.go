@@ -127,7 +127,7 @@ func (a *App) startRender(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	q := clone(p)
-	job := Render{Range: request.Range, RequestID: request.RequestID, RequestHash: requestHash, Kind: request.Kind, ContentHash: productionHash(*p), HasSubtitles: p.Subtitles != nil && p.Subtitles.Enabled, HasAudio: len(audioTracks(p.Audio)) > 0, ID: uid(), Revision: p.Revision, State: "running", Created: time.Now().UTC().Format(time.RFC3339Nano)}
+	job := Render{SourceHash: narrationSourceHash(*p), Range: request.Range, RequestID: request.RequestID, RequestHash: requestHash, Kind: request.Kind, ContentHash: productionHash(*p), HasSubtitles: p.Subtitles != nil && p.Subtitles.Enabled, HasAudio: len(audioTracks(p.Audio)) > 0, ID: uid(), Revision: p.Revision, State: "running", Created: time.Now().UTC().Format(time.RFC3339Nano)}
 	if usesEditDSL(*p) {
 		job.Engine = "ffmpeg_edit"
 		job.Duration = ir.Duration

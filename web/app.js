@@ -1,5 +1,5 @@
 "use strict";
-const TOOL_VERSION = "0.19.0";
+const TOOL_VERSION = "0.20.0";
 const $ = (s) => document.querySelector(s),
   el = (tag, text, cls) => {
     const n = document.createElement(tag);
@@ -11,6 +11,7 @@ let ttsSettings = null, savingTTS = false, discoveringVoices = false;
 const speechSubmission = SpeechSubmission.create(() => sessionStorage);
 const renderSubmission = SpeechSubmission.create(() => sessionStorage,"video-render-pending-v1","渲染");
 let startingRender=false;
+let startingDraft=false, boardLoading=false, boardKey="";
 let productionDirty = false;
 let editDSLDirty=false,editDSLBase=0,editPanelLoading=false;
 let serviceJobsKey="", serviceJobsLoading=false;
@@ -140,6 +141,7 @@ async function openProject(pid) {
   rows = new Map();
   renderKey = "";
   serviceJobsKey="";
+  boardKey="";
   speechKey = "";
   approvalKey = "";
   $("#conversation").replaceChildren(
@@ -165,6 +167,8 @@ function drawProject() {
  if(project && narrationProject!==project.id){narrationDirty=false;narrationProject=project.id;}
  if(project && !narrationDirty) narrationBase=project.revision;
  if(project && !narrationDirty) $("#narration-text").value=project.narrationText||"";
+ $("#narration-use-existing").hidden=!!project?.narrationText?.trim()||(!project?.production?.text?.trim()&&!project?.news);
+ $("#narration-use-existing").textContent=project?.production?.text?.trim()?"使用已有正文":"使用新闻原稿";
   if (!project) return;
   $("#project-name").textContent = project.name;
   $("#brief").value = project.brief;
@@ -194,6 +198,7 @@ function drawProject() {
   drawEditingMode();
   if(!editDSLDirty)loadEditPanel().catch(()=>{});
   loadProductionJobs().catch(()=>{});
+  loadProductionBoard().catch(()=>{});
 }
 function assetURL(a) {
   return path("/assets/" + a.id);
@@ -310,7 +315,7 @@ function save() {
 async function saveChanges() {
   if (!project) return;
   if (!dirty) return project;
-  const pid = project.id, gen = epoch, serial = editSerial;
+  const pid = project.id, gen = epoch, serial = editSerial, baseRevision = project.revision;
   const captions = captionDraft ? {...captionDraft} : null;
   const textDraft = productionDirty ? $("#production-text").value : null;
   try {
@@ -324,6 +329,7 @@ async function saveChanges() {
       p = await api('/api/projects/' + pid + '/subtitles', {...captions, revision:p.revision, reviewed:false}, 'PUT');
     }
     if (gen !== epoch) return p;
+    advanceIndependentBases(baseRevision,p.revision);
     if (serial === editSerial) {
       project = p;
       captionDraft = null;
@@ -595,6 +601,7 @@ async function poll() {
         $("#conflict").hidden = false;
         project.renders = p.renders;
       } else {
+        if(narrationDirty||workflowDirty||editDSLDirty)$("#conflict").hidden=false;
         project = p;
         drawProject();
       }
@@ -607,6 +614,8 @@ async function poll() {
     drawSpeech();
     drawRenders();
     loadProductionJobs().catch(()=>{});
+    loadProductionBoard().catch(()=>{});
+    drawWorkflow();
     if (project.sessionId) {
       const [s, events, approvals] = await Promise.all([
         api(path("/agent")),
@@ -658,7 +667,7 @@ $("#login-form").onsubmit = async (e) => {
   }
 };
 $("#logout").onclick = action(async () => {
-  if (dirty && !confirm("有未保存的编辑，仍要退出？")) return;
+  if (hasUnsavedEdits() && !confirm("有未保存的编辑，仍要退出？")) return;
   await api("/logout", {});
   location.reload();
 });
@@ -666,6 +675,7 @@ $("#new-project").onclick = () => $("#new-dialog").showModal();
 $("#cancel-new").onclick = () => $("#new-dialog").close();
 $("#new-form").onsubmit = action(async (e) => {
   e.preventDefault();
+  if (hasUnsavedEdits()&&!confirm("创建新项目会离开当前项目，仍要继续？"))return;
   if (dirty) await save();
   const p = await api("/api/projects", { name: $("#new-name").value });
   $("#new-dialog").close();
@@ -674,7 +684,7 @@ $("#new-form").onsubmit = action(async (e) => {
 });
 $("#projects").onchange = action(async (e) => {
   const pid = e.target.value;
-  if ((dirty||editDSLDirty) && !confirm("放弃当前未保存编辑并切换项目？")) {
+  if (hasUnsavedEdits() && !confirm("放弃当前未保存编辑并切换项目？")) {
     $("#projects").value = project.id;
     return;
   }
@@ -682,8 +692,10 @@ $("#projects").onchange = action(async (e) => {
 });
 $("#save").onclick = action(async()=>{if(editDSLDirty)await saveEditDSL();else await save()});
 $("#reload-project").onclick = action(async () => {
-  if (confirm("重新载入会替换当前草稿，确定继续？"))
+  if (confirm("重新载入会替换当前草稿，确定继续？")) {
+    narrationDirty=false;workflowDirty=false;
     await openProject(project.id);
+  }
 });
 $("#brief").oninput = () => {
   if (project) {
@@ -755,8 +767,10 @@ $("#upload").onchange = action(async () => {
     for (const file of $("#upload").files) {
       const body = new FormData();
       body.append("file", file);
+      const previous=project.revision;
       const p = await api("/api/projects/" + pid + "/assets", body);
       if (gen === epoch) {
+        if(p.revision===previous+1)advanceIndependentBases(previous,p.revision);
         if (dirty) {
           project.assets = p.assets;
           $("#conflict").hidden = false;
@@ -811,41 +825,42 @@ $("#connect").onclick = action(async () => {
   }
   await poll();
 });
-async function submitMessage(e) {
-  e.preventDefault();
-  if (sending || !project?.sessionId) return;
-  const text = $("#prompt").value.trim();
-  if (!text) return;
-  const pid = project.id, gen = epoch;
-  let body = pendingMessage(pid);
-  if (body && text !== body.text) {
-    toast("上一条消息仍待确认；请先确认原提交，再发送新内容"); return;
-  }
-  await save();
-  if (gen !== epoch) return;
-  if (!body) {
-    body = {text, requestId: id(),skills:(project.workflow?.skills||["video-narration","video-editing","video-review"])};
-    if (session?.turnId && ["running", "waiting"].includes(session.status)) body.expectedTurnId = session.turnId;
-    rememberMessage(pid, body);
-  }
-  sending = true;
-  $("#send").disabled = true;
+async function deliverMessage(pid, body) {
+  const gen=epoch;
+  sending=true;$("#send").disabled=true;drawWorkflow();
   try {
-    await api("/api/projects/" + pid + "/messages", body);
-    rememberMessage(pid, null);
-    if (gen === epoch) {
-      if ($("#prompt").value.trim() === body.text) $("#prompt").value = "";
-      $("#send-state").textContent = "指令已接收";
+    await api("/api/projects/"+pid+"/messages",body);
+    rememberMessage(pid,null);
+    if(gen===epoch) {
+      if($("#prompt").value.trim()===body.text)$("#prompt").value="";
+      $("#send-state").textContent="指令已接收";
     }
-  } catch (err) {
-    if (err.status >= 400 && err.status < 500 && !err.uncertain) rememberMessage(pid, null);
-    if (gen === epoch) $("#send-state").textContent = pendingMessage(pid) ? "接收情况待确认，已保留原指令，可刷新后继续确认" : err.message;
+  } catch(err) {
+    if(err.status>=400&&err.status<500&&!err.uncertain)rememberMessage(pid,null);
+    if(gen===epoch)$("#send-state").textContent=pendingMessage(pid)?"接收情况待确认，已保留原指令，可刷新后继续确认":err.message;
     throw err;
   } finally {
-    sending = false;
-    $("#send").disabled = !project?.sessionId;
+    sending=false;$("#send").disabled=!project?.sessionId;drawWorkflow();
   }
   await poll();
+}
+async function submitMessage(e) {
+  e.preventDefault();
+  if(sending||!project?.sessionId)return;
+  const text=$("#prompt").value.trim();if(!text)return;
+  const pid=project.id,gen=epoch;let body=pendingMessage(pid);
+  if(body&&text!==body.text){toast("上一条消息仍待确认；请先确认原提交，再发送新内容");return;}
+  if(body){await deliverMessage(pid,body);return;}
+  const previous=project.revision;await save();if(gen!==epoch)return;advanceIndependentBases(previous,project.revision);
+  if(narrationDirty){if(!await saveNarration())return;}
+  if(workflowDirty){if(!await saveWorkflow())return;}
+  if(gen!==epoch)return;
+  if(!body) {
+    body={text,requestId:id(),skills:(project.workflow?.skills||["video-narration","video-editing","video-review"])};
+    if(session?.turnId&&["running","waiting"].includes(session.status))body.expectedTurnId=session.turnId;
+    rememberMessage(pid,body);
+  }
+  await deliverMessage(pid,body);
 }
 $("#composer").onsubmit = action(submitMessage);
 $("#prompt").onkeydown = (e) => {
@@ -922,7 +937,7 @@ for (const [button, side, cls] of [
     $(".layout").classList.toggle(cls, $(side).hidden);
   };
 window.addEventListener("beforeunload", (e) => {
-  if (dirty||editDSLDirty) {
+  if (hasUnsavedEdits()) {
     e.preventDefault();
     e.returnValue = "";
   }
@@ -1172,7 +1187,7 @@ $('#news-package').onchange = action(async () => {
   try {
     const p = await api('/api/news/import', data);
     // A project switch or new draft while uploading must not be overwritten.
-    if (gen === epoch && !dirty) await openProject(p.id);
+    if (gen === epoch && !hasUnsavedEdits()) await openProject(p.id);
     await listProjects();
     toast('已接收审核稿；分镜为待核对的制作草稿。');
   } finally { $('#import-news').disabled = false; }
@@ -1495,8 +1510,8 @@ $('#folder-files').onchange=action(async()=>{
   if(!project)throw Error('请先创建项目');await save();const pid=project.id,gen=epoch;
   for(const file of $('#folder-files').files) {
     if(!/\.(png|jpe?g|webp|mp4|webm|wav|mp3|m4a|flac|ogg)$/i.test(file.name))continue;
-    const body=new FormData();body.append('file',file);const p=await api('/api/projects/'+pid+'/assets',body);
-    if(gen===epoch){if(dirty){project.assets=p.assets;$('#conflict').hidden=false}else{project=p;drawProject()}}
+    const body=new FormData();body.append('file',file);const previous=project.revision;const p=await api('/api/projects/'+pid+'/assets',body);
+    if(gen===epoch){if(p.revision===previous+1)advanceIndependentBases(previous,p.revision);if(dirty){project.assets=p.assets;$('#conflict').hidden=false}else{project=p;drawProject()}}
   }
   $('#folder-files').value='';toast('目录素材已导入');
 });
@@ -1589,40 +1604,150 @@ $('#edit-reload').onclick=action(async()=>{if(editDSLDirty&&!confirm('放弃未�
 async function switchEditing(active){if(editDSLDirty)throw Error('请先保存剪辑或载入已保存版本');await save();const gen=epoch,pid=project.id;const p=await api('/api/projects/'+pid+'/edit/active',{revision:project.revision,active});if(gen!==epoch)return;project=p;drawProject()}
 $('#edit-activate').onclick=action(()=>switchEditing(true));$('#edit-legacy').onclick=action(()=>switchEditing(false));
 
-$("#narration-text").oninput=()=>{narrationDirty=true;};
-$("#narration-save").onclick=action(async()=>{const pid=project.id,gen=epoch;const result=await api("/api/projects/"+pid+"/narration",{revision:narrationBase,text:$("#narration-text").value},"PUT");if(epoch!==gen||project.id!==pid)return;project=result;narrationDirty=false;drawProject();$("#narration-status").textContent="正文已保存，配音需重新核对";});
-
+function hasUnsavedEdits(){return dirty||editDSLDirty||narrationDirty||workflowDirty||!!$("#prompt")?.value.trim();}
+function advanceIndependentBases(previous,next){
+ if(narrationDirty&&narrationBase===previous)narrationBase=next;
+ if(workflowDirty&&workflowBase===previous)workflowBase=next;
+ if(editDSLDirty&&editDSLBase===previous)editDSLBase=next;
+}
+$("#narration-text").oninput=()=>{narrationDirty=true;$("#narration-status").textContent="正文有新修改，发起制作时自动保存";};
+async function saveNarration(){
+ if(!project)return false;
+ const pid=project.id,gen=epoch,text=$("#narration-text").value,previous=project.revision;
+ const result=await api("/api/projects/"+pid+"/narration",{revision:narrationBase,text},"PUT");
+ if(gen!==epoch||project.id!==pid)return false;
+ advanceIndependentBases(previous,result.revision);project=result;
+ narrationDirty=$("#narration-text").value!==text;narrationBase=result.revision;
+ drawProject();$("#narration-status").textContent=narrationDirty?"有新的正文修改尚未保存":"正文已保存";return true;
+}
+$("#narration-save").onclick=action(async()=>{await save();await saveNarration();});
+$('#narration-use-existing').onclick=action(async()=>{
+ if(!project)return;
+ const pid=project.id,gen=epoch;let text=project.production?.text;
+ const original=!text?.trim();
+ if(original&&project.news){const data=await api('/api/projects/'+pid+'/news');text=data.snapshot?.document?.script_text;}
+ if(gen!==epoch||project?.id!==pid)return;
+ if(typeof text!=='string'||!text.trim())throw Error('没有可读取的已有正文，请导入或粘贴文本');
+ if($('#narration-text').value.trim()&&!confirm('用已有新闻正文替换当前输入？'))return;
+ $('#narration-text').value=text;$('#narration-text').dispatchEvent(new Event('input'));
+ $('#narration-status').textContent=original?'已载入新闻原稿，请核对是否包含后续修改；发起制作时保存。':'已载入已有新闻正文，发起制作时保存。';
+});
+$('#narration-import').onclick=()=>$('#narration-file').click();
+$('#narration-file').onchange=action(async()=>{
+ const file=$('#narration-file').files[0];if(!file)return;
+ if(file.size>1024*1024)throw Error('正文文件应小于 1 MiB');
+ const pid=project?.id,gen=epoch,text=await file.text();if(gen!==epoch||project?.id!==pid)return;
+ if($('#narration-text').value.trim()&&!confirm('用导入文本替换当前正文？'))return;
+ $('#narration-text').value=text;$('#narration-text').dispatchEvent(new Event('input'));$('#narration-file').value='';
+});
 let workflowDirty=false,workflowBase=0,workflowProject="";
 function drawWorkflow(){
  if(!project)return;
  if(workflowProject!==project.id){workflowDirty=false;workflowProject=project.id;}
  if(!workflowDirty){workflowBase=project.revision;const w=project.workflow||{skills:['video-narration','video-editing','video-review'],instructions:''};
- for(const name of ['narration','editing','review']) $('#skill-'+name).checked=w.skills.includes('video-'+name);
+ for(const name of ['narration','editing','review'])$('#skill-'+name).checked=w.skills.includes('video-'+name);
  $('#workflow-instructions').value=w.instructions||'';}
- $('#draft-start').disabled=!project.sessionId||sending;
+ $('#draft-start').disabled=sending||startingDraft;
+ $('#draft-start').textContent=startingDraft?'正在交给 RunDesk…':pendingMessage(project.id)?'确认原制作提交':'交给 RunDesk 制作';
+ const counts={image:0,video:0,audio:0,other:0};
+ for(const asset of project.assets||[]){const type=asset.mime?.split('/')[0];counts[type in counts?type:'other']++;}
+ $('#primary-material-summary').textContent=project.assets?.length?`${counts.image} 张图片 · ${counts.video} 段视频 · ${counts.audio} 段音频`+(counts.other?` · ${counts.other} 份文件`:''):'可添加已有图片、视频和音频，也可先由正文开始。';
 }
-for(const name of ['narration','editing','review']) $('#skill-'+name).onchange=()=>{workflowDirty=true;};
+for(const name of ['narration','editing','review'])$('#skill-'+name).onchange=()=>{workflowDirty=true;};
 $('#workflow-instructions').oninput=()=>{workflowDirty=true;};
 async function saveWorkflow(){
- const pid=project.id,gen=epoch;const workflow={skills:['narration','editing','review'].filter(n=>$('#skill-'+n).checked).map(n=>'video-'+n),instructions:$('#workflow-instructions').value};
+ const pid=project.id,gen=epoch,previous=project.revision;
+ const workflow={skills:['narration','editing','review'].filter(n=>$('#skill-'+n).checked).map(n=>'video-'+n),instructions:$('#workflow-instructions').value};
  const result=await api('/api/projects/'+pid+'/workflow',{revision:workflowBase,workflow},'PUT');
- if(gen!==epoch||project.id!==pid)return false;project=result;workflowDirty=false;drawProject();$('#workflow-status').textContent='制作要求已保存';return true;
+ if(gen!==epoch||project.id!==pid)return false;
+ advanceIndependentBases(previous,result.revision);project=result;
+ workflowDirty=$('#workflow-instructions').value!==workflow.instructions||['narration','editing','review'].some(n=>$('#skill-'+n).checked!==workflow.skills.includes('video-'+n));
+ workflowBase=result.revision;drawProject();$('#workflow-status').textContent='制作要求已保存';return true;
 }
-$('#workflow-save').onclick=action(saveWorkflow);
-$('#draft-start').onclick=action(async()=>{
- if(!project?.sessionId||sending)return;const pid=project.id,gen=epoch;
- if(pendingMessage(pid))throw new Error('上一条提交仍待确认，请先恢复原提交');
- if(session&&['running','waiting','starting','stopping'].includes(session.status))throw new Error('当前 Agent 任务尚未结束，请用对话调整或先停止');
- if($('#prompt').value.trim())throw new Error('对话框中有未发送内容，请先发送或清空');
- if(narrationDirty)throw new Error('请先保存口播正文');
- if(workflowDirty)throw new Error('请先保存制作要求');
- await save();if(gen!==epoch||project.id!==pid)return;
- const instruction=await api('/api/projects/'+pid+'/draft/instruction',{revision:project.revision});
- if(gen!==epoch||project.id!==pid)return;
- $('#prompt').value=instruction.text;
- await submitMessage({preventDefault(){}});
- if(gen===epoch)$('#workflow-status').textContent='已交给 RunDesk；任务与取消状态见当前对话';
-});
+$('#workflow-save').onclick=action(async()=>{await save();await saveWorkflow();});
+async function startProduction(){
+ if(!project){$('#new-dialog').showModal();return;}
+ if(sending||startingDraft)return;
+ const pid=project.id,gen=epoch;
+ startingDraft=true;drawWorkflow();
+ try {
+  // An uncertain request always resumes the original receipt and content.
+  const pending=pendingMessage(pid);
+  if(pending){await deliverMessage(pid,pending);if(gen===epoch)$('#workflow-status').textContent='已确认原制作提交';return;}
+  if($('#prompt').value.trim())throw Error('对话框中有未发送内容，请先发送或保留到其他位置');
+  if(session&&['running','waiting','starting','stopping'].includes(session.status))throw Error('当前 Agent 正在制作，请在右侧对话补充修改要求');
+  if(editDSLDirty)throw Error('高级工具中有未保存剪辑，请先保存或载入已保存版本');
+  $('#workflow-status').textContent='正在保存正文与制作要求…';
+  const previous=project.revision;await save();if(gen!==epoch||project.id!==pid)return;
+  advanceIndependentBases(previous,project.revision);
+  if(narrationDirty){if(!await saveNarration())return;}
+  if(workflowDirty){if(!await saveWorkflow())return;}
+  if(gen!==epoch||project.id!==pid)return;
+  const instruction=await api('/api/projects/'+pid+'/draft/instruction',{revision:project.revision});
+  if(gen!==epoch||project.id!==pid)return;
+  if(project.sessionId){
+    const current=await api('/api/projects/'+pid+'/agent');
+    if(gen!==epoch)return;
+    session=current;
+    if(['running','waiting','starting','stopping'].includes(current.status))throw Error('当前 Agent 正在制作，请在右侧对话补充修改要求');
+  }
+  if(!project.sessionId||project.toolsVersion!==TOOL_VERSION){
+    $('#workflow-status').textContent='正在连接 RunDesk 并配置制作工具…';
+    const connected=await api('/api/projects/'+pid+'/connect'+(project.sessionId?'?refresh=1':''),{});
+    if(gen!==epoch||project.id!==pid)return;
+    project.sessionId=connected.sessionId;project.workspaceId=connected.workspaceId;project.toolsVersion=connected.toolsVersion;drawProject();
+  }
+  if($('#prompt').value.trim())throw Error('对话框中有新输入，已保存正文；请先处理对话内容后重新发起');
+  if(narrationDirty||workflowDirty)throw Error('准备过程中正文或要求又有修改，请再次发起制作');
+  const body={text:instruction.text,requestId:id(),skills:project.workflow?.skills||['video-narration','video-editing','video-review']};
+  rememberMessage(pid,body);
+  await deliverMessage(pid,body);
+  if(gen===epoch)$('#workflow-status').textContent='已交给 RunDesk；制作产物会显示在下方，修改要求可直接发到右侧对话。';
+ } catch(err) {
+  if(gen===epoch)$('#workflow-status').textContent=err.message;
+  throw err;
+ } finally {startingDraft=false;if(gen===epoch)drawWorkflow();}
+}
+$('#draft-start').onclick=action(startProduction);
+
+function boardArtifactURL(value,pid){
+ if(typeof value!=='string'||!value)return null;
+ try{const url=new URL(value,location.origin);return url.origin===location.origin&&url.pathname.startsWith('/api/projects/'+pid+'/')?url.href:null;}catch{return null;}
+}
+function drawProductionBoard(board){
+ const box=$('#production-board');box.replaceChildren();
+ const labels={empty:'待制作',running:'进行中',ready:'已有产物',failed:'失败',blocked:'待处理',stale:'需更新'};
+ for(const stage of board.stages||[]){
+  const card=el('article',undefined,'stage-card');card.dataset.stage=stage.id;card.dataset.state=stage.state;
+  const head=el('div',undefined,'stage-card-head');head.append(el('h3',stage.title),el('span',labels[stage.state]||'状态未知','stage-status'));card.append(head);
+  if(stage.summary)card.append(el('p',stage.summary,'muted small'));
+  if(stage.text){const details=el('details');details.append(el('summary','查看内容'),el('pre',stage.text));card.append(details);}
+  for(const item of stage.items||[]){
+   const node=el('div',undefined,'stage-item');if(item.title)node.append(el('strong',item.title));
+   if(item.summary)node.append(el('p',item.summary,'muted small'));
+   const url=boardArtifactURL(item.url,board.projectId);
+   if(url&&['audio','video','image'].includes(item.kind)){
+    const media=el(item.kind==='image'?'img':item.kind);media.src=url;
+    if(item.kind==='image'){media.alt=item.title||'素材';media.loading='lazy';}else{media.controls=true;media.preload='none';if(item.kind==='video')media.playsInline=true;}
+    node.append(media);
+   }
+   if(item.text){const details=el('details');details.append(el('summary','查看内容'),el('pre',item.text));node.append(details);}
+   if(url){const link=el('a',item.kind==='link'?item.title||'打开':'打开 / 下载');link.href=url;link.target='_blank';link.rel='noopener';node.append(link);}
+   card.append(node);
+  }
+  box.append(card);
+ }
+}
+async function loadProductionBoard(force=false){
+ if(!project||boardLoading)return;
+ const pid=project.id,gen=epoch;boardLoading=true;
+ try{
+  const board=await api('/api/projects/'+pid+'/production-board');if(gen!==epoch||project?.id!==pid)return;
+  const key=JSON.stringify(board);if(force||key!==boardKey){drawProductionBoard(board);boardKey=key;}
+  $('#production-board-status').textContent='根据项目中实际保存的正文、任务和产物更新。';
+ }catch(err){if(gen===epoch)$('#production-board-status').textContent='制作记录暂不可用：'+err.message;throw err;}finally{boardLoading=false;}
+}
+$('#refresh-board').onclick=action(()=>loadProductionBoard(true));
 
 let patchPreview=null;
 $('#edit-patch').oninput=()=>{patchPreview=null;$('#patch-apply').disabled=true;};
