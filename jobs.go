@@ -36,14 +36,15 @@ type ProductionJob struct {
 	Artifacts      []JobArtifact `json:"artifacts"`
 }
 type JobOptions struct {
-	Prompt   string  `json:"prompt,omitempty"`
-	Source   string  `json:"source,omitempty"`
-	Backend  string  `json:"backend,omitempty"`
-	Voice    string  `json:"voice,omitempty"`
-	Language string  `json:"language,omitempty"`
-	Speed    float64 `json:"speed,omitempty"`
-	Rate     int     `json:"rate,omitempty"`
-	Kind     string  `json:"kind,omitempty"`
+	Range    *RenderRange `json:"range,omitempty"`
+	Prompt   string       `json:"prompt,omitempty"`
+	Source   string       `json:"source,omitempty"`
+	Backend  string       `json:"backend,omitempty"`
+	Voice    string       `json:"voice,omitempty"`
+	Language string       `json:"language,omitempty"`
+	Speed    float64      `json:"speed,omitempty"`
+	Rate     int          `json:"rate,omitempty"`
+	Kind     string       `json:"kind,omitempty"`
 }
 
 func (o *JobOptions) UnmarshalJSON(raw []byte) error {
@@ -192,7 +193,7 @@ func (a *App) jobStart(w http.ResponseWriter, r *http.Request) {
 		a.startGeneration(w, r, in)
 		return
 	case "tts":
-		if in.Options.Prompt != "" || in.Options.Kind != "" {
+		if in.Options.Range != nil || in.Options.Prompt != "" || in.Options.Kind != "" {
 			fail(w, 400, errors.New("TTS不接受渲染kind"))
 			return
 		}
@@ -202,7 +203,7 @@ func (a *App) jobStart(w http.ResponseWriter, r *http.Request) {
 			fail(w, 400, errors.New("渲染仅接受kind"))
 			return
 		}
-		native = RenderRequest{Revision: in.Revision, RequestID: in.RequestID, Kind: in.Options.Kind}
+		native = RenderRequest{Revision: in.Revision, RequestID: in.RequestID, Kind: in.Options.Kind, Range: in.Options.Range}
 	default:
 		fail(w, 501, fmt.Errorf("任务能力 %q 尚未实现；当前支持tts和render", in.Type))
 		return

@@ -16,6 +16,10 @@ description: Manage this video app project through video_project MCP tools. Use 
 ---
 # Video project workflow
 
+## Partial previews and final snapshots (v0.18)
+For DSL-only preview call video_job_start(type=render,options={kind:"draft",range:{start,end}}); range must fit timeline and span at most60 seconds. Output starts at zero; stored IR keeps original times. This renders through the original filter graph; it is not a cache or guaranteed faster. Partial outputs cannot be designated final. video_final_get reports current designation versus DSL/narration. video_final_save requires revision, a completed full DSL renderId and reviewed=true ONLY after explicit human review of that exact complete output. Never infer review from compiler success. It records output/snapshot hashes and retains an immutable final record; changed DSL or narration makes designation stale. Actual file byte validation is done at designation; get does not rehash files.
+
+
 ## Extended edits (v0.17)
 Changes may set target=clip(default)/track/anchor/canvas. Canvas uses id=canvas and update only. Tracks and anchors allow add/update/delete; changing an object ID is forbidden, so add the replacement and fix references in one patch before deleting the old object. Preview returns fieldDiffs (top-level old/new values) and affected compiled clips. Track order and object reordering still use full DSL. Nested fields replace whole objects. video_edit_redo restores the most recent undone patch only when current DSL/mode still match. New patch applications or full DSL saves clear the redo branch.
 

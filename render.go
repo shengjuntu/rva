@@ -16,9 +16,10 @@ import (
 )
 
 type RenderRequest struct {
-	Kind      string `json:"kind,omitempty"`
-	Revision  int    `json:"revision,omitempty"`
-	RequestID string `json:"requestId,omitempty"`
+	Range     *RenderRange `json:"range,omitempty"`
+	Kind      string       `json:"kind,omitempty"`
+	Revision  int          `json:"revision,omitempty"`
+	RequestID string       `json:"requestId,omitempty"`
 }
 
 func (a *App) startRender(w http.ResponseWriter, r *http.Request) {
@@ -117,11 +118,22 @@ func (a *App) startRender(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
+	if request.Range != nil {
+		v := request.Range
+		if !usesEditDSL(*p) || request.Kind != "draft" || !finite(v.Start) || !finite(v.End) || v.Start < 0 || v.End <= v.Start || v.End-v.Start > 60 || v.End > ir.Duration || v.End-v.Start < 1/float64(ir.Canvas.FPS) {
+			a.mu.Unlock()
+			fail(w, 422, errors.New("局部预览需draft、DSL模式及有效范围，最长60秒"))
+			return
+		}
+	}
 	q := clone(p)
-	job := Render{RequestID: request.RequestID, RequestHash: requestHash, Kind: request.Kind, ContentHash: productionHash(*p), HasSubtitles: p.Subtitles != nil && p.Subtitles.Enabled, HasAudio: len(audioTracks(p.Audio)) > 0, ID: uid(), Revision: p.Revision, State: "running", Created: time.Now().UTC().Format(time.RFC3339Nano)}
+	job := Render{Range: request.Range, RequestID: request.RequestID, RequestHash: requestHash, Kind: request.Kind, ContentHash: productionHash(*p), HasSubtitles: p.Subtitles != nil && p.Subtitles.Enabled, HasAudio: len(audioTracks(p.Audio)) > 0, ID: uid(), Revision: p.Revision, State: "running", Created: time.Now().UTC().Format(time.RFC3339Nano)}
 	if usesEditDSL(*p) {
 		job.Engine = "ffmpeg_edit"
 		job.Duration = ir.Duration
+		if request.Range != nil {
+			job.Duration = request.Range.End - request.Range.Start
+		}
 		job.HasAudio = ir.HasAudio
 		job.HasSubtitles = false
 	} else {

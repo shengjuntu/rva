@@ -1,5 +1,5 @@
 "use strict";
-const TOOL_VERSION = "0.17.0";
+const TOOL_VERSION = "0.18.0";
 const $ = (s) => document.querySelector(s),
   el = (tag, text, cls) => {
     const n = document.createElement(tag);
@@ -1647,4 +1647,16 @@ $('#patch-redo').onclick=action(async()=>{
  if(editDSLDirty)throw new Error('请先处理完整剪辑草稿');const pid=project.id,gen=epoch;
  await api('/api/projects/'+pid+'/edit/redo',{revision:project.revision});if(gen!==epoch)return;
  const result=await api('/api/projects/'+pid);if(gen!==epoch)return;project=result;patchPreview=null;$('#patch-apply').disabled=true;drawProject();await loadEditPanel(true);
+});
+
+$('#range-render').onclick=action(async()=>{
+ if(editDSLDirty)throw new Error('请先保存剪辑草稿');if(startingRender)return;const pid=project.id,gen=epoch;
+ const pending=renderSubmission.read(pid);if(pending&&!pending.options?.range)throw new Error('完整渲染提交仍待确认，请先确认原任务');
+ const body=pending||{type:'render',revision:project.revision,requestId:id(),options:{kind:'draft',range:{start:Number($('#preview-start').value),end:Number($('#preview-end').value)}}};
+ startingRender=true;let job;try{job=await renderSubmission.submit(pid,body,original=>api('/api/projects/'+pid+'/jobs',original));}finally{startingRender=false}if(gen!==epoch)return;$('#final-status').textContent='局部预览任务：'+job.nativeId+'；不能用于终稿';await loadProductionJobs(true);
+});
+$('#final-designate').onclick=action(async()=>{
+ if(editDSLDirty||narrationDirty)throw new Error('请先处理未保存内容');const pid=project.id,gen=epoch;
+ const result=await api('/api/projects/'+pid+'/final',{revision:project.revision,renderId:$('#final-render-id').value.trim(),reviewed:$('#final-reviewed').checked});if(gen!==epoch)return;
+ const refreshed=await api('/api/projects/'+pid);if(gen!==epoch)return;project=refreshed;drawProject();$('#final-reviewed').checked=false;$('#final-status').textContent='已保存终稿快照：'+result.final.id;
 });

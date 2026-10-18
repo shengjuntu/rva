@@ -28,7 +28,7 @@ import (
 	"time"
 )
 
-const version = "0.17.0"
+const version = "0.18.0"
 
 //go:embed web/*
 var ui embed.FS
@@ -64,21 +64,23 @@ type Asset struct {
 	MIME            string            `json:"mime"`
 }
 type Render struct {
-	Engine       string  `json:"engine,omitempty"`
-	RequestID    string  `json:"requestId,omitempty"`
-	RequestHash  string  `json:"requestHash,omitempty"`
-	ContentHash  string  `json:"contentHash,omitempty"`
-	Kind         string  `json:"kind,omitempty"`
-	HasSubtitles bool    `json:"hasSubtitles,omitempty"`
-	ID           string  `json:"id"`
-	Revision     int     `json:"revision"`
-	State        string  `json:"state"`
-	Created      string  `json:"created"`
-	Error        string  `json:"error,omitempty"`
-	Duration     float64 `json:"duration"`
-	HasAudio     bool    `json:"hasAudio"`
+	Range        *RenderRange `json:"range,omitempty"`
+	Engine       string       `json:"engine,omitempty"`
+	RequestID    string       `json:"requestId,omitempty"`
+	RequestHash  string       `json:"requestHash,omitempty"`
+	ContentHash  string       `json:"contentHash,omitempty"`
+	Kind         string       `json:"kind,omitempty"`
+	HasSubtitles bool         `json:"hasSubtitles,omitempty"`
+	ID           string       `json:"id"`
+	Revision     int          `json:"revision"`
+	State        string       `json:"state"`
+	Created      string       `json:"created"`
+	Error        string       `json:"error,omitempty"`
+	Duration     float64      `json:"duration"`
+	HasAudio     bool         `json:"hasAudio"`
 }
 type Project struct {
+	Final               *FinalSnapshot      `json:"final,omitempty"`
 	EditRedo            []EditHistory       `json:"editRedo,omitempty"`
 	EditHistory         []EditHistory       `json:"editHistory,omitempty"`
 	Generation          []GenerationJob     `json:"generation,omitempty"`
@@ -516,6 +518,8 @@ func (a *App) routes() http.Handler {
 	m.HandleFunc("POST /api/projects/{id}/edit/patch/{action}", a.editPatch)
 	m.HandleFunc("POST /api/projects/{id}/edit/undo", a.editUndo)
 	m.HandleFunc("POST /api/projects/{id}/edit/redo", a.editRedo)
+	m.HandleFunc("GET /api/projects/{id}/final", a.finalGet)
+	m.HandleFunc("POST /api/projects/{id}/final", a.finalSave)
 	m.HandleFunc("GET /api/projects/{id}/workflow", a.workflowGet)
 	m.HandleFunc("PUT /api/projects/{id}/workflow", a.workflowSave)
 	m.HandleFunc("POST /api/projects/{id}/draft/instruction", a.draftInstruction)

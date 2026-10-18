@@ -167,7 +167,12 @@ func (a *App) renderEditDSL(ctx context.Context, p Project, job Render) {
 		if ir.HasAudio {
 			args = append(args, "-map", "[aout]", "-c:a", "aac", "-ar", "48000", "-ac", "2")
 		}
-		args = append(args, "-c:v", "libx264", "-preset", "veryfast", "-threads", "2", "-crf", "23", "-r", strconv.Itoa(ir.Canvas.FPS), "-t", decimal(ir.Duration), "-movflags", "+faststart", "final.mp4")
+		outputDuration := ir.Duration
+		if job.Range != nil {
+			args = append(args, "-ss", decimal(job.Range.Start))
+			outputDuration = job.Range.End - job.Range.Start
+		}
+		args = append(args, "-c:v", "libx264", "-preset", "veryfast", "-threads", "2", "-crf", "23", "-r", strconv.Itoa(ir.Canvas.FPS), "-t", decimal(outputDuration), "-movflags", "+faststart", "final.mp4")
 	}
 	if e == nil {
 		fmt.Fprintln(log, "ffmpeg editing DSL", strings.Join(args, " "))
@@ -180,7 +185,11 @@ func (a *App) renderEditDSL(ctx context.Context, p Project, job Render) {
 		e = cmd.Run()
 	}
 	if e == nil {
-		e = verifyEditOutput(ctx, dir, ir)
+		expected := ir
+		if job.Range != nil {
+			expected.Duration = job.Range.End - job.Range.Start
+		}
+		e = verifyEditOutput(ctx, dir, expected)
 	}
 	if e != nil && log != nil {
 		fmt.Fprintln(log, "FAILED:", e)
