@@ -43,7 +43,15 @@ const root=require('path').resolve(__dirname,'..'), testData=fs.mkdtempSync(requ
   if(w.document.querySelectorAll('#edit-timeline .edit-block').length!==2)throw Error('timeline not rendered');
   await vm.runInContext('switchEditing(false)',ctx);
   const retained=await(await realFetch('/api/projects/'+p.id+'/edit')).json();if(retained.active||!retained.dsl)throw Error('switch deleted DSL');
-  fs.writeFileSync(root+'/docs/dom-validation-0.11.json' ,JSON.stringify({passed:true,environment:'JSDOM + real Go HTTP API, not a graphical browser',checks:['load embedded UI','save narration text','build paragraph alignment table','protect canonical text','assign actual uploaded image','preserve mapping after new lead','persist text','return actual MCP image content','capability status panel','actual HTTP import deduplication','unsupported generation rejection','unified task panel','create and save editing DSL','activate DSL render mode','show compiled multi-track timeline','switch back without deleting DSL']},null,2));
+  const narration=w.document.querySelector('#narration-text');narration.value='独立口播正文。';narration.dispatchEvent(new w.Event('input'));
+  await vm.runInContext('drawProject()',ctx);if(narration.value!=='独立口播正文。')throw Error('unsaved narration lost');
+  w.document.querySelector('#narration-save').click();await new Promise(r=>setTimeout(r,100));
+  w.document.querySelector('#workflow-instructions').value='保持原意';w.document.querySelector('#workflow-instructions').dispatchEvent(new w.Event('input'));
+  await vm.runInContext('saveWorkflow()',ctx);
+  const workflowSaved=await(await realFetch('/api/projects/'+p.id)).json();if(workflowSaved.workflow.instructions!=='保持原意')throw Error('workflow not persisted');
+  const instruction=await(await realFetch('/api/projects/'+p.id+'/draft/instruction',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:workflowSaved.revision})})).json();if(!instruction.text?.includes('保持原意'))throw Error('draft instruction missing');
+  if(!w.document.querySelector('#draft-start').disabled)throw Error('disconnected draft button enabled');
+  fs.writeFileSync(root+'/docs/dom-validation-0.13.json' ,JSON.stringify({passed:true,environment:'JSDOM + real Go HTTP API, not a graphical browser',checks:['load embedded UI','save narration text','build paragraph alignment table','protect canonical text','assign actual uploaded image','preserve mapping after new lead','persist text','return actual MCP image content','capability status panel','actual HTTP import deduplication','unsupported generation rejection','unified task panel','create and save editing DSL','activate DSL render mode','show compiled multi-track timeline','switch back without deleting DSL']},null,2));
   console.log('DOM + HTTP workflow passed');
  }finally{dom?.window.close();proc.kill('SIGTERM')}
 })().catch(e=>{console.error(e);process.exitCode=1});

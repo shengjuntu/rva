@@ -28,7 +28,7 @@ import (
 	"time"
 )
 
-const version = "0.12.0"
+const version = "0.13.0"
 
 //go:embed web/*
 var ui embed.FS
@@ -78,30 +78,31 @@ type Render struct {
 	HasAudio     bool    `json:"hasAudio"`
 }
 type Project struct {
-	NarrationText       string           `json:"narrationText,omitempty"`
-	EditActive          bool             `json:"editActive,omitempty"`
-	EditDSL             *EditDocument    `json:"editDsl,omitempty"`
-	CreationRequestID   string           `json:"creationRequestId,omitempty"`
-	CreationRequestHash string           `json:"creationRequestHash,omitempty"`
-	Production          *Production      `json:"production,omitempty"`
-	PreviousSessionIDs  []string         `json:"previousSessionIds,omitempty"`
-	AgentSubmission     *AgentSubmission `json:"agentSubmission,omitempty"`
-	AgentRunID          string           `json:"agentRunId,omitempty"`
-	Speech              []SpeechJob      `json:"speech,omitempty"`
-	Subtitles           *SubtitleTrack   `json:"subtitles,omitempty"`
-	News                *NewsOrigin      `json:"news,omitempty"`
-	ID                  string           `json:"id"`
-	Name                string           `json:"name"`
-	Brief               string           `json:"brief"`
-	Revision            int              `json:"revision"`
-	Shots               []Shot           `json:"shots"`
-	Audio               *AudioMix        `json:"audio,omitempty"`
-	Assets              []Asset          `json:"assets"`
-	Renders             []Render         `json:"renders"`
-	WorkspaceID         string           `json:"workspaceId"`
-	SessionID           string           `json:"sessionId"`
-	Updated             string           `json:"updated"`
-	ToolsVersion        string           `json:"toolsVersion,omitempty"`
+	Workflow            *ProductionWorkflow `json:"workflow,omitempty"`
+	NarrationText       string              `json:"narrationText,omitempty"`
+	EditActive          bool                `json:"editActive,omitempty"`
+	EditDSL             *EditDocument       `json:"editDsl,omitempty"`
+	CreationRequestID   string              `json:"creationRequestId,omitempty"`
+	CreationRequestHash string              `json:"creationRequestHash,omitempty"`
+	Production          *Production         `json:"production,omitempty"`
+	PreviousSessionIDs  []string            `json:"previousSessionIds,omitempty"`
+	AgentSubmission     *AgentSubmission    `json:"agentSubmission,omitempty"`
+	AgentRunID          string              `json:"agentRunId,omitempty"`
+	Speech              []SpeechJob         `json:"speech,omitempty"`
+	Subtitles           *SubtitleTrack      `json:"subtitles,omitempty"`
+	News                *NewsOrigin         `json:"news,omitempty"`
+	ID                  string              `json:"id"`
+	Name                string              `json:"name"`
+	Brief               string              `json:"brief"`
+	Revision            int                 `json:"revision"`
+	Shots               []Shot              `json:"shots"`
+	Audio               *AudioMix           `json:"audio,omitempty"`
+	Assets              []Asset             `json:"assets"`
+	Renders             []Render            `json:"renders"`
+	WorkspaceID         string              `json:"workspaceId"`
+	SessionID           string              `json:"sessionId"`
+	Updated             string              `json:"updated"`
+	ToolsVersion        string              `json:"toolsVersion,omitempty"`
 }
 type Config struct {
 	WorkspaceID      string `json:"workspaceId,omitempty"`
@@ -499,6 +500,9 @@ func (a *App) routes() http.Handler {
 	m.HandleFunc("GET /api/environment", a.environment)
 	m.HandleFunc("POST /api/projects/{id}/connect", a.connect)
 	m.HandleFunc("POST /api/projects/{id}/messages", a.message)
+	m.HandleFunc("GET /api/projects/{id}/workflow", a.workflowGet)
+	m.HandleFunc("PUT /api/projects/{id}/workflow", a.workflowSave)
+	m.HandleFunc("POST /api/projects/{id}/draft/instruction", a.draftInstruction)
 	m.HandleFunc("GET /api/projects/{id}/agent", a.agentState)
 	m.HandleFunc("GET /api/projects/{id}/agent/configuration", a.agentConfiguration)
 	m.HandleFunc("POST /api/projects/{id}/agent/stop", a.agentStop)

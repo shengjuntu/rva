@@ -154,7 +154,7 @@ func (a *App) connect(w http.ResponseWriter, r *http.Request) {
 	e = a.rdCall(r.Context(), "POST", "/applications/rundesk-video-app/connect", map[string]any{
 		"name": "视频制作", "description": "读取视频项目与素材，编写脚本、分镜并保存项目；按用户要求制作视频。任务须提供 projectId。",
 		"installationId": installationID, "instanceId": iid, "workspaceId": p.WorkspaceID, "entryUrl": base,
-		"defaults": map[string]any{"skills": map[string]any{"video-project": map[string]string{"SKILL.md": projectSkill}}, "mcp": map[string]any{"video_project": map[string]any{"url": callback, "http_headers": map[string]string{"Authorization": "Bearer " + a.token}, "enabled": true}}},
+		"defaults": map[string]any{"skills": installedProductionSkills(), "mcp": map[string]any{"video_project": map[string]any{"url": callback, "http_headers": map[string]string{"Authorization": "Bearer " + a.token}, "enabled": true}}},
 	}, &binding)
 	if e != nil {
 		fail(w, 502, e)
@@ -272,9 +272,10 @@ func (a *App) message(w http.ResponseWriter, r *http.Request) {
 	a.bridgeMu.Lock()
 	defer a.bridgeMu.Unlock()
 	var in struct {
-		Text           string `json:"text"`
-		RequestID      string `json:"requestId"`
-		ExpectedTurnID string `json:"expectedTurnId"`
+		Skills         []string `json:"skills,omitempty"`
+		Text           string   `json:"text"`
+		RequestID      string   `json:"requestId"`
+		ExpectedTurnID string   `json:"expectedTurnId"`
 	}
 	if !decode(w, r, &in) {
 		return
@@ -282,6 +283,12 @@ func (a *App) message(w http.ResponseWriter, r *http.Request) {
 	if strings.TrimSpace(in.Text) == "" || len(in.Text) > 128<<10 || !requestIdentifier.MatchString(in.RequestID) {
 		fail(w, 400, errors.New("需要消息内容和 8–128 位 requestId"))
 		return
+	}
+	if len(in.Skills) > 0 {
+		if err := validateWorkflow(ProductionWorkflow{Skills: in.Skills}); err != nil {
+			fail(w, 400, err)
+			return
+		}
 	}
 	p, e := a.session(r)
 	if e != nil {
@@ -293,7 +300,7 @@ func (a *App) message(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if pending := p.AgentSubmission; pending != nil && pending.ID == in.RequestID {
-		if pending.Text != in.Text || pending.TurnID != in.ExpectedTurnID {
+		if pending.Text != in.Text || pending.TurnID != in.ExpectedTurnID || strings.Join(pending.Skills, "\n") != strings.Join(in.Skills, "\n") {
 			fail(w, 409, &RunDeskError{Status: 409, Code: "idempotency_conflict", Message: "同一 requestId 不能用于不同消息"})
 			return
 		}
@@ -335,7 +342,7 @@ func (a *App) message(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if e = a.saveAgent(p.ID, func(q *Project) {
-			q.AgentSubmission = &AgentSubmission{ID: in.RequestID, Text: in.Text, TurnID: in.ExpectedTurnID, RunID: q.AgentRunID, State: "pending"}
+			q.AgentSubmission = &AgentSubmission{Skills: in.Skills, ID: in.RequestID, Text: in.Text, TurnID: in.ExpectedTurnID, RunID: q.AgentRunID, State: "pending"}
 		}); e != nil {
 			fail(w, 500, e)
 			return

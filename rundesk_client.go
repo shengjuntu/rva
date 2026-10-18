@@ -230,6 +230,7 @@ func (a *App) rdOperation(ctx context.Context, scope, path string, body any, out
 }
 
 type AgentSubmission struct {
+	Skills          []string        `json:"skills,omitempty"`
 	ID              string          `json:"id"`
 	Text            string          `json:"text"`
 	TurnID          string          `json:"turnId,omitempty"`
@@ -271,6 +272,13 @@ func (a *App) recoverAgent(ctx context.Context, p Project, allowSend bool) (any,
 		body["requestId"] = pending.ID
 	}
 	if len(pending.Body) == 0 {
+		if len(pending.Skills) > 0 && a.cfg.ManagedByRunDesk {
+			refs, err := a.resolveProductionSkills(ctx, p)
+			if err != nil {
+				return nil, err
+			}
+			body["skills"] = refs
+		}
 		raw, err := json.Marshal(body)
 		if err != nil {
 			return nil, err

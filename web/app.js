@@ -1,5 +1,5 @@
 "use strict";
-const TOOL_VERSION = "0.12.0";
+const TOOL_VERSION = "0.13.0";
 const $ = (s) => document.querySelector(s),
   el = (tag, text, cls) => {
     const n = document.createElement(tag);
@@ -161,6 +161,7 @@ async function openProject(pid) {
 }
 let narrationDirty=false,narrationBase=0,narrationProject="";
 function drawProject() {
+ drawWorkflow();
  if(project && narrationProject!==project.id){narrationDirty=false;narrationProject=project.id;}
  if(project && !narrationDirty) narrationBase=project.revision;
  if(project && !narrationDirty) $("#narration-text").value=project.narrationText||"";
@@ -809,7 +810,7 @@ $("#connect").onclick = action(async () => {
   }
   await poll();
 });
-$("#composer").onsubmit = action(async (e) => {
+async function submitMessage(e) {
   e.preventDefault();
   if (sending || !project?.sessionId) return;
   const text = $("#prompt").value.trim();
@@ -822,7 +823,7 @@ $("#composer").onsubmit = action(async (e) => {
   await save();
   if (gen !== epoch) return;
   if (!body) {
-    body = {text, requestId: id()};
+    body = {text, requestId: id(),skills:(project.workflow?.skills||["video-narration","video-editing","video-review"])};
     if (session?.turnId && ["running", "waiting"].includes(session.status)) body.expectedTurnId = session.turnId;
     rememberMessage(pid, body);
   }
@@ -844,7 +845,8 @@ $("#composer").onsubmit = action(async (e) => {
     $("#send").disabled = !project?.sessionId;
   }
   await poll();
-});
+}
+$("#composer").onsubmit = action(submitMessage);
 $("#prompt").onkeydown = (e) => {
   if (e.key === "Enter" && !e.shiftKey && !e.isComposing) {
     e.preventDefault();
@@ -1588,3 +1590,35 @@ $('#edit-activate').onclick=action(()=>switchEditing(true));$('#edit-legacy').on
 
 $("#narration-text").oninput=()=>{narrationDirty=true;};
 $("#narration-save").onclick=action(async()=>{const pid=project.id,gen=epoch;const result=await api("/api/projects/"+pid+"/narration",{revision:narrationBase,text:$("#narration-text").value},"PUT");if(epoch!==gen||project.id!==pid)return;project=result;narrationDirty=false;drawProject();$("#narration-status").textContent="正文已保存，配音需重新核对";});
+
+let workflowDirty=false,workflowBase=0,workflowProject="";
+function drawWorkflow(){
+ if(!project)return;
+ if(workflowProject!==project.id){workflowDirty=false;workflowProject=project.id;}
+ if(!workflowDirty){workflowBase=project.revision;const w=project.workflow||{skills:['video-narration','video-editing','video-review'],instructions:''};
+ for(const name of ['narration','editing','review']) $('#skill-'+name).checked=w.skills.includes('video-'+name);
+ $('#workflow-instructions').value=w.instructions||'';}
+ $('#draft-start').disabled=!project.sessionId||sending;
+}
+for(const name of ['narration','editing','review']) $('#skill-'+name).onchange=()=>{workflowDirty=true;};
+$('#workflow-instructions').oninput=()=>{workflowDirty=true;};
+async function saveWorkflow(){
+ const pid=project.id,gen=epoch;const workflow={skills:['narration','editing','review'].filter(n=>$('#skill-'+n).checked).map(n=>'video-'+n),instructions:$('#workflow-instructions').value};
+ const result=await api('/api/projects/'+pid+'/workflow',{revision:workflowBase,workflow},'PUT');
+ if(gen!==epoch||project.id!==pid)return false;project=result;workflowDirty=false;drawProject();$('#workflow-status').textContent='制作要求已保存';return true;
+}
+$('#workflow-save').onclick=action(saveWorkflow);
+$('#draft-start').onclick=action(async()=>{
+ if(!project?.sessionId||sending)return;const pid=project.id,gen=epoch;
+ if(pendingMessage(pid))throw new Error('上一条提交仍待确认，请先恢复原提交');
+ if(session&&['running','waiting','starting','stopping'].includes(session.status))throw new Error('当前 Agent 任务尚未结束，请用对话调整或先停止');
+ if($('#prompt').value.trim())throw new Error('对话框中有未发送内容，请先发送或清空');
+ if(narrationDirty)throw new Error('请先保存口播正文');
+ if(workflowDirty)throw new Error('请先保存制作要求');
+ await save();if(gen!==epoch||project.id!==pid)return;
+ const instruction=await api('/api/projects/'+pid+'/draft/instruction',{revision:project.revision});
+ if(gen!==epoch||project.id!==pid)return;
+ $('#prompt').value=instruction.text;
+ await submitMessage({preventDefault(){}});
+ if(gen===epoch)$('#workflow-status').textContent='已交给 RunDesk；任务与取消状态见当前对话';
+});
