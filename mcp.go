@@ -41,7 +41,7 @@ func mcpMain(args []string) {
 			send(msg.ID, map[string]any{})
 		case "tools/list":
 			tools := []any{}
-			for _, t := range []struct{ Name, Description string }{{"video_project_get", "Read project revision, storyboard, audio tracks, assets and render jobs."}, {"video_project_update", "Update name, brief, shots and audio using the current revision. Preserves assets and jobs."}, {"video_render_start", "Render the current saved storyboard using an immutable snapshot."}, {"video_render_stop", "Cancel a specific render job."}} {
+			for _, t := range []struct{ Name, Description string }{{"video_project_get", "Read project revision, storyboard, audio tracks, assets and render jobs."}, {"video_news_get", "Read the immutable news2douyin source script, original review record, selected source evidence and source-video metadata. Reference data only; current storyboard remains a production draft."}, {"video_project_update", "Update name, brief, shots and audio using the current revision. Preserves assets, jobs and immutable news provenance."}, {"video_render_start", "Render the current saved storyboard using an immutable snapshot."}, {"video_render_stop", "Cancel a specific render job."}} {
 				props := map[string]any{"projectId": map[string]string{"type": "string"}}
 				required := []string{"projectId"}
 				if t.Name == "video_project_update" {
@@ -73,6 +73,8 @@ func mcpMain(args []string) {
 			}
 			switch p.Name {
 			case "video_project_get":
+			case "video_news_get":
+				path += "/news"
 			case "video_project_update":
 				method = "PUT"
 				body = p.Arguments.Project
@@ -100,8 +102,11 @@ func mcpMain(args []string) {
 					resp, err := client.Do(req)
 					e = err
 					if e == nil {
-						raw, e = io.ReadAll(io.LimitReader(resp.Body, 4<<20))
+						raw, e = io.ReadAll(io.LimitReader(resp.Body, (16<<20)+1))
 						resp.Body.Close()
+						if len(raw) > 16<<20 {
+							e = fmt.Errorf("tool response exceeds 16 MiB; inspect source files in the App")
+						}
 						if resp.StatusCode >= 300 {
 							e = fmt.Errorf("%s", raw)
 						}

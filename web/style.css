@@ -707,3 +707,11 @@ dialog p {
     grid-template-columns: 1fr;
   }
 }
+
+#news-panel { margin: 0 0 18px; padding: 16px; border: 1px solid #cbdad4; border-radius: 12px; background: #f1f7f3; }
+#news-player { display: block; width: min(100%, 300px); max-height: 420px; background: #17271f; margin: 12px 0; }
+#news-dialog { width: min(820px, 94vw); max-height: 88vh; overflow: auto; }
+#news-evidence pre { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 40vh; overflow: auto; }
+#news-evidence article { margin: 14px 0; padding-top: 12px; border-top: 1px solid #dbe5df; overflow-wrap: anywhere; }
+#news-video-downloads { flex-wrap: wrap; gap: 14px; }
+#import-news { margin-top: 10px; }

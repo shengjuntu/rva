@@ -1,4 +1,4 @@
-# RunDesk Video App · v0.2.0
+# RunDesk Video App · v0.3.0
 
 一个使用 **Go + HTML/CSS/原生 JavaScript** 的本地视频工作台。通过 RunDesk HTTP API 使用 Codex；项目、素材、分镜和渲染任务由视频 App 管理。
 
@@ -7,6 +7,14 @@
 ![界面截图](docs/preview.png)
 
 ![音轨配置](docs/audio-preview.png)
+
+## 新闻工作台接入
+
+v0.3.0 可导入 news2douyin 已审核脚本制作包，保留原稿、审核记录和来源证据；可接收同一稿件版本的成片 ZIP，播放原始视频并下载 WAV/SRT。RunDesk 配置的 MCP 新增 `video_news_get`，让 Agent 读取这些依据后修改制作草稿。
+
+导入分镜时长是估算值，原始交接成片不会随分镜编辑更新。安装 App 即可导入脚本；接收成片还需 FFprobe。只有从分镜重新渲染时才需要 HyperFrames/Node/Chrome 等依赖。
+
+详见 [新闻交接步骤与限制](docs/NEWS-HANDOFF.md) 和 [v0.3 验证记录](docs/VALIDATION-0.3.md)。
 
 ## 当前可用
 

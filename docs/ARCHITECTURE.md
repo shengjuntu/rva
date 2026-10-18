@@ -67,3 +67,9 @@ API 使用 `Authorization: Bearer <VIDEO_APP_TOKEN>`，浏览器使用登录 Coo
 音轨混音先解码 sourceStart 之后的片段为 48kHz 双声道 PCM，再应用延时/音量，按需要循环背景音乐；补齐/截断至视频时长，限制峰值并编码 AAC，视频流直接复制。每次渲染使用自己的音频素材副本。最终校验包括尺寸、30 fps、总时长和预期音频流是否存在。
 
 项目 toolsVersion 记录已写入的 Skill/MCP 版本。旧版本项目保留会话与工作区，通过更新工具按钮应用新规范。App 的配置写入与发送请求串行处理，更新前检查该专用实例是否存在活动会话；原生权限和并发策略仍由 RunDesk 决定。
+
+## v0.3 新闻交接
+
+news2douyin 通过版本化 ZIP 交接，不共享数据库。项目新增只由导入接口维护的 news 来源记录；分镜仍是制作草稿。来源文件独立保存在 Agent 工作区之外，MCP 新增 video_news_get 读取原稿、审核与证据。
+
+原始交接成片与 APP 渲染列表分开，独立保存哈希和版本。完整接口、存储及限制见 [NEWS-HANDOFF.md](NEWS-HANDOFF.md)。

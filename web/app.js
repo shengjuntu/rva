@@ -1,5 +1,5 @@
 "use strict";
-const TOOL_VERSION = "0.2.0";
+const TOOL_VERSION = "0.3.0";
 const $ = (s) => document.querySelector(s),
   el = (tag, text, cls) => {
     const n = document.createElement(tag);
@@ -128,6 +128,7 @@ function drawProject() {
   drawShots(true);
   drawAudio();
   drawRenders();
+  drawNews();
 }
 function assetURL(a) {
   return path("/assets/" + a.id);
@@ -977,4 +978,93 @@ $("#refresh-tools").onclick = action(async () => {
   } finally {
     $("#refresh-tools").disabled = false;
   }
+});
+
+function newsURL(group, file) {
+  return path('/news/' + group + '/files/' + encodeURIComponent(file));
+}
+function drawNews() {
+  const origin = project?.news;
+  $('#news-panel').hidden = !origin;
+  const player = $('#news-player');
+  if (!origin) {
+    player.pause(); player.removeAttribute('src'); player.load();
+    delete player.dataset.source;
+    return;
+  }
+  $('#news-summary').textContent = '原稿 r' + origin.revision + ' · ' + origin.packageKey + ' · 目标 ' + origin.targetDuration + ' 秒 · 原稿包完整性已校验';
+  $('#news-source-download').href = newsURL('script', 'bundle.zip') + '?download';
+  $('#news-video').hidden = !origin.video;
+  $('#import-news-video').disabled = !!origin.video;
+  if (origin.video) {
+    const v = origin.video;
+    $('#news-video-meta').textContent = '原始交接成片 · ' + v.width + ' × ' + v.height + ' · ' + v.fps + ' fps · ' + v.duration.toFixed(2) + ' 秒';
+    const url = newsURL('video', 'video.mp4');
+    if (player.dataset.source !== url) {
+      player.pause(); player.src = url; player.poster = newsURL('video', 'cover.png'); player.dataset.source = url;
+    }
+    const links = $('#news-video-downloads'); links.replaceChildren();
+    for (const [name, label] of [['video.mp4','MP4'],['narration.wav','配音 WAV'],['subtitles.srt','字幕 SRT'],['manifest.json','制作清单'],['bundle.zip','完整成片包']]) {
+      const a = el('a', label); a.href = newsURL('video', name) + '?download'; links.append(a);
+    }
+  } else {
+    player.pause(); player.removeAttribute('src'); player.load(); delete player.dataset.source;
+  }
+}
+$('#import-news').onclick = () => $('#news-package').click();
+$('#news-package').onchange = action(async () => {
+  const file = $('#news-package').files[0];
+  if (!file) return;
+  $('#news-package').value = '';
+  if (file.size > 4 * 1024 * 1024) throw new Error('脚本制作包最大 4 MiB');
+  if (dirty) await save();
+  const gen = epoch, data = new FormData(); data.append('file', file);
+  $('#import-news').disabled = true;
+  try {
+    const p = await api('/api/news/import', data);
+    // A project switch or new draft while uploading must not be overwritten.
+    if (gen === epoch && !dirty) await openProject(p.id);
+    await listProjects();
+    toast('已接收审核稿；分镜为待核对的制作草稿。');
+  } finally { $('#import-news').disabled = false; }
+});
+$('#import-news-video').onclick = () => $('#news-video-package').click();
+$('#news-video-package').onchange = action(async () => {
+  const file = $('#news-video-package').files[0];
+  if (!file || !project?.news) return;
+  $('#news-video-package').value = '';
+  if (file.size > 256 * 1024 * 1024) throw new Error('成片包最大 256 MiB');
+  if (dirty) await save();
+  const gen = epoch, serial = editSerial, pid = project.id, data = new FormData();
+  data.append('file', file); data.append('revision', String(project.revision));
+  $('#import-news-video').disabled = true;
+  try {
+    const p = await api('/api/projects/' + pid + '/news/video', data);
+    if (gen === epoch) {
+      if (!dirty && serial === editSerial) { project = p; drawProject(); }
+      else { $('#conflict').hidden = false; }
+    }
+    toast('原始成片已校验并接收。');
+  } finally { if (gen === epoch) $('#import-news-video').disabled = !!project.news?.video; }
+});
+$('#news-close').onclick = () => $('#news-dialog').close();
+$('#news-details').onclick = action(async () => {
+  if (!project?.news) return;
+  const gen = epoch, data = await api(path('/news'));
+  if (gen !== epoch) return;
+  const box = $('#news-evidence'); box.replaceChildren();
+  box.append(el('h3', data.snapshot.document.title), el('p', '原稿 r' + data.origin.revision + ' · 内容 SHA-256：' + data.origin.contentHash), el('pre', data.snapshot.document.script_text));
+  box.append(el('h3', '所选来源'));
+  for (const source of data.sources) {
+    const article = el('article'); article.append(el('strong', source.title || source.article_key));
+    try {
+      const u = new URL(source.url);
+      if (['http:', 'https:'].includes(u.protocol) && !u.username && !u.password) {
+        const link = el('a', ' 打开原文'); link.href = u.href; link.target = '_blank'; link.rel = 'noopener noreferrer'; article.append(link);
+      }
+    } catch (_) {}
+    article.append(el('p', source.published_at || ''), el('pre', JSON.stringify(source, null, 2))); box.append(article);
+  }
+  const reviews = el('details'); reviews.append(el('summary', '原稿审核记录'), el('pre', JSON.stringify(data.manifest.review_history, null, 2))); box.append(reviews);
+  $('#news-dialog').showModal();
 });

@@ -28,7 +28,7 @@ import (
 	"time"
 )
 
-const version = "0.2.0"
+const version = "0.3.0"
 
 //go:embed web/*
 var ui embed.FS
@@ -66,18 +66,19 @@ type Render struct {
 	HasAudio bool    `json:"hasAudio"`
 }
 type Project struct {
-	ID           string    `json:"id"`
-	Name         string    `json:"name"`
-	Brief        string    `json:"brief"`
-	Revision     int       `json:"revision"`
-	Shots        []Shot    `json:"shots"`
-	Audio        *AudioMix `json:"audio,omitempty"`
-	Assets       []Asset   `json:"assets"`
-	Renders      []Render  `json:"renders"`
-	WorkspaceID  string    `json:"workspaceId"`
-	SessionID    string    `json:"sessionId"`
-	Updated      string    `json:"updated"`
-	ToolsVersion string    `json:"toolsVersion,omitempty"`
+	News         *NewsOrigin `json:"news,omitempty"`
+	ID           string      `json:"id"`
+	Name         string      `json:"name"`
+	Brief        string      `json:"brief"`
+	Revision     int         `json:"revision"`
+	Shots        []Shot      `json:"shots"`
+	Audio        *AudioMix   `json:"audio,omitempty"`
+	Assets       []Asset     `json:"assets"`
+	Renders      []Render    `json:"renders"`
+	WorkspaceID  string      `json:"workspaceId"`
+	SessionID    string      `json:"sessionId"`
+	Updated      string      `json:"updated"`
+	ToolsVersion string      `json:"toolsVersion,omitempty"`
 }
 type Config struct {
 	InstanceID string `json:"instanceId"`
@@ -297,6 +298,10 @@ func (a *App) auth(next http.Handler) http.Handler {
 }
 func (a *App) routes() http.Handler {
 	m := http.NewServeMux()
+	m.HandleFunc("POST /api/news/import", a.importNews)
+	m.HandleFunc("GET /api/projects/{id}/news", a.newsDetail)
+	m.HandleFunc("POST /api/projects/{id}/news/video", a.importNewsVideo)
+	m.HandleFunc("GET /api/projects/{id}/news/{group}/files/{file}", a.newsFile)
 	m.HandleFunc("POST /login", func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
 			Token string `json:"token"`

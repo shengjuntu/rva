@@ -5,13 +5,13 @@
 ## 1. 解压程序
 
 ```bash
-unzip rundesk-video-app-v0.2.0.zip
+unzip rundesk-video-app-v0.3.0.zip
 cd rundesk-video-app
 chmod +x bin/video-app scripts/*.sh
 ./bin/video-app --version
 ```
 
-应输出 `RunDesk Video App 0.2.0`。`bin/video-app` 是 Linux amd64 二进制。其他架构可用 Go 1.25+ 运行 `./scripts/build.sh` 从源码构建。包内 Windows amd64 二进制仅经过交叉编译，未实机验证。
+应输出 `RunDesk Video App 0.3.0`。`bin/video-app` 是 Linux amd64 二进制。其他架构可用 Go 1.25+ 运行 `./scripts/build.sh` 从源码构建。包内 Windows amd64 二进制仅经过交叉编译，未实机验证。
 
 ## 2. 准备运行环境
 
