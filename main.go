@@ -28,7 +28,7 @@ import (
 	"time"
 )
 
-const version = "0.8.0"
+const version = "0.8.1"
 
 //go:embed web/*
 var ui embed.FS
@@ -357,6 +357,8 @@ func (a *App) routes() http.Handler {
 	m.HandleFunc("GET /api/speech/capabilities", a.speechCapabilities)
 	m.HandleFunc("GET /api/speech/settings", a.speechSettings)
 	m.HandleFunc("PUT /api/speech/settings", a.saveSpeechSettings)
+	m.HandleFunc("GET /api/speech/voices", a.speechVoices)
+	m.HandleFunc("POST /api/speech/voices", a.speechVoices)
 	m.HandleFunc("POST /api/projects/{id}/speech", a.startSpeech)
 	m.HandleFunc("POST /api/projects/{id}/speech/{sid}/stop", a.stopSpeech)
 	m.HandleFunc("POST /api/projects/{id}/speech/{sid}/adopt", a.adoptSpeech)
@@ -572,6 +574,9 @@ func errText(e error) string {
 	return e.Error()
 }
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "speech-doctor" {
+		os.Exit(runSpeechDoctor(os.Args[2:], os.Stdout, os.Stderr))
+	}
 	if len(os.Args) > 1 && os.Args[1] == "mcp" {
 		mcpMain(os.Args[2:])
 		return

@@ -1,4 +1,6 @@
-# RunDesk Video App · v0.8.0
+# RunDesk Video App · v0.8.1
+
+本版完善已有 IndexTTS-2.5 接入：音色列表读取、断线后原请求确认、Go 命令行自检。运行 `bin/video-app speech-doctor --data ./data`，接入步骤见 [INDEXTTS](docs/INDEXTTS.md)，验证范围见 [VALIDATION](docs/VALIDATION-0.8.1.md)。
 
 独立的视频制作工作台：管理项目、素材、分镜、音轨、字幕、预览配音和成片。通过 RunDesk 调用 Codex，通过 HTTP MCP 让 Agent 读取和更新项目、启动渲染；RunDesk 保留会话、审批和执行轨迹。
 
@@ -26,7 +28,7 @@ bash scripts/docker.sh doctor
 bash scripts/docker.sh smoke
 ```
 
-`build` 构建 `rundesk-video-app:0.8.0`；`up` 只启动已有镜像。`smoke` 创建两秒中文标题与测试音视频，检查实际 MP4。`logs / status / stop` 提供日常运维入口。数据默认保存到 `.state/video`，升级须保留原完整数据目录。
+`build` 构建 `rundesk-video-app:0.8.1`；`up` 只启动已有镜像。`smoke` 创建两秒中文标题与测试音视频，检查实际 MP4。`logs / status / stop` 提供日常运维入口。数据默认保存到 `.state/video`，升级须保留原完整数据目录。
 
 RunDesk 中的 `video-build` 是另一个 **Codex 工具镜像**，通过初始化向导准备一次并选给视频应用。它不包含本 App 的 HyperFrames 渲染服务。首次切换到 Docker，需要为该容器配置视频 MCP/Skill 和 Codex 认证，详见联调文档。
 

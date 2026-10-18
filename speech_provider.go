@@ -45,6 +45,10 @@ func validSpeechLanguage(s string) bool {
 }
 
 func validateSpeechConfig(c SpeechConfig) error {
+	return validateSpeechSettings(c, true)
+}
+
+func validateSpeechSettings(c SpeechConfig, requireTarget bool) error {
 	if c.Backend != "espeak-ng" && c.Backend != "indextts" {
 		return errors.New("配音后端必须为 espeak-ng 或 indextts")
 	}
@@ -66,7 +70,7 @@ func validateSpeechConfig(c SpeechConfig) error {
 			return errors.New("服务地址必须是完整 HTTP(S) 地址，并以 /v1/audio/speech 结尾")
 		}
 	}
-	if c.Backend == "indextts" && (strings.TrimSpace(c.Model) == "" || len(c.Model) > 200 || c.Voice == "") {
+	if c.Backend == "indextts" && requireTarget && (strings.TrimSpace(c.Model) == "" || len(c.Model) > 200 || c.Voice == "") {
 		return errors.New("请填写 IndexTTS 模型名和已注册的音色 ID")
 	}
 	return nil
@@ -126,11 +130,33 @@ func (a *App) speechSettings(w http.ResponseWriter, r *http.Request) {
 	defer a.mu.Unlock()
 	writeJSON(w, 200, a.publicSpeechConfig())
 }
-func (a *App) saveSpeechSettings(w http.ResponseWriter, r *http.Request) {
-	var in struct {
-		SpeechConfig
-		ClearAPIKey bool `json:"clearApiKey"`
+
+type speechSettingsInput struct {
+	SpeechConfig
+	ClearAPIKey bool `json:"clearApiKey"`
+}
+
+// A draft check uses the same credential rules as a save. Never forward the
+// saved key to a changed endpoint without explicit replacement/clearing.
+func resolveSpeechSettings(in speechSettingsInput, old SpeechConfig) (SpeechConfig, error) {
+	c := in.SpeechConfig
+	c.URL = strings.TrimSpace(c.URL)
+	c.Model = strings.TrimSpace(c.Model)
+	c.Voice = strings.TrimSpace(c.Voice)
+	if c.APIKey == "" && !in.ClearAPIKey {
+		if c.URL != old.URL && old.APIKey != "" {
+			return c, errors.New("更换服务地址时请重新填写 API Key 或勾选清除，防止旧密钥发送到新服务")
+		}
+		c.APIKey = old.APIKey
 	}
+	if in.ClearAPIKey {
+		c.APIKey = ""
+	}
+	return c, nil
+}
+
+func (a *App) saveSpeechSettings(w http.ResponseWriter, r *http.Request) {
+	var in speechSettingsInput
 	if !decode(w, r, &in) {
 		return
 	}
@@ -144,19 +170,10 @@ func (a *App) saveSpeechSettings(w http.ResponseWriter, r *http.Request) {
 		fail(w, 409, errors.New("请先等待或取消运行中的配音，再修改服务"))
 		return
 	}
-	c := in.SpeechConfig
-	c.URL = strings.TrimSpace(c.URL)
-	c.Model = strings.TrimSpace(c.Model)
-	c.Voice = strings.TrimSpace(c.Voice)
-	if c.APIKey == "" && !in.ClearAPIKey {
-		if c.URL != a.tts.URL && a.tts.APIKey != "" {
-			fail(w, 400, errors.New("更换服务地址时请重新填写 API Key 或勾选清除，防止旧密钥发送到新服务"))
-			return
-		}
-		c.APIKey = a.tts.APIKey
-	}
-	if in.ClearAPIKey {
-		c.APIKey = ""
+	c, e := resolveSpeechSettings(in, a.tts)
+	if e != nil {
+		fail(w, 400, e)
+		return
 	}
 	if e := validateSpeechConfig(c); e != nil {
 		fail(w, 400, e)
@@ -168,6 +185,94 @@ func (a *App) saveSpeechSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	a.tts = c
 	writeJSON(w, 200, a.publicSpeechConfig())
+}
+
+type speechVoiceCatalog struct {
+	Supported bool     `json:"supported"`
+	Voices    []string `json:"voices"`
+	Message   string   `json:"message,omitempty"`
+}
+
+func listSpeechVoices(ctx context.Context, c SpeechConfig) (speechVoiceCatalog, error) {
+	result := speechVoiceCatalog{Voices: []string{}}
+	c.Backend = "indextts"
+	if e := validateSpeechSettings(c, false); e != nil {
+		return result, e
+	}
+	req, e := http.NewRequestWithContext(ctx, "GET", strings.TrimSuffix(c.URL, "/speech")+"/voices", nil)
+	if e != nil {
+		return result, errors.New("IndexTTS 地址无效")
+	}
+	if c.APIKey != "" {
+		req.Header.Set("Authorization", "Bearer "+c.APIKey)
+	}
+	resp, e := speechHTTPClient(8 * time.Second).Do(req)
+	if e != nil {
+		return result, errors.New("无法读取音色：检查地址、端口、网络与 TLS 证书")
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode == 404 || resp.StatusCode == 405 {
+		result.Message = "服务未提供音色列表，请手动填写服务端已注册的音色 ID"
+		return result, nil
+	}
+	if resp.StatusCode != 200 {
+		return result, fmt.Errorf("读取音色 HTTP %d（检查认证和服务状态）", resp.StatusCode)
+	}
+	b, e := io.ReadAll(io.LimitReader(resp.Body, (1<<20)+1))
+	if e != nil || len(b) > 1<<20 {
+		return result, errors.New("音色列表下载中断或超过 1 MiB")
+	}
+	var in struct {
+		Voices *[]string `json:"voices"`
+	}
+	if json.Unmarshal(b, &in) != nil || in.Voices == nil || len(*in.Voices) > 512 {
+		return result, errors.New("音色列表格式无效或超过 512 项")
+	}
+	seen := map[string]bool{}
+	for _, voice := range *in.Voices {
+		if !speechVoiceID.MatchString(voice) {
+			return result, errors.New("服务返回了无效音色 ID，请检查服务端配置")
+		}
+		if !seen[voice] {
+			result.Voices = append(result.Voices, voice)
+			seen[voice] = true
+		}
+	}
+	result.Supported = true
+	return result, nil
+}
+
+func (a *App) speechVoices(w http.ResponseWriter, r *http.Request) {
+	a.mu.Lock()
+	c, managed := a.tts, a.ttsManaged
+	a.mu.Unlock()
+	if r.Method == "POST" {
+		var in speechSettingsInput
+		if !decode(w, r, &in) {
+			return
+		}
+		if managed {
+			fail(w, 409, errors.New("配音服务由环境变量管理，请读取已配置服务的音色"))
+			return
+		}
+		var e error
+		c, e = resolveSpeechSettings(in, c)
+		if e != nil {
+			fail(w, 400, e)
+			return
+		}
+	}
+	c.Backend = "indextts"
+	if e := validateSpeechSettings(c, false); e != nil {
+		fail(w, 400, e)
+		return
+	}
+	result, e := listSpeechVoices(r.Context(), c)
+	if e != nil {
+		fail(w, 502, e)
+		return
+	}
+	writeJSON(w, 200, result)
 }
 
 func speechBackend(s string) string {

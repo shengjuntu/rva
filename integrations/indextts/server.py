@@ -38,7 +38,7 @@ class SpeechServer(ThreadingHTTPServer):
 class Handler(BaseHTTPRequestHandler):
     # HTTP/1.0 closes connections; errors cannot leave unread request bytes for
     # another request. Do not log query strings, bodies, tokens or voice paths.
-    server_version = "IndexTTS-VideoAdapter/0.8.0"
+    server_version = "IndexTTS-VideoAdapter/0.8.1"
 
     def setup(self):
         super().setup()

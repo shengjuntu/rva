@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>视频工作台 · RunDesk App</title>
     <link rel="stylesheet" href="/style.css" />
+    <script src="/speech-submit.js" defer></script>
     <script src="/app.js" defer></script>
   </head>
   <body>
@@ -25,7 +26,7 @@
     </div>
     <div id="app" hidden>
       <header>
-        <div class="brand">视频工作台 <span>v0.5.1</span></div>
+        <div class="brand">视频工作台 <span>v0.8.1</span></div>
         <div class="top-actions">
           <button id="environment">环境准备</button
           ><button id="toggle-assets">素材栏</button
@@ -170,11 +171,13 @@
                 <label>默认引擎<select id="tts-backend"><option value="indextts">IndexTTS-2.5</option><option value="espeak-ng">eSpeak 预览</option></select></label>
                 <label>语音接口完整地址<input id="tts-url" type="url" placeholder="http://127.0.0.1:8092/v1/audio/speech" autocomplete="off" /></label>
                 <label>模型名<input id="tts-model" value="IndexTeam/IndexTTS-2.5" /></label>
-                <label>默认音色 ID<input id="tts-voice" placeholder="news_zh（在服务端注册的名称）" /></label>
+                <label>默认音色 ID<input id="tts-voice" list="tts-voices" placeholder="news_zh（在服务端注册的名称）" /></label>
                 <label>默认语言<select id="tts-language"><option value="zh">中文</option><option value="en">英语</option><option value="zhen">中英混合（vLLM）</option><option value="ja">日语</option><option value="es">西班牙语</option><option value="ar">阿拉伯语</option></select></label>
                 <label>每段超时 / 秒<input id="tts-timeout" type="number" min="10" max="900" value="180" /></label>
                 <label>API Key（可选）<input id="tts-key" type="password" autocomplete="new-password" placeholder="留空保留原密钥" /></label>
                 <label><input id="tts-clear-key" type="checkbox" />清除已保存密钥</label>
+                <datalist id="tts-voices"></datalist>
+                <button id="tts-discover">读取可用音色</button>
                 <button id="tts-save">保存配音设置</button>
               </div>
               <p class="muted small">填写语音 API 地址，不是 Gradio 网页地址。只有 WebUI 的部署可使用包内 integrations/indextts 服务入口。配置保存在应用数据目录。</p>

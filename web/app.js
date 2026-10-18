@@ -1,5 +1,5 @@
 "use strict";
-const TOOL_VERSION = "0.8.0";
+const TOOL_VERSION = "0.8.1";
 const $ = (s) => document.querySelector(s),
   el = (tag, text, cls) => {
     const n = document.createElement(tag);
@@ -7,7 +7,8 @@ const $ = (s) => document.querySelector(s),
     if (cls) n.className = cls;
     return n;
   };
-let ttsSettings = null, savingTTS = false;
+let ttsSettings = null, savingTTS = false, discoveringVoices = false;
+const speechSubmission = SpeechSubmission.create(() => sessionStorage);
 let captionDraft = null, savePromise = null, speechKey = "", startingSpeech = false;
 let project = null,
   selected = 0,
@@ -21,13 +22,17 @@ let project = null,
   renderKey = "",
   approvalKey = "",
   rows = new Map();
-const api = async (path, body, method) => {
+const api = async (path, body, method, timeoutMs = 0) => {
   const opts = { method: method || (body === undefined ? "GET" : "POST") };
   if (body !== undefined) {
     opts.body = body instanceof FormData ? body : JSON.stringify(body);
     if (!(body instanceof FormData))
       opts.headers = { "Content-Type": "application/json" };
   }
+  const controller = timeoutMs ? new AbortController() : null;
+  if (controller) opts.signal = controller.signal;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  try {
   const r = await fetch(path, opts);
   const data = await r.json();
   if (!r.ok) {
@@ -39,6 +44,7 @@ const api = async (path, body, method) => {
     throw e;
   }
   return data;
+  } finally { if (timer !== null) clearTimeout(timer); }
 };
 const path = (tail = "") => "/api/projects/" + project.id + tail;
 function toast(msg) {
@@ -1254,9 +1260,12 @@ function drawSpeech() {
   if (!project) return;
   const jobs = project.speech || [];
   const active = jobs.find(j => ['running','stopping'].includes(j.state));
-  $('#speech-start').disabled = startingSpeech || savingTTS || !!active || !ttsSettings;
+  let pending = null, storageError = '';
+  try { pending = speechSubmission.reconcile(project.id, jobs); } catch (e) { storageError = e.message; }
+  $('#speech-start').disabled = startingSpeech || savingTTS || !!active || !ttsSettings || !!storageError;
+  $('#speech-start').textContent = pending ? '确认上次配音请求' : '生成配音与字幕';
   $('#tts-save').disabled = savingTTS || !!active || !!ttsSettings?.managedByEnvironment;
-  $('#speech-state').textContent = active ? `配音 ${active.progress}/${active.total} 段 · ${states[active.state] || active.state}` : '生成结果不会自动替换当前音轨。';
+  $('#speech-state').textContent = storageError || (pending ? '上次提交结果待确认；点击确认将沿用原稿件版本和配音参数，不创建重复任务。' : active ? `配音 ${active.progress}/${active.total} 段 · ${states[active.state] || active.state}` : '生成结果不会自动替换当前音轨。');
   const key = project.id + ':' + JSON.stringify(jobs) + ':' + project.audio?.narration?.assetId;
   if (key === speechKey) return;
   speechKey = key;
@@ -1292,6 +1301,7 @@ function drawSpeech() {
 }
 function updateSpeechOptions(resetVoice = false) {
   const neural = $('#speech-backend').value === 'indextts';
+  $('#speech-voice').setAttribute('list', neural ? 'tts-voices' : 'speech-voices');
   $('#speech-rate-field').hidden = neural;
   $('#speech-speed-field').hidden = !neural;
   $('#speech-language-field').hidden = !neural;
@@ -1310,21 +1320,46 @@ function applyTTSSettings(c) {
   $('#speech-language').value = c.language;
   updateSpeechOptions(true);
   $('#speech-environment').textContent = c.backend === 'indextts' ? '已选择 IndexTTS；点击环境检查验证服务，首次生成请先试听。' : 'eSpeak 仅用于机械音预览；正式配音可在服务设置中切换 IndexTTS。';
+  $('#tts-discover').disabled = discoveringVoices;
+  $('#tts-voices').replaceChildren();
+  $('#speech-voice').setAttribute('list', c.backend === 'indextts' ? 'tts-voices' : 'speech-voices');
   drawSpeech();
 }
 async function loadTTSSettings() {
   applyTTSSettings(await api('/api/speech/settings'));
 }
+function ttsDraft() {
+  return {
+    backend: $('#tts-backend').value, url: $('#tts-url').value.trim(), model: $('#tts-model').value.trim(),
+    voice: $('#tts-voice').value.trim(), language: $('#tts-language').value, timeoutSeconds: Number($('#tts-timeout').value),
+    apiKey: $('#tts-key').value, clearApiKey: $('#tts-clear-key').checked
+  };
+}
+$('#tts-url').addEventListener('input', () => $('#tts-voices').replaceChildren());
+$('#tts-discover').onclick = action(async () => {
+  if (discoveringVoices) return;
+  discoveringVoices = true; $('#tts-discover').disabled = true;
+  const draft = ttsDraft(), url = draft.url;
+  $('#tts-voices').replaceChildren();
+  $('#tts-settings-state').textContent = '读取音色列表中…';
+  try {
+    const catalog = await api('/api/speech/voices', ttsSettings?.managedByEnvironment ? undefined : draft);
+    if ($('#tts-url').value.trim() !== url) return;
+    for (const voice of catalog.voices) {
+      const option = el('option'); option.value = voice; $('#tts-voices').append(option);
+    }
+    $('#tts-settings-state').textContent = catalog.supported
+      ? (catalog.voices.length ? `已读取 ${catalog.voices.length} 个音色，请在音色输入框选择。` : '服务音色列表为空，请先在服务端注册音色。')
+      : catalog.message;
+  } catch (e) { $('#tts-settings-state').textContent = e.message; throw e; }
+  finally { discoveringVoices = false; $('#tts-discover').disabled = false; }
+});
 $('#speech-backend').onchange = () => updateSpeechOptions(true);
 $('#tts-save').onclick = action(async () => {
   if (savingTTS) return;
   savingTTS = true; $('#tts-save').disabled = true; drawSpeech();
   try {
-    const c = await api('/api/speech/settings', {
-      backend: $('#tts-backend').value, url: $('#tts-url').value.trim(), model: $('#tts-model').value.trim(),
-      voice: $('#tts-voice').value.trim(), language: $('#tts-language').value, timeoutSeconds: Number($('#tts-timeout').value),
-      apiKey: $('#tts-key').value, clearApiKey: $('#tts-clear-key').checked
-    }, 'PUT');
+    const c = await api('/api/speech/settings', ttsDraft(), 'PUT');
     applyTTSSettings(c); toast('配音设置已保存。');
   } finally { savingTTS = false; $('#tts-save').disabled = !!ttsSettings?.managedByEnvironment; drawSpeech(); }
 });
@@ -1340,12 +1375,16 @@ $('#speech-start').onclick = action(async()=>{
   if (!project || startingSpeech) return;
   const gen = epoch, pid = project.id, voice = $('#speech-voice').value.trim(), backend = $('#speech-backend').value;
   const options = backend === 'indextts' ? {speed:Number($('#speech-speed').value),language:$('#speech-language').value} : {rate:Number($('#speech-rate').value)};
+  let body = speechSubmission.read(pid);
   startingSpeech = true; drawSpeech();
   try {
-    await save();
-    if (gen !== epoch || dirty) throw new Error('项目仍有新编辑，请保存后重试');
-    await api('/api/projects/' + pid + '/speech',{revision:project.revision, requestId:id(), voice, backend, ...options});
-    if (gen === epoch) {toast('配音任务已创建，完成后可试听并采用。');await poll();}
+    if (!body) {
+      await save();
+      if (gen !== epoch || dirty) throw new Error('项目仍有新编辑，请保存后重试');
+      body = {revision:project.revision, requestId:id(), voice, backend, ...options};
+    }
+    await speechSubmission.submit(pid, body, request => api('/api/projects/' + pid + '/speech', request, 'POST', 30000));
+    if (gen === epoch) {toast('配音任务已确认，完成后可试听并采用。');await poll();}
   } finally { startingSpeech = false; drawSpeech(); }
 });
 

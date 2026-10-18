@@ -1,8 +1,10 @@
-# 升级到 v0.8.0
+# 升级到 v0.8.1
+
+从 v0.8.0 升级无需重新部署 IndexTTS，也无需重填已保存的服务配置。本次主要增加音色列表、提交恢复与只读自检；可先运行 `bin/video-app speech-doctor --data ./data`，再用两句短稿试听。
 
 1. 停止 Video App，备份整个 data（或 `/data` 挂载源）。保留 access-token、config.json、项目、RunDesk 回执和素材。
-2. 替换本包程序/页面；Docker 用户保留原 `VIDEO_HOST_DATA` 等设置，将 `docker/.env` 的 `VIDEO_IMAGE` 改为 `rundesk-video-app:0.8.0`，使用新版 compose 执行 `bash scripts/docker.sh build`，再执行 `bash scripts/docker.sh up`。
-3. 浏览器刷新，版本应为 0.8.0。“自动配音 → 配音服务设置”连接已有 IndexTTS，见 [INDEXTTS](INDEXTTS.md)。旧配置默认使用 eSpeak，不会自动切换音色或改写旧配音。
+2. 替换本包程序/页面；Docker 用户保留原 `VIDEO_HOST_DATA` 等设置，将 `docker/.env` 的 `VIDEO_IMAGE` 改为 `rundesk-video-app:0.8.1`，使用新版 compose 执行 `bash scripts/docker.sh build`，再执行 `bash scripts/docker.sh up`。
+3. 浏览器刷新，版本应为 0.8.1。“自动配音 → 配音服务设置”连接已有 IndexTTS，见 [INDEXTTS](INDEXTTS.md)。旧配置默认使用 eSpeak，不会自动切换音色或改写旧配音。
 4. 新配置保存在 `data/speech-config.json`，其中可能包含 TTS API Key，备份时一并保护。配置在容器重建后保留；使用非空 VIDEO_TTS_* 环境变量时，页面显示由环境管理。
 5. 若通过 Codex 生成配音，在当前 RunDesk 实例更新项目工具/业务 Skill（保持自定义设置；手动安装的容器 Skill 可按差异更新配音段落）。HTTP MCP 仍为同一个入口、10 个工具，只增加可选参数。
 6. 创建两句测试稿 → 检查环境 → 生成 → 试听 → 采用 → 渲染。此版不包含或重装你的 IndexTTS 模型；RunDesk 0.48.0+ 与 news2douyin 的现有兼容版本可继续使用。

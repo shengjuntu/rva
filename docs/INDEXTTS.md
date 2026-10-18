@@ -26,6 +26,8 @@
 | 每段超时 | 180 秒；首次加载慢可调大，范围 10–900 |
 | API Key | 服务要求的 Bearer Token；无认证时留空 |
 
+填好地址和 API Key 后，可先点击“读取可用音色”，在默认音色输入框选择服务返回的 ID，再保存。此操作不修改配置，也不生成音频；服务未提供列表时仍可手动填写。环境变量管理时按钮读取已配置服务。
+
 保存后点击“检查配音环境”。检查会访问同一服务的 `/v1/models` 并确认模型名，且检查本地 FFmpeg/FFprobe。它不运行模型或测试音色；服务没有模型列表接口会显示“无法自动确认”，仍允许启动短句合成。
 
 语言控制朗读，不负责翻译。英文新闻要生成中文声音，先将分镜正文写成中文，再选择中文。`zhen` 是 vLLM-Omni 的额外混合文本模式；随包原生适配器仅接受 `zh/en/ja/es/ar`，中文夹少量英文可先使用 `zh` 试听。
@@ -98,9 +100,10 @@ App 单段超时默认 180 秒，不跟随重定向，不把服务响应正文�
 2. 检查任务后端为 IndexTTS、模型/语言/语速正确，试听 WAV，检查漏字、重字、多音字和段落连接。
 3. 下载 SRT/清单。字幕时间来自每段实测音频长度，目前没有 ASR 校验或逐字对齐。
 4. 采用配音与字幕，核对各镜头实测时长，再渲染成片。
-5. 修改一段稿件后旧结果不可直接采用；新建任务会重新合成本任务全部段落，目前没有跨任务片段缓存。相同 requestId 的原样重试会复用回执，不重复合成。
+5. 若提交后网络断开或等待超过 30 秒，点击“确认上次配音请求”。当前标签页刷新后仍沿用原请求和参数；先确认原任务，再新建任务。合成段落超时仍按服务配置，和提交响应的 30 秒不是同一计时。
+6. 修改一段稿件后旧结果不可直接采用；新建任务会重新合成本任务全部段落，目前没有跨任务片段缓存。相同 requestId 的原样重试会复用回执，不重复合成。
 
-本发行环境没有连接你的 GPU 服务，也未对真实 IndexTTS 音质、吞吐或显存进行验收，详见 [VALIDATION-0.8](VALIDATION-0.8.md)。
+本发行环境没有连接你的 GPU 服务，也未对真实 IndexTTS 音质、吞吐或显存进行验收，详见 [VALIDATION-0.8.1](VALIDATION-0.8.1.md)。
 
 ## 六、环境变量方式
 
@@ -119,3 +122,24 @@ VIDEO_TTS_API_KEY=
 任一 VIDEO_TTS_* 非空时，环境变量覆盖已保存配置对应字段，整个设置页只读；其他字段沿用已保存值或默认值。要恢复页面管理，移除这些非空环境变量并重启。环境变量中的值不写回 `speech-config.json`。
 
 协议依据：[官方 IndexTTS 仓库](https://github.com/index-tts/index-tts)、[官方 vLLM-Omni 接入说明](https://recipes.vllm.ai/IndexTeam/IndexTTS-2.5)。
+
+## 七、命令行联调检查（v0.8.1）
+
+在 **Video App 所在机器或容器**运行；从浏览器电脑执行不能代表容器网络可达。
+
+```bash
+# 使用保存的设置；与启动 App 一样继承 VIDEO_TTS_* 环境变量
+bin/video-app speech-doctor --data ./data
+
+# 输出诊断报告供排查
+bin/video-app speech-doctor --data ./data > speech-doctor.json
+
+# 随包 Docker 已启动时（在 docker 目录执行）
+docker compose exec -T video-app /opt/video-app/bin/video-app speech-doctor --data /data
+```
+
+输出 JSON：`ready` 为基础检查结果，`checks` 给出配置、FFmpeg、FFprobe、模型和音色检查项，`voices` 列出可选 ID。退出码 0 表示基础检查通过，1 表示检查失败或模型接口无法确认，2 表示参数用法有误。音色列表不受支持时标记 `unknown`，不单独阻止基础检查通过；仍需实际短句试听。
+
+检查只读取配置，不创建项目、不写 App 数据、不调用语音合成，也不在输出中包含 API Key。`synthesisTested` 始终为 false，不能将 `ready:true` 当成真实音质或 GPU 验收。若默认音色不在服务公开列表，诊断会提示核对；服务列表不完整时可在 UI 手动填写并短句验证。
+
+音色列表协议依据：[vLLM-Omni Speech API](https://docs.vllm.ai/projects/vllm-omni/en/stable/serving/speech_api/#voices-endpoint)。随包原生适配器使用同样的 `voices` 数组。

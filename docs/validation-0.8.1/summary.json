@@ -1,0 +1,41 @@
+{
+  "version": "0.8.1",
+  "date": "2026-10-13",
+  "go": {
+    "passed": 105,
+    "topLevelPassed": 46,
+    "failed": 0,
+    "skipped": [
+      "TestSpeechSnapshotGenerationAndAdoption"
+    ],
+    "race": true
+  },
+  "node": {
+    "passed": 5,
+    "failed": 0
+  },
+  "python": {
+    "passed": 4,
+    "failed": 0,
+    "engine": "fake"
+  },
+  "shellSyntax": [
+    "scripts/setup-renderer.sh",
+    "scripts/build.sh",
+    "scripts/start.sh",
+    "scripts/docker.sh",
+    "docker/entrypoint.sh"
+  ],
+  "builds": [
+    "linux-amd64",
+    "windows-amd64"
+  ],
+  "limits": [
+    "No user GPU / real IndexTTS synthesis",
+    "No browser visual or interaction acceptance",
+    "No Docker build/run",
+    "No Windows runtime",
+    "No real eSpeak installed",
+    "No new complete HyperFrames render"
+  ]
+}
