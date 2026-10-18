@@ -1,0 +1,13 @@
+{
+  "version": "0.8.0",
+  "date": "2026-10-13",
+  "goTopLevelPassed": 42,
+  "goWithSubtestsPassed": 88,
+  "goSkipped": 1,
+  "goFailed": 0,
+  "pythonTestsPassed": 4,
+  "realIndexTTSModelTested": false,
+  "dockerBuilt": false,
+  "browserTested": false,
+  "windowsRun": false
+}

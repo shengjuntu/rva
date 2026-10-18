@@ -28,7 +28,7 @@ import (
 	"time"
 )
 
-const version = "0.7.0"
+const version = "0.8.0"
 
 //go:embed web/*
 var ui embed.FS
@@ -97,6 +97,8 @@ type Config struct {
 	InstanceID       string `json:"instanceId"`
 }
 type App struct {
+	tts                                                      SpeechConfig
+	ttsManaged                                               bool
 	espeak                                                   string
 	speechJobs                                               map[string]context.CancelFunc
 	mu                                                       sync.Mutex
@@ -184,6 +186,9 @@ func newApp(data string) (*App, error) {
 		return nil, e
 	}
 	a := &App{data: d, projects: map[string]*Project{}, jobs: map[string]context.CancelFunc{}, speechJobs: map[string]context.CancelFunc{}, client: &http.Client{Timeout: 25 * time.Second, CheckRedirect: func(r *http.Request, via []*http.Request) error { return http.ErrUseLastResponse }}}
+	if e = a.loadSpeechConfig(); e != nil {
+		return nil, e
+	}
 	b, _ := os.ReadFile(filepath.Join(d, "config.json"))
 	_ = json.Unmarshal(b, &a.cfg)
 	entries, _ := os.ReadDir(filepath.Join(d, "projects"))
@@ -350,6 +355,8 @@ func (a *App) routes() http.Handler {
 	m.HandleFunc("GET /api/runtime", a.runtimeStatus)
 	m.HandleFunc("POST /api/runtime/prepare", a.runtimePrepare)
 	m.HandleFunc("GET /api/speech/capabilities", a.speechCapabilities)
+	m.HandleFunc("GET /api/speech/settings", a.speechSettings)
+	m.HandleFunc("PUT /api/speech/settings", a.saveSpeechSettings)
 	m.HandleFunc("POST /api/projects/{id}/speech", a.startSpeech)
 	m.HandleFunc("POST /api/projects/{id}/speech/{sid}/stop", a.stopSpeech)
 	m.HandleFunc("POST /api/projects/{id}/speech/{sid}/adopt", a.adoptSpeech)
@@ -635,6 +642,9 @@ func serve(opts serverOptions) error {
 		return e
 	}
 	if a.espeak, e = absoluteOrEmpty(opts.ESpeak); e != nil {
+		return e
+	}
+	if e = a.speechEnvironment(); e != nil {
 		return e
 	}
 	a.public = "http://" + opts.Listen

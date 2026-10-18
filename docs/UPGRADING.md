@@ -1,3 +1,17 @@
+# 升级到 v0.8.0
+
+1. 停止 Video App，备份整个 data（或 `/data` 挂载源）。保留 access-token、config.json、项目、RunDesk 回执和素材。
+2. 替换本包程序/页面；Docker 用户保留原 `VIDEO_HOST_DATA` 等设置，将 `docker/.env` 的 `VIDEO_IMAGE` 改为 `rundesk-video-app:0.8.0`，使用新版 compose 执行 `bash scripts/docker.sh build`，再执行 `bash scripts/docker.sh up`。
+3. 浏览器刷新，版本应为 0.8.0。“自动配音 → 配音服务设置”连接已有 IndexTTS，见 [INDEXTTS](INDEXTTS.md)。旧配置默认使用 eSpeak，不会自动切换音色或改写旧配音。
+4. 新配置保存在 `data/speech-config.json`，其中可能包含 TTS API Key，备份时一并保护。配置在容器重建后保留；使用非空 VIDEO_TTS_* 环境变量时，页面显示由环境管理。
+5. 若通过 Codex 生成配音，在当前 RunDesk 实例更新项目工具/业务 Skill（保持自定义设置；手动安装的容器 Skill 可按差异更新配音段落）。HTTP MCP 仍为同一个入口、10 个工具，只增加可选参数。
+6. 创建两句测试稿 → 检查环境 → 生成 → 试听 → 采用 → 渲染。此版不包含或重装你的 IndexTTS 模型；RunDesk 0.48.0+ 与 news2douyin 的现有兼容版本可继续使用。
+
+旧项目、eSpeak 任务、音轨和成片继续读取；新任务额外记录后端/模型/语言/语速。若降级，恢复升级前完整备份。
+
+---
+以下为历史升级说明。
+
 # 升级到 v0.7.0
 
 配套 RunDesk 0.48.0+，推荐 0.48.1。停止旧 App，备份完整 data，替换二进制或构建新镜像，沿用原数据目录、RunDesk URL、Token 与安装身份。Docker 配置和步骤见 [DOCKER](DOCKER.md)。

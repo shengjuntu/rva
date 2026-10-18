@@ -727,3 +727,9 @@ dialog p {
 .speech-options label { flex:1; min-width:160px; }
 .speech-job { border-top:1px solid #dbe5df; margin-top:14px; padding-top:14px; }
 .speech-job audio { display:block; max-width:100%; height:38px; }
+
+/* Speech controls can be hidden despite flex label rules. */
+.speech-options [hidden] { display: none !important; }
+#tts-settings { margin: 12px 0; }
+#tts-settings summary { cursor: pointer; }
+#tts-url { min-width: 280px; }

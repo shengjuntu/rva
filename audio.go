@@ -129,7 +129,7 @@ func rendererEnvironment() []string {
 	for _, s := range os.Environ() {
 		key, _, _ := strings.Cut(s, "=")
 		switch key {
-		case "VIDEO_APP_TOKEN", "RUNDESK_TOKEN", "HYPERFRAMES_NO_TELEMETRY", "DO_NOT_TRACK":
+		case "VIDEO_APP_TOKEN", "RUNDESK_TOKEN", "VIDEO_TTS_API_KEY", "HYPERFRAMES_NO_TELEMETRY", "DO_NOT_TRACK":
 			continue
 		}
 		env = append(env, s)

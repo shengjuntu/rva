@@ -1,3 +1,10 @@
+# v0.8.0 — IndexTTS-2.5 配音
+
+- 增加 IndexTTS 语音 HTTP 客户端、持久配置页、服务诊断、语言/音色/语速和环境变量入口。
+- 增加复用官方 Python 模型的服务适配脚本，与 vLLM-Omni `/v1/audio/speech` 调用形状一致。
+- 生成继续采用快照/幂等回执/取消/校验/显式采用；22.05k 音频统一转成 24k PCM，并按样本数建立字幕和镜头时长。
+- MCP、业务 Skill、Docker doctor 与升级文档同步；默认保留 eSpeak，配置 IndexTTS 后不要求安装 eSpeak。
+
 # 0.6.0
 
 - 应用主动注册并复用旧实例；连接不覆盖后台配置。

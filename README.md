@@ -1,17 +1,16 @@
-# RunDesk Video App · v0.7.0
+# RunDesk Video App · v0.8.0
 
 独立的视频制作工作台：管理项目、素材、分镜、音轨、字幕、预览配音和成片。通过 RunDesk 调用 Codex，通过 HTTP MCP 让 Agent 读取和更新项目、启动渲染；RunDesk 保留会话、审批和执行轨迹。
 
-推荐配套 **RunDesk 0.48.1**（0.48.0 也有所需运行环境 API）与 **news2douyin 0.15.0**。Go 主程序只使用标准库，WebUI 嵌入二进制；视频渲染使用锁定的 HyperFrames 0.8.87 / GSAP 3.15.0，以及 Chromium、FFmpeg、Noto CJK。eSpeak NG 提供机械预览配音，不是专业 TTS。
+推荐配套 **RunDesk 0.48.1**（0.48.0 也有所需运行环境 API）与 **news2douyin 0.15.0**。Go 主程序只使用标准库，WebUI 嵌入二进制；视频渲染使用锁定的 HyperFrames 0.8.87 / GSAP 3.15.0，以及 Chromium、FFmpeg、Noto CJK。配音可连接已有 IndexTTS-2.5 服务，eSpeak NG 保留为机械预览。App 无需 Python 或 GPU，IndexTTS 在你的现有服务器运行。
 
 ## 本版变化
 
-- 补齐 App/渲染 Dockerfile、Linux Compose、持久数据挂载和统一生命周期脚本；依赖在构建阶段安装，启动不再下载安装。
-- 分离浏览器入口 `VIDEO_APP_PUBLIC_URL` 与 Codex 容器回调 `VIDEO_APP_MCP_URL`。
-- 新任务提交前检查并启动已选 Docker 环境，核对模型认证与 10 个视频 MCP 工具；不构建镜像、不改管理员设置、不消耗模型请求。
-- 更换运行方式后，重连自动更换空会话；已有对话使用“新建当前环境对话”，历史留在 RunDesk。新建操作带原会话校验，重试不重复创建。
-- 前后端工具版本号统一为 0.7.0；数据锁在进程异常退出后由系统释放。
-- 支持 news2douyin 0.15.0 短脚本 ZIP：保留目标语言、证据和最多 4 张图片候选；图片保留出处，先选入分镜再渲染。支持不属于聚类事件的短脚本。
+- 新增 IndexTTS-2.5 HTTP 配音：页面配置服务地址、模型、音色、语言、语速；设置持久保存，API Key 不回传浏览器或写入任务日志。
+- 对接 `/v1/audio/speech` WAV 协议；附复用现有官方模型/环境的轻量 Python 服务入口。详细步骤见 [IndexTTS 接入](docs/INDEXTTS.md)。
+- 保留已有配音任务、进度、取消、试听、采用和真实音频时长字幕；不会静默回退到 eSpeak。新任务记录后端/模型/音色/语言/语速。
+- MCP 配音工具支持 IndexTTS 参数；省略参数使用管理员默认配置。RunDesk 与 news2douyin 无需为此次配音接入升级。
+- 继承 v0.7 的 Docker、RunDesk 运行环境准备、news2douyin 素材导入与持久数据挂载。
 
 ## Docker 启动（Linux）
 
@@ -27,7 +26,7 @@ bash scripts/docker.sh doctor
 bash scripts/docker.sh smoke
 ```
 
-`build` 构建 `rundesk-video-app:0.7.0`；`up` 只启动已有镜像。`smoke` 创建两秒中文标题与测试音视频，检查实际 MP4。`logs / status / stop` 提供日常运维入口。数据默认保存到 `.state/video`，升级须保留原完整数据目录。
+`build` 构建 `rundesk-video-app:0.8.0`；`up` 只启动已有镜像。`smoke` 创建两秒中文标题与测试音视频，检查实际 MP4。`logs / status / stop` 提供日常运维入口。数据默认保存到 `.state/video`，升级须保留原完整数据目录。
 
 RunDesk 中的 `video-build` 是另一个 **Codex 工具镜像**，通过初始化向导准备一次并选给视频应用。它不包含本 App 的 HyperFrames 渲染服务。首次切换到 Docker，需要为该容器配置视频 MCP/Skill 和 Codex 认证，详见联调文档。
 
@@ -53,13 +52,13 @@ bash scripts/start.sh
 4. 按需要导入/生成配音、采用音轨、核对字幕；发送制作要求或点渲染。
 5. 查看渲染日志与进度，播放成片，检查中文排版、画面、音频和字幕。Agent 完成与视频渲染完成分开记录。
 
-当前固定竖屏 1080×1920、30fps，单镜头 1–60 秒、最多 80 镜头，总长不超过 10 分钟。一次只执行一个渲染。没有接入生成视频模型、专业配音服务或自动逐字校对。
+当前固定竖屏 1080×1920、30fps，单镜头 1–60 秒、最多 80 镜头，总长不超过 10 分钟。一次只执行一个渲染。IndexTTS 合成结果需要试听；字幕是实测句段边界。尚未接入生成视频模型、ASR 自动校对或逐字强制对齐。
 
 ## 文档与验证
 
 - [升级](docs/UPGRADING.md)、[Docker 联调](docs/DOCKER.md)、[架构](docs/ARCHITECTURE.md)
 - [新闻交接](docs/NEWS-HANDOFF.md)、[音轨](docs/AUDIO.md)、[配音](docs/SPEECH.md)、[字幕](docs/SUBTITLES.md)
-- [v0.7 验证结果与未验证项](docs/VALIDATION-0.7.md)
+- [IndexTTS 部署与接入](docs/INDEXTTS.md)、[v0.8 验证结果](docs/VALIDATION-0.8.md)
 - `integrations/video-project/SKILL.md`：可安装到 RunDesk 当前容器环境的业务 Skill。
 - `scripts/integration_rundesk.py`：真实 App/RunDesk HTTP + Docker/Codex 测试替身；不是实际模型或 Docker 验收。
 - `examples/short_script_bundle.zip`：news2douyin 0.15.0 实际导出器生成的协议样例，新闻和图片均为测试数据。

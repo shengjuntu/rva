@@ -163,9 +163,31 @@
           </section>
           <section id="speech-section">
             <div class="section-head"><h2>自动配音</h2><button id="speech-check">检查配音环境</button></div>
-            <p class="muted small">使用本机 eSpeak NG 逐句合成镜头正文；机械音适合流程验证。无正文镜头保留静音。生成后先试听，再采用配音、字幕与实测镜头时长。</p>
-            <p id="speech-environment" class="muted small">需安装 eSpeak NG、FFmpeg 与 FFprobe。</p>
-            <div class="speech-options"><label>语音<select id="speech-voice"><option value="cmn">中文 · cmn</option><option value="en-us">英语 · en-us</option></select></label><label>语速 / 词每分钟<input id="speech-rate" type="number" min="80" max="300" step="10" value="170" /></label><button id="speech-start">生成配音与字幕</button></div>
+            <p class="muted small">连接已部署的 IndexTTS-2.5，或使用 eSpeak 预览。先试听，再采用配音、字幕与实测镜头时长。</p>
+            <details id="tts-settings"><summary>配音服务设置</summary>
+              <p id="tts-settings-state" class="muted small"></p>
+              <div class="speech-options">
+                <label>默认引擎<select id="tts-backend"><option value="indextts">IndexTTS-2.5</option><option value="espeak-ng">eSpeak 预览</option></select></label>
+                <label>语音接口完整地址<input id="tts-url" type="url" placeholder="http://127.0.0.1:8092/v1/audio/speech" autocomplete="off" /></label>
+                <label>模型名<input id="tts-model" value="IndexTeam/IndexTTS-2.5" /></label>
+                <label>默认音色 ID<input id="tts-voice" placeholder="news_zh（在服务端注册的名称）" /></label>
+                <label>默认语言<select id="tts-language"><option value="zh">中文</option><option value="en">英语</option><option value="zhen">中英混合（vLLM）</option><option value="ja">日语</option><option value="es">西班牙语</option><option value="ar">阿拉伯语</option></select></label>
+                <label>每段超时 / 秒<input id="tts-timeout" type="number" min="10" max="900" value="180" /></label>
+                <label>API Key（可选）<input id="tts-key" type="password" autocomplete="new-password" placeholder="留空保留原密钥" /></label>
+                <label><input id="tts-clear-key" type="checkbox" />清除已保存密钥</label>
+                <button id="tts-save">保存配音设置</button>
+              </div>
+              <p class="muted small">填写语音 API 地址，不是 Gradio 网页地址。只有 WebUI 的部署可使用包内 integrations/indextts 服务入口。配置保存在应用数据目录。</p>
+            </details>
+            <p id="speech-environment" class="muted small">加载配音设置中…</p>
+            <div class="speech-options">
+              <label>本次引擎<select id="speech-backend"><option value="indextts">IndexTTS-2.5</option><option value="espeak-ng">eSpeak 预览</option></select></label>
+              <label>音色 ID<input id="speech-voice" value="cmn" list="speech-voices" /><datalist id="speech-voices"><option value="cmn"></option><option value="en-us"></option></datalist></label>
+              <label id="speech-rate-field">语速 / 词每分钟<input id="speech-rate" type="number" min="80" max="300" step="10" value="170" /></label>
+              <label id="speech-speed-field">语速倍率<input id="speech-speed" type="number" min="0.5" max="2" step="0.05" value="1" /></label>
+              <label id="speech-language-field">朗读语言<select id="speech-language"><option value="zh">中文</option><option value="en">英语</option><option value="zhen">中英混合（vLLM）</option><option value="ja">日语</option><option value="es">西班牙语</option><option value="ar">阿拉伯语</option></select></label>
+              <button id="speech-start">生成配音与字幕</button>
+            </div>
             <p id="speech-state" role="status" class="muted small"></p>
             <div id="speech-jobs"></div>
           </section>

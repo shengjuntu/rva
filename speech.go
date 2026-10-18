@@ -13,7 +13,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -23,31 +22,42 @@ import (
 const speechSampleRate = 24000
 
 type SpeechJob struct {
-	ID         string              `json:"id"`
-	RequestID  string              `json:"requestId"`
-	Revision   int                 `json:"revision"`
-	State      string              `json:"state"`
-	Created    string              `json:"created"`
-	Voice      string              `json:"voice"`
-	Rate       int                 `json:"rate"`
-	ScriptHash string              `json:"scriptHash"`
-	Progress   int                 `json:"progress"`
-	Total      int                 `json:"total"`
-	Duration   float64             `json:"duration"`
-	Error      string              `json:"error,omitempty"`
-	Files      map[string]NewsFile `json:"files,omitempty"`
+	Backend     string              `json:"backend,omitempty"`
+	Model       string              `json:"model,omitempty"`
+	Language    string              `json:"language,omitempty"`
+	Speed       float64             `json:"speed,omitempty"`
+	RequestHash string              `json:"requestHash,omitempty"`
+	ID          string              `json:"id"`
+	RequestID   string              `json:"requestId"`
+	Revision    int                 `json:"revision"`
+	State       string              `json:"state"`
+	Created     string              `json:"created"`
+	Voice       string              `json:"voice"`
+	Rate        int                 `json:"rate"`
+	ScriptHash  string              `json:"scriptHash"`
+	Progress    int                 `json:"progress"`
+	Total       int                 `json:"total"`
+	Duration    float64             `json:"duration"`
+	Error       string              `json:"error,omitempty"`
+	Files       map[string]NewsFile `json:"files,omitempty"`
 }
 type SpeechRequest struct {
-	Revision  int    `json:"revision"`
-	RequestID string `json:"requestId"`
-	Voice     string `json:"voice"`
-	Rate      int    `json:"rate"`
+	Backend   string  `json:"backend,omitempty"`
+	Language  string  `json:"language,omitempty"`
+	Speed     float64 `json:"speed,omitempty"`
+	Revision  int     `json:"revision"`
+	RequestID string  `json:"requestId"`
+	Voice     string  `json:"voice"`
+	Rate      int     `json:"rate"`
 }
 type SpeechShot struct {
 	ID       string  `json:"id"`
 	Duration float64 `json:"duration"`
 }
 type SpeechManifest struct {
+	Model      string        `json:"model,omitempty"`
+	Language   string        `json:"language,omitempty"`
+	Speed      float64       `json:"speed,omitempty"`
 	Schema     int           `json:"schemaVersion"`
 	JobID      string        `json:"jobId"`
 	ScriptHash string        `json:"scriptHash"`
@@ -110,10 +120,43 @@ func (a *App) speechExecutable() (string, error) {
 	return exec.LookPath(name)
 }
 func (a *App) speechCapabilities(w http.ResponseWriter, r *http.Request) {
+	c := a.speechConfig()
 	path, e := a.speechExecutable()
 	_, fe := exec.LookPath("ffmpeg")
 	_, pe := exec.LookPath("ffprobe")
-	writeJSON(w, 200, map[string]any{"backend": "espeak-ng", "ready": e == nil && fe == nil && pe == nil, "executable": path, "espeakReady": e == nil, "ffmpegReady": fe == nil, "ffprobeReady": pe == nil, "offline": true, "quality": "mechanical_preview", "voices": []string{"cmn", "en-us"}, "rateMin": 80, "rateMax": 300})
+	backend := r.URL.Query().Get("backend")
+	if backend == "" {
+		backend = c.Backend
+	}
+	result := map[string]any{"backend": backend, "ready": false, "executable": path, "espeakReady": e == nil, "ffmpegReady": fe == nil, "ffprobeReady": pe == nil, "rateMin": 80, "rateMax": 300, "speedMin": .5, "speedMax": 2}
+	switch backend {
+	case "espeak-ng":
+		result["ready"] = e == nil && fe == nil && pe == nil
+		result["offline"] = true
+		result["quality"] = "mechanical_preview"
+		result["voices"] = []string{"cmn", "en-us"}
+	case "indextts":
+		c.Backend = backend
+		result["model"] = c.Model
+		result["voice"] = c.Voice
+		result["language"] = c.Language
+		result["quality"] = "neural_tts"
+		result["configured"] = validateSpeechConfig(c) == nil
+		if e := validateSpeechConfig(c); e != nil {
+			result["error"] = e.Error()
+		} else {
+			state, err := probeIndexTTS(r.Context(), c)
+			result["probe"] = state
+			result["ready"] = err == nil && fe == nil && pe == nil
+			if err != nil {
+				result["error"] = err.Error()
+			}
+		}
+	default:
+		fail(w, 400, errors.New("未知配音后端"))
+		return
+	}
+	writeJSON(w, 200, result)
 }
 func (a *App) speechDir(pid, sid string) string { return filepath.Join(a.dir(pid), "speech", sid) }
 func findSpeech(p Project, sid string) (SpeechJob, error) {
@@ -129,16 +172,8 @@ func (a *App) startSpeech(w http.ResponseWriter, r *http.Request) {
 	if !decode(w, r, &in) {
 		return
 	}
-	if in.Voice == "" {
-		in.Voice = "cmn"
-	}
-	if in.Rate == 0 {
-		in.Rate = 170
-	}
-	if !identifier.MatchString(in.RequestID) || !regexp.MustCompile(`^[A-Za-z][A-Za-z0-9_+\-]{0,59}$`).MatchString(in.Voice) || in.Rate < 80 || in.Rate > 300 {
-		fail(w, 400, errors.New("需要 24 位十六进制 requestId、合法 voice 和 80–300 语速"))
-		return
-	}
+	requestBytes, _ := json.Marshal(in)
+	requestHash := hashBytes(requestBytes)
 	a.mu.Lock()
 	defer a.mu.Unlock()
 	p := a.projects[r.PathValue("id")]
@@ -148,13 +183,23 @@ func (a *App) startSpeech(w http.ResponseWriter, r *http.Request) {
 	}
 	for _, old := range p.Speech {
 		if old.RequestID == in.RequestID {
-			if old.Revision != in.Revision || old.Voice != in.Voice || old.Rate != in.Rate {
+			matches := old.RequestHash == requestHash
+			if old.RequestHash == "" {
+				legacy := in
+				matches = legacy.normalize(defaultSpeechConfig()) == nil && legacy.Backend == "espeak-ng" && old.Revision == legacy.Revision && old.Voice == legacy.Voice && old.Rate == legacy.Rate
+			}
+			if !matches {
 				fail(w, 409, errors.New("同一 requestId 不能用于不同配音请求"))
 				return
 			}
 			writeJSON(w, 200, old)
 			return
 		}
+	}
+	cfg := a.tts
+	if e := in.normalize(cfg); e != nil {
+		fail(w, 400, e)
+		return
 	}
 	if a.closing {
 		fail(w, 503, errors.New("服务正在停止"))
@@ -180,10 +225,20 @@ func (a *App) startSpeech(w http.ResponseWriter, r *http.Request) {
 		fail(w, 422, errors.New("配音正文需能拆分为 1–300 段"))
 		return
 	}
-	executable, e := a.speechExecutable()
-	if e != nil {
-		fail(w, 409, errors.New("请安装本机 eSpeak NG 或设置 --espeak 路径"))
-		return
+	executable := ""
+	var e error
+	if in.Backend == "espeak-ng" {
+		executable, e = a.speechExecutable()
+		if e != nil {
+			fail(w, 409, errors.New("请安装本机 eSpeak NG 或设置 --espeak 路径"))
+			return
+		}
+	} else {
+		cfg.Backend = "indextts"
+		if e = validateSpeechConfig(cfg); e != nil {
+			fail(w, 409, e)
+			return
+		}
 	}
 	for _, n := range []string{"ffmpeg", "ffprobe"} {
 		if _, e = exec.LookPath(n); e != nil {
@@ -191,7 +246,10 @@ func (a *App) startSpeech(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	job := SpeechJob{ID: uid(), RequestID: in.RequestID, Revision: p.Revision, State: "running", Created: time.Now().UTC().Format(time.RFC3339Nano), Voice: in.Voice, Rate: in.Rate, ScriptHash: speechScriptHash(*p), Total: total}
+	job := SpeechJob{Backend: in.Backend, Language: in.Language, Speed: in.Speed, RequestHash: requestHash, ID: uid(), RequestID: in.RequestID, Revision: p.Revision, State: "running", Created: time.Now().UTC().Format(time.RFC3339Nano), Voice: in.Voice, Rate: in.Rate, ScriptHash: speechScriptHash(*p), Total: total}
+	if in.Backend == "indextts" {
+		job.Model = cfg.Model
+	}
 	snapshot := clone(p)
 	dir := a.speechDir(p.ID, job.ID)
 	if e = os.MkdirAll(dir, 0700); e != nil {
@@ -214,7 +272,7 @@ func (a *App) startSpeech(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Minute)
 	a.speechJobs[job.ID] = cancel
 	a.wg.Add(1)
-	go func() { defer a.wg.Done(); defer cancel(); a.runSpeech(ctx, snapshot, job, executable) }()
+	go func() { defer a.wg.Done(); defer cancel(); a.runSpeech(ctx, snapshot, job, executable, cfg) }()
 	writeJSON(w, 202, job)
 }
 func (a *App) stopSpeech(w http.ResponseWriter, r *http.Request) {
@@ -257,7 +315,7 @@ func (a *App) speechProgress(pid, sid string, done int) error {
 	a.projects[pid] = &q
 	return nil
 }
-func (a *App) runSpeech(ctx context.Context, p Project, job SpeechJob, executable string) {
+func (a *App) runSpeech(ctx context.Context, p Project, job SpeechJob, executable string, cfg SpeechConfig) {
 	dir := a.speechDir(p.ID, job.ID)
 	f, e := os.OpenFile(filepath.Join(dir, "speech.log"), os.O_CREATE|os.O_WRONLY, 0600)
 	if f != nil {
@@ -266,7 +324,7 @@ func (a *App) runSpeech(ctx context.Context, p Project, job SpeechJob, executabl
 	result := SpeechManifest{}
 	files := map[string]NewsFile{}
 	if e == nil {
-		result, e = a.synthesizeSpeech(ctx, p, job, executable, dir, f)
+		result, e = a.synthesizeSpeech(ctx, p, job, executable, dir, f, cfg)
 	}
 	if e == nil {
 		for _, name := range []string{"narration.wav", "subtitles.srt", "manifest.json", "snapshot.json"} {
@@ -342,8 +400,8 @@ func writeSpeechWAVHeader(f *os.File, samples int64) error {
 	_, e := f.Write(h[:])
 	return e
 }
-func (a *App) synthesizeSpeech(ctx context.Context, p Project, job SpeechJob, executable, dir string, logfile io.Writer) (SpeechManifest, error) {
-	result := SpeechManifest{Schema: 1, JobID: job.ID, ScriptHash: job.ScriptHash, Backend: "espeak-ng", Voice: job.Voice, Rate: job.Rate, Alignment: "synthesized_sentence_durations", Cues: []SubtitleCue{}, Shots: []SpeechShot{}}
+func (a *App) synthesizeSpeech(ctx context.Context, p Project, job SpeechJob, executable, dir string, logfile io.Writer, cfg SpeechConfig) (SpeechManifest, error) {
+	result := SpeechManifest{Schema: 1, JobID: job.ID, ScriptHash: job.ScriptHash, Backend: speechBackend(job.Backend), Model: job.Model, Language: job.Language, Speed: job.Speed, Voice: job.Voice, Rate: job.Rate, Alignment: "synthesized_sentence_durations", Cues: []SubtitleCue{}, Shots: []SpeechShot{}}
 	run := func(name string, args ...string) error {
 		if e := ctx.Err(); e != nil {
 			return e
@@ -384,10 +442,16 @@ func (a *App) synthesizeSpeech(ctx context.Context, p Project, job SpeechJob, ex
 					return result, err
 				}
 			}
-			if e = os.WriteFile(input, []byte(text), 0600); e != nil {
-				return result, e
+			fmt.Fprintf(logfile, "segment=%d backend=%s voice=%s language=%s speed=%g\n", done+1, speechBackend(job.Backend), job.Voice, job.Language, job.Speed)
+			if job.Backend == "indextts" {
+				e = synthesizeIndexTTS(ctx, cfg, job, text, raw)
+			} else {
+				if e = os.WriteFile(input, []byte(text), 0600); e != nil {
+					return result, e
+				}
+				e = run(executable, "-b", "1", "-v", job.Voice, "-s", strconv.Itoa(job.Rate), "-w", raw, "-f", input)
 			}
-			if e = run(executable, "-b", "1", "-v", job.Voice, "-s", strconv.Itoa(job.Rate), "-w", raw, "-f", input); e != nil {
+			if e != nil {
 				return result, e
 			}
 			duration, err := audioDuration(ctx, raw)

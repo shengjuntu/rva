@@ -11,3 +11,6 @@
 - Chrome Headless Shell：由 HyperFrames 准备，遵循其自身分发条款。
 
 锁文件包含传递依赖；详细版权和许可见各安装包。发布包含字体、GSAP 或素材的工程文件时，应一并保留相应许可和素材授权信息。
+
+- [IndexTTS](https://github.com/index-tts/index-tts)：可选外部语音模型与推理实现。本包仅提供自行编写的 HTTP 适配器，不分发模型权重或上游推理源码。模型及原项目遵循其各自许可。
+- [vLLM-Omni IndexTTS-2.5 recipe](https://recipes.vllm.ai/IndexTeam/IndexTTS-2.5)：语音请求协议、语言与语速映射参考。

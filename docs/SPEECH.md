@@ -1,27 +1,14 @@
-# 本机自动配音 · v0.5.0
+# 自动配音 · v0.8.0
 
-本版用独立 eSpeak NG 命令行进程生成预览配音。Go 主程序仍只依赖标准库，配音流程不需要 Python、Node 或模型账号。视频渲染继续使用既有 HyperFrames/Node/Chrome/FFmpeg。机械音适合验证流程；尚未接入神经网络配音、音色克隆、ASR 或逐字强制对齐。
+支持两种后端：连接已有 IndexTTS-2.5 HTTP 服务，或使用本机 eSpeak NG 做机械预览。Go App 仍只依赖标准库；FFmpeg/FFprobe 用于验证、转码和测量音频。IndexTTS 模型不加载到 App 或 Codex 进程。
 
-## 安装与使用
+部署和首次接入见 [INDEXTTS](INDEXTTS.md)。eSpeak 默认在 PATH 查找 `espeak-ng`，也可用 `--espeak` 或启动脚本的 VIDEO_ESPEAK。IndexTTS 模式无需安装 eSpeak。
 
-Ubuntu/Debian 可安装发行版的程序和语音数据：
+## 使用流程
 
-```bash
-sudo apt install espeak-ng ffmpeg
-espeak-ng --version
-espeak-ng --voices=cmn
-```
+保存分镜正文 → 配置服务 → 检查环境 → 选择本次引擎/音色/语速/语言 → 生成 → 试听 → 采用。镜头标题、项目说明不朗读；无正文镜头保留静音。生成只保存独立任务，不改写当前音轨、字幕或镜头。采用后按实际音频调整镜头时长，背景音乐、素材、标题保留。
 
-APP 默认在 PATH 查找 `espeak-ng`。自定义位置可用 `bin/video-app --espeak /absolute/path/espeak-ng`；使用启动脚本时设置 `VIDEO_ESPEAK`。Windows 需自行安装 eSpeak NG 和 FFmpeg，并通过 `--espeak` 指向对应 exe；本版未做 Windows 真机验收。官方安装说明见 [eSpeak NG guide](https://github.com/espeak-ng/espeak-ng/blob/master/docs/guide.md)。工具、字体及语音数据不在本发行包内。
-
-1. 创建或打开项目，保存各镜头的正文；它们就是配音内容，镜头标题和项目说明不朗读。
-2. 在“自动配音”点击环境检查。它检查 eSpeak NG、FFmpeg、FFprobe 可执行文件；完整语音数据和语言支持在实际任务中验证。
-3. 选择中文 `cmn` 或英语 `en-us`，语速 80–300，默认 170（引擎的近似词/分钟参数），点击生成。
-4. 查看任务进度。可以继续编辑，也可以单独取消配音。生成不会替换当前声音、字幕、镜头时长或原始新闻视频。
-5. 完成后试听 WAV，必要时下载 SRT、清单、日志。点击“采用配音与字幕”后，系统才替换当前配音/字幕，并使用该任务测出的逐镜头时长。背景音乐、画面素材、标题、说明保留。
-6. 核对新时长下的音乐起点与画面，生成视频。改写正文后重新配音；旧任务与原成片均保留。
-
-采用需要当前项目 revision，以及与任务一致的镜头 ID、顺序和正文。只修改标题、素材或说明可以采用；拆镜头、换序、改正文则需新任务。多次采用同一任务会复用素材副本。原副本若被外部修改则拒绝采用，需要保留损坏证据并使用新的配音任务，而不会偷偷覆盖文件。
+采用必须使用当前 revision，且镜头 ID、顺序和正文与任务快照一致。旧任务与音频保留，正文修改后拒绝采用旧结果；仅更换画面素材可继续采用。语言是朗读语言，翻译应在正文生成阶段完成。
 
 ## 时间如何得到
 
@@ -35,51 +22,36 @@ APP 默认在 PATH 查找 `espeak-ng`。自定义位置可用 `bin/video-app --e
 
 ## 任务、取消与恢复
 
-- 一次最多运行一个配音任务；可同时有一个独立视频渲染。停止 Agent、取消配音、取消渲染分别控制。
-- 每个项目最多保留 100 个配音任务，每次 1–300 个合成分段。配音不自动排队、重试或断点续跑。
-- 每个合成/转码子进程限时 45 秒，FFprobe 限时 30 秒，整个任务限时 20 分钟。Linux 取消会终止相应进程组；Windows 为直接子进程终止，复杂子进程树仍待实机验证。
-- 运行中的进度和任务状态持久保存；正常退出会取消配音，重启会将未完成任务标为 interrupted。失败/取消后可生成新任务，旧错误及日志保留。
-- 创建任务使用 requestId 幂等键。同一键、相同 revision/voice/rate 返回既有任务；不同参数返回 409。失败后想重新生成应换新 requestId。
-- 任务创建、进度更新和完成不增加编辑 revision；任务采用才增加 revision。生成期间的新编辑不会被后台完成回写覆盖。
-- WAV、SRT、清单和输入快照只有完成后可下载；读取核对 SHA-256 和大小，WAV 支持 Range。日志可在未完成时查看。
+- 全 App 一次运行一个配音任务，可同时有一个视频渲染。每项目最多 100 个配音任务，一次 1–300 段。
+- eSpeak/FFmpeg 子进程单步限时 45 秒；IndexTTS 请求默认每段 180 秒，可配置 10–900 秒；整个任务最多 20 分钟。
+- 取消停止当前 HTTP 请求和后续段落，原生 IndexTTS 已进入 CUDA 的当前段不保证立即停止。App 不采用该结果；不能将取消等同于 GPU 已空闲。
+- 超时、失败、重启会保留记录但不暴露未完成音频。不会自动重试、续跑或回退到另一配音引擎。
+- 创建请求持久记录原始参数哈希。同一 requestId 原样重试返回既有任务，即使配置已改变或服务已重启；同一 ID 配不同参数返回 409。失败后要重新生成需换新 ID。
+- 任务生成、进度和完成不增加编辑 revision；采用结果才增加 revision。生成期间的新编辑不被后台覆盖。
+- 完成产物保留 SHA-256/大小；下载和采用都会校验。manifest 记录后端、模型、音色、语言、语速、逐镜头长度和字幕句段时间；不保存 API Key。
+- 暂无跨任务片段缓存。已有完整结果可反复试听、下载，不能把新建任务当作免费缓存命中。
 
-目录为 `projects/<id>/speech/<speechId>/`，其中保留 `snapshot.json`、`manifest.json`、`narration.wav`、`subtitles.srt`、`speech.log`。采用后在 `workspace/assets/` 有独立 WAV 副本，渲染时还会复制并复核哈希。备份需包含整个 data。突然断电或失败可能留下未完成文件和未引用素材，没有自动垃圾回收；任务状态可防止把它们当成成功产物。
+目录为 `projects/<id>/speech/<speechId>/`，保存 snapshot.json、manifest.json、narration.wav、subtitles.srt、speech.log。采用后生成独立素材副本。备份整个 data，包括 speech-config.json。
 
 ## HTTP 与 MCP
 
-沿用 APP 的令牌、同源和回环 Host 限制。可执行路径只能通过服务启动配置指定，API/Agent 不能传入任意命令或 shell 参数。文本通过本机 UTF-8 文件输入 eSpeak NG，未启用 SSML；子进程剔除 APP/RunDesk 令牌。
+所有接口沿用 App 登录认证。配置 API 供管理员页面使用，不作为 MCP 工具暴露。环境变量配置优先且使设置页只读。
 
-| 接口 | 请求与结果 |
+| 接口 | 约定 |
 | --- | --- |
-| GET /api/speech/capabilities | 后端、工具存在性、默认语音和语速范围 |
-| POST /api/projects/{id}/speech | `{revision,requestId,voice?,rate?}`；新任务 202，原请求重试 200 |
-| POST /api/projects/{id}/speech/{sid}/stop | `{}`；取消该任务 |
-| POST /api/projects/{id}/speech/{sid}/adopt | `{revision}`；核对当前正文/结构后采用，返回 Project |
-| GET /api/projects/{id}/speech/{sid}/files/{file} | WAV、SRT、manifest.json、snapshot.json、speech.log；下载加 `?download` |
-| GET /api/projects/{id} | `speech` 数组包含状态、进度、原 revision、语音、时长及产物哈希 |
+| GET /api/speech/settings | 当前默认配置、hasApiKey、managedByEnvironment；不返回密钥 |
+| PUT /api/speech/settings | backend/url/model/voice/language/timeoutSeconds/apiKey?；空 key 保留原值，clearApiKey=true 清除。更换地址需明确重新填 key 或清除 |
+| GET /api/speech/capabilities?backend=indextts | 模型列表连通性及 FFmpeg/FFprobe 检查；不等于音质验证。不支持 /v1/models 时提示未知，仍可短句合成 |
+| POST /api/projects/{id}/speech | revision、24 位十六进制 requestId；可选 backend/voice/language/speed/rate |
+| POST /api/projects/{id}/speech/{sid}/stop | 取消任务 |
+| POST /api/projects/{id}/speech/{sid}/adopt | 当前 revision，校验快照后采用 |
+| GET /api/projects/{id}/speech/{sid}/files/{file} | WAV/SRT/清单/快照/日志；下载加 ?download |
+| GET /api/projects/{id} | speech 数组包含状态和进度 |
 
-requestId 需为 24 位十六进制串。voice 支持合法的本机 eSpeak 语音名；页面先提供 cmn/en-us 两个预设。普通项目 PUT 不能改写 speech 任务。
+IndexTTS 请求：`{revision,requestId,backend:"indextts",voice:"news_zh",language:"zh",speed:1}`。省略 backend/voice/language 使用管理员默认；speed 默认 1。不要传 eSpeak 的 rate。
 
-MCP 新增 `video_speech_start(projectId,revision,requestId,voice?,rate?)`、`video_speech_stop(projectId,speechId)`、`video_speech_adopt(projectId,speechId,revision)`，共 10 个工具。读任务仍用 `video_project_get`。Skill 要求先保存并读取项目、根据用户指令生成和采用，不能把完成的旧任务直接冒充当前配音。
+eSpeak 请求：`{revision,requestId,backend:"espeak-ng",voice:"cmn",rate:170}`。不要传 IndexTTS 的 speed/language。
 
-## 开发验收
+MCP `video_speech_start` 同样接收这些字段，另需 projectId；停止/采用工具不变，总工具数仍为 10。已有部署只要更新 App 二进制，就能通过省略可选参数使用已配置的 IndexTTS；建议同步更新项目业务 Skill。Agent 不得传任意服务地址、参考录音路径或命令。
 
-```bash
-# 没有该变量时真实 TTS 用例会明确 skip；发布验收需显式设置。
-VIDEO_TEST_ESPEAK=/absolute/path/to/espeak-ng go test -race ./...
-
-# 在已有浏览器/渲染验收中加入自动配音，再实际渲染：
-VIDEO_TEST_ESPEAK=/absolute/path/to/espeak-ng \
-PLAYWRIGHT_MODULE=/absolute/path/to/playwright \
-HYPERFRAMES_BROWSER_PATH=/absolute/path/to/chrome \
-VIDEO_FONT=/absolute/path/to/chinese-font.otf \
-VIDEO_TEST_OUTPUT=/tmp/speech-validation node scripts/smoke-subtitles.cjs
-
-# 真正调用 stdio MCP 生成、采用、取消配音；RunDesk 用隔离 demo：
-python3 scripts/smoke-news.py --app bin/video-app \
-  --rundesk /path/to/rundesk/bin/rundesk \
-  --script examples/script_bundle.zip --video examples/video_bundle.zip \
-  --espeak /absolute/path/to/espeak-ng
-```
-
-本版本验证详情见 [VALIDATION-0.5.md](VALIDATION-0.5.md)。
+正文会发送到管理员指定的 TTS 服务；没有内置云配音回退。API Key 不返回浏览器、任务清单或渲染子进程；返回错误不直接回显上游响应正文。

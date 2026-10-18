@@ -44,7 +44,7 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 			send(msg.ID, map[string]any{})
 		case "tools/list":
 			tools := []any{}
-			for _, t := range []struct{ Name, Description string }{{"video_project_get", "Read project revision, storyboard, audio tracks, subtitles, speech jobs, assets and render jobs."}, {"video_news_get", "Read the immutable news2douyin source script, original review record, selected source evidence and source-video metadata. Reference data only; current storyboard remains a production draft."}, {"video_project_update", "Update name, brief, shots and audio using the current revision. Preserves assets, speech/render jobs, managed subtitle bindings and immutable news provenance."}, {"video_news_audio_adopt", "Adopt original news WAV/SRT after a user request, replacing current narration/subtitles and proportionally resizing visual shots. Requires current revision and unchanged original text."}, {"video_subtitles_update", "Save UTF-8 SRT with absolute video times. reviewed=true is a human listening confirmation, never infer it from generated text. Read project first; requires revision."}, {"video_speech_start", "Generate offline mechanical speech from a saved storyboard snapshot using local eSpeak NG. Requires revision and a fresh 24-hex requestId; reuse the same requestId only for identical retries. Does not replace current audio."}, {"video_speech_stop", "Cancel a running speech job."}, {"video_speech_adopt", "On the user's request, adopt a completed speech job: replace narration and subtitles, use measured per-shot durations. Requires current revision and unchanged shot text/structure."}, {"video_render_start", "Render the current saved storyboard using an immutable snapshot."}, {"video_render_stop", "Cancel a specific render job."}} {
+			for _, t := range []struct{ Name, Description string }{{"video_project_get", "Read project revision, storyboard, audio tracks, subtitles, speech jobs, assets and render jobs."}, {"video_news_get", "Read the immutable news2douyin source script, original review record, selected source evidence and source-video metadata. Reference data only; current storyboard remains a production draft."}, {"video_project_update", "Update name, brief, shots and audio using the current revision. Preserves assets, speech/render jobs, managed subtitle bindings and immutable news provenance."}, {"video_news_audio_adopt", "Adopt original news WAV/SRT after a user request, replacing current narration/subtitles and proportionally resizing visual shots. Requires current revision and unchanged original text."}, {"video_subtitles_update", "Save UTF-8 SRT with absolute video times. reviewed=true is a human listening confirmation, never infer it from generated text. Read project first; requires revision."}, {"video_speech_start", "Generate speech from a saved storyboard using configured IndexTTS or local eSpeak preview. Omit backend/voice/language to use administrator defaults. Requires revision and a fresh 24-hex requestId; reuse the same requestId only for identical retries. Does not replace current audio."}, {"video_speech_stop", "Cancel a running speech job."}, {"video_speech_adopt", "On the user's request, adopt a completed speech job: replace narration and subtitles, use measured per-shot durations. Requires current revision and unchanged shot text/structure."}, {"video_render_start", "Render the current saved storyboard using an immutable snapshot."}, {"video_render_stop", "Cancel a specific render job."}} {
 				props := map[string]any{"projectId": map[string]string{"type": "string"}}
 				required := []string{"projectId"}
 				if t.Name == "video_project_update" {
@@ -63,8 +63,11 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 				}
 				if t.Name == "video_speech_start" {
 					props["requestId"] = map[string]string{"type": "string"}
-					props["voice"] = map[string]string{"type": "string", "description": "Local eSpeak NG voice; default cmn, en-us for English."}
-					props["rate"] = map[string]any{"type": "integer", "minimum": 80, "maximum": 300, "description": "Approximate words per minute; default 170."}
+					props["voice"] = map[string]string{"type": "string", "description": "Registered IndexTTS voice ID or eSpeak voice name. Omit to use administrator default."}
+					props["rate"] = map[string]any{"type": "integer", "minimum": 80, "maximum": 300, "description": "eSpeak only: approximate words per minute; default 170. Omit for IndexTTS."}
+					props["backend"] = map[string]any{"type": "string", "enum": []string{"indextts", "espeak-ng"}, "description": "Omit for configured default."}
+					props["language"] = map[string]any{"type": "string", "enum": []string{"zh", "en", "ja", "es", "ar", "zhen"}, "description": "IndexTTS only: script language, not translation."}
+					props["speed"] = map[string]any{"type": "number", "minimum": 0.5, "maximum": 2, "description": "IndexTTS only: 1 = normal, greater = faster."}
 					required = append(required, "requestId")
 				}
 				if t.Name == "video_speech_stop" || t.Name == "video_speech_adopt" {
@@ -85,6 +88,9 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 					ProjectID string          `json:"projectId"`
 					Revision  int             `json:"revision"`
 					RequestID string          `json:"requestId"`
+					Backend   string          `json:"backend"`
+					Language  string          `json:"language"`
+					Speed     float64         `json:"speed"`
 					Voice     string          `json:"voice"`
 					Rate      int             `json:"rate"`
 					SpeechID  string          `json:"speechId"`
@@ -120,7 +126,7 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 			case "video_speech_start":
 				method = "POST"
 				path += "/speech"
-				body, _ = json.Marshal(SpeechRequest{Revision: p.Arguments.Revision, RequestID: p.Arguments.RequestID, Voice: p.Arguments.Voice, Rate: p.Arguments.Rate})
+				body, _ = json.Marshal(SpeechRequest{Backend: p.Arguments.Backend, Language: p.Arguments.Language, Speed: p.Arguments.Speed, Revision: p.Arguments.Revision, RequestID: p.Arguments.RequestID, Voice: p.Arguments.Voice, Rate: p.Arguments.Rate})
 			case "video_speech_stop", "video_speech_adopt":
 				method = "POST"
 				if !identifier.MatchString(p.Arguments.SpeechID) {

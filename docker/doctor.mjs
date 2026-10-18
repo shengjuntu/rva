@@ -9,16 +9,17 @@ if (health) process.exit(0); // Liveness is independent of RunDesk availability.
 const checks = {...env.checks};
 for (const [name,path,args] of [
   ['browser', process.env.HYPERFRAMES_BROWSER_PATH, ['--version']],
-  ['espeak', '/usr/bin/espeak-ng', ['--version']],
 ]) {
   const run = path && existsSync(path) ? spawnSync(path,args,{encoding:'utf8',timeout:10000}) : null;
   checks[name] = {ready:run?.status===0,path,version:run?.stdout?.split('\n')[0]};
 }
 try { accessSync(root,constants.W_OK); checks.data = {ready:true}; } catch { checks.data={ready:false}; }
+const speech = await fetch(`http://127.0.0.1:${port}/api/speech/capabilities`, {headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(12000)}).then(async r=>{if(!r.ok)throw Error('Speech HTTP '+r.status);return r.json()});
+checks.speech = {ready:speech.ready,backend:speech.backend,error:speech.error};
 let runtime;
 if(env.instanceId) {
   const r=await fetch(`http://127.0.0.1:${port}/api/runtime`,{headers:{Authorization:'Bearer '+token},signal:AbortSignal.timeout(10000)});
   runtime=await r.json();
 }
-console.log(JSON.stringify({appVersion:env.version,checks,rundeskReady:env.rundeskReady,rundeskError:env.rundeskError,runtime,renderTested:false,modelTested:false},null,2));
+console.log(JSON.stringify({appVersion:env.version,checks,rundeskReady:env.rundeskReady,rundeskError:env.rundeskError,runtime,speech,renderTested:false,modelTested:false},null,2));
 if(Object.values(checks).some(c=>!c.ready)||!env.rundeskReady) process.exitCode=1;

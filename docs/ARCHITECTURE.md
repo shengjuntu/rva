@@ -1,3 +1,9 @@
+# v0.8 配音服务补充
+
+Video App 直接调用独立 IndexTTS HTTP 服务；RunDesk 负责 Agent 编排和轨迹。服务在任务创建时形成配置快照，进行中的任务不会被设置更改影响；设置页在任务运行时拒绝变更。普通 Agent MCP 不能设置服务 URL、API Key 或任意服务端路径。Go App 保持标准库依赖，Python/GPU 仅属于独立推理服务。
+
+新增 `GET/PUT /api/speech/settings`；`GET /api/speech/capabilities` 可按 backend 检查服务模型列表和媒体工具。任务保留原始请求哈希，配置改变或重启后同一请求仍返回原回执，避免重复生成。详细 HTTP 约定见 [SPEECH](SPEECH.md)，部署见 [INDEXTTS](INDEXTTS.md)。
+
 # v0.7 架构补充（当前约定）
 
 Video App/HyperFrames 在独立渲染容器运行；RunDesk 在宿主机管理 Codex 容器。业务 API 与 HTTP MCP 均由 App 提供。两容器不共享 App 数据；Codex 用 assetId 操作分镜，App 自己读取素材与保存成片。RunDesk 注册应用创建一个工作区供该应用项目使用，项目分别关联会话。项目工作区目录不是 Codex 的 cwd。
@@ -70,7 +76,7 @@ API 使用 `Authorization: Bearer <VIDEO_APP_TOKEN>`，浏览器使用登录 Coo
 - `video_news_audio_adopt(projectId, revision)`
 - `video_subtitles_update(projectId, revision, srt, enabled, reviewed)`
 - `video_project_update(projectId, project)`
-- `video_speech_start(projectId, revision, requestId, voice?, rate?)`
+- `video_speech_start(projectId, revision, requestId, backend?, voice?, language?, speed?, rate?)`
 - `video_speech_stop(projectId, speechId)`
 - `video_speech_adopt(projectId, speechId, revision)`
 - `video_render_start(projectId)`

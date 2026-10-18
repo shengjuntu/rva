@@ -1,6 +1,6 @@
 # Video App 与 RunDesk：视频 Docker 与联调
 
-配套版本：RunDesk 0.48.1、Video App 0.7.0、news2douyin 0.15.0。RunDesk 0.48.0 已具备所需 API，可继续使用；0.48.1 增加入口、说明和通用错误措辞。
+配套版本：RunDesk 0.48.1、Video App 0.8.0、news2douyin 0.15.0。RunDesk 0.48.0 已具备所需 API，可继续使用；0.48.1 增加入口、说明和通用错误措辞。
 
 ## 两个镜像，各准备一次
 
@@ -8,7 +8,7 @@
 |---|---|---|---|
 | RunDesk | Linux 宿主机 | 应用注册、Codex 生命周期、会话、审批、轨迹 | 原 RunDesk data |
 | `rundesk-video-build` | RunDesk 托管 Docker | Codex、FFmpeg/Pillow 工具、视频制作 Skill；通过 `video_project` MCP 操作业务 | RunDesk 工作区、Codex home |
-| `rundesk-video-app:0.7.0` | 独立 Compose 容器 | WebUI、项目、HTTP MCP、HyperFrames 0.8.87、GSAP 3.15.0、Chromium、FFmpeg、Noto CJK、eSpeak NG | 宿主目录挂到 `/data` |
+| `rundesk-video-app:0.8.0` | 独立 Compose 容器 | WebUI、项目、HTTP MCP、HyperFrames 0.8.87、GSAP 3.15.0、Chromium、FFmpeg、Noto CJK、eSpeak NG | 宿主目录挂到 `/data` |
 
 Codex 发起 `video_render_start`，实际渲染由 App 容器执行。不是在 Codex 容器里启动第二个 App；不要向 App 挂载 Docker socket。App 数据与 Codex 工作目录不共用，素材由 App 按 assetId 读取。视频不要求 Exa/Agent-Reach；新闻搜索继续在 news2douyin 研究环境完成，已审核制作包携带素材交接。
 
@@ -16,7 +16,7 @@ Codex 发起 `video_render_start`，实际渲染由 App 容器执行。不是在
 
 1. 停止旧 RunDesk，备份 data；解压源码、`make build`，沿用原 `--data` 启动。不要清空 data 或创建第二份同名应用安装。
 2. 在 RunDesk 初始化/运行环境页选择 `video-build`，填写已安装 Codex 的精确版本，准备镜像一次。可以从已有本地镜像或受信仓库拉取；应用注册和任务开始不触发构建。
-3. 解压 Video App 0.7.0。若从 0.6.0 升级，先停旧 App、备份整个 data，在 Docker 配置中令 `VIDEO_HOST_DATA` 指向该目录。保留 access-token、config.json、rundesk-requests、projects，避免安装身份、会话和回执丢失。
+3. 解压 Video App 0.8.0。若从 0.6.0 升级，先停旧 App、备份整个 data，在 Docker 配置中令 `VIDEO_HOST_DATA` 指向该目录。保留 access-token、config.json、rundesk-requests、projects，避免安装身份、会话和回执丢失。
 4. 执行 App 包的 `bash scripts/docker.sh init`。编辑生成的 `docker/.env`：填 RunDesk Token，核对 UID/GID、数据目录、浏览器入口与 MCP 回调地址。
 5. `bash scripts/docker.sh build` 显式构建渲染镜像；`bash scripts/docker.sh up` 只启动已有镜像。镜像内已安装所有渲染依赖，启动不再执行 npm/apt 或浏览器下载。
 6. `bash scripts/docker.sh token` 获取 App 登录 Token，打开 `http://127.0.0.1:3220`。远程访问需把 `VIDEO_APP_PUBLIC_URL` 改为浏览器可访问地址。
@@ -52,3 +52,9 @@ App Compose 默认 `network_mode: host`，可访问宿主 `127.0.0.1:3210` 的 R
 镜像可由 CI/维护者提前构建并推送到自己的 GHCR/Docker Hub，部署配置引用版本标签或 digest 后拉取即可。当前包没有已发布镜像地址；不要把示例标签当成远程可下载镜像。App 镜像构建上下文采用白名单，不包含 `.env`、data、Token、日志或旧二进制。发布前运行 smoke、记录 digest；同时保留镜像的第三方许可。
 
 Node/Debian 基础标签和 apt 仓库随时间更新；需要字节级复现时传入带 digest 的 `GO_IMAGE`/`NODE_IMAGE` 并使用自己的 apt 快照。npm 依赖使用 package-lock.json + npm ci；镜像记录 runtime-versions.json 和 debian-packages.txt。
+
+## IndexTTS-2.5 配音
+
+Video App 通过 HTTP 连接已有 TTS 服务，镜像不需要 GPU/PyTorch。Linux 默认 `network_mode: host`，同机服务可填 `http://127.0.0.1:8092/v1/audio/speech`；不同服务器使用可达的局域网地址。若自行改成 bridge 网络，127.0.0.1 是 App 容器自身，需配置宿主机网关或服务 DNS。
+
+推荐在 WebUI 保存配音配置到 `/data/speech-config.json`。也可启用 `.env.example` 的 VIDEO_TTS_* 配置，新版 compose 已透传这些变量；任一非空变量会使设置页改为环境管理。API Key 只设置在运行环境，不写入 Dockerfile。`doctor` 检查当前配音后端；`--health` 仍仅用于 App 存活，不因外部 TTS 暂时不可用而重启 App。详细步骤见 [INDEXTTS](INDEXTTS.md)。

@@ -1,5 +1,5 @@
 "use strict";
-const TOOL_VERSION = "0.7.0";
+const TOOL_VERSION = "0.8.0";
 const $ = (s) => document.querySelector(s),
   el = (tag, text, cls) => {
     const n = document.createElement(tag);
@@ -7,6 +7,7 @@ const $ = (s) => document.querySelector(s),
     if (cls) n.className = cls;
     return n;
   };
+let ttsSettings = null, savingTTS = false;
 let captionDraft = null, savePromise = null, speechKey = "", startingSpeech = false;
 let project = null,
   selected = 0,
@@ -882,6 +883,7 @@ window.addEventListener("beforeunload", (e) => {
 async function boot() {
   const list = await listProjects();
   showApp();
+  await loadTTSSettings();
   api("/api/environment")
     .then((e) => {
       $("#open-rundesk").href = e.rundeskURL + (project?.sessionId ? "/?session="+encodeURIComponent(project.sessionId) : "/#application/rundesk-video-app");
@@ -1252,7 +1254,8 @@ function drawSpeech() {
   if (!project) return;
   const jobs = project.speech || [];
   const active = jobs.find(j => ['running','stopping'].includes(j.state));
-  $('#speech-start').disabled = startingSpeech || !!active;
+  $('#speech-start').disabled = startingSpeech || savingTTS || !!active || !ttsSettings;
+  $('#tts-save').disabled = savingTTS || !!active || !!ttsSettings?.managedByEnvironment;
   $('#speech-state').textContent = active ? `配音 ${active.progress}/${active.total} 段 · ${states[active.state] || active.state}` : '生成结果不会自动替换当前音轨。';
   const key = project.id + ':' + JSON.stringify(jobs) + ':' + project.audio?.narration?.assetId;
   if (key === speechKey) return;
@@ -1261,7 +1264,7 @@ function drawSpeech() {
   if (!jobs.length) { box.append(el('p','尚无自动配音任务。','muted small')); return; }
   for (const j of [...jobs].reverse()) {
     const row = el('article',undefined,'speech-job'), head = el('div'), links = el('div',undefined,'row subtitle-actions');
-    head.append(el('strong', `修订 ${j.revision} · ${states[j.state] || j.state} · ${j.voice} / ${j.rate}`));
+    head.append(el('strong', `修订 ${j.revision} · ${states[j.state] || j.state} · ${j.backend === "indextts" ? "IndexTTS / " + j.language + " / " + j.speed + "×" : "eSpeak / " + j.rate} · ${j.voice}`));
     head.append(el('p', `${j.progress}/${j.total} 段` + (j.duration ? ` · ${j.duration.toFixed(3)} 秒` : ''),'muted small'));
     if (j.error) head.append(el('p',j.error,'render-error'));
     const pid = project.id, gen = epoch, base = '/api/projects/' + pid + '/speech/' + j.id;
@@ -1287,18 +1290,61 @@ function drawSpeech() {
     row.append(head,links);box.append(row);
   }
 }
+function updateSpeechOptions(resetVoice = false) {
+  const neural = $('#speech-backend').value === 'indextts';
+  $('#speech-rate-field').hidden = neural;
+  $('#speech-speed-field').hidden = !neural;
+  $('#speech-language-field').hidden = !neural;
+  if (resetVoice) $('#speech-voice').value = neural ? (ttsSettings?.voice || '') : 'cmn';
+}
+function applyTTSSettings(c) {
+  ttsSettings = c;
+  for (const [id, key] of [['backend','backend'],['url','url'],['model','model'],['voice','voice'],['language','language'],['timeout','timeoutSeconds']]) {
+    $('#tts-'+id).value = c[key] ?? '';
+  }
+  $('#tts-key').value = ''; $('#tts-clear-key').checked = false;
+  $('#tts-key').placeholder = c.hasApiKey ? '已保存；留空保持' : '服务无认证时可留空';
+  for (const n of $('#tts-settings').querySelectorAll('input,select,button')) n.disabled = c.managedByEnvironment;
+  $('#tts-settings-state').textContent = c.managedByEnvironment ? '由环境变量管理，修改启动配置后重启生效。' : '保存后立即生效，已有任务和产物保留。';
+  $('#speech-backend').value = c.backend;
+  $('#speech-language').value = c.language;
+  updateSpeechOptions(true);
+  $('#speech-environment').textContent = c.backend === 'indextts' ? '已选择 IndexTTS；点击环境检查验证服务，首次生成请先试听。' : 'eSpeak 仅用于机械音预览；正式配音可在服务设置中切换 IndexTTS。';
+  drawSpeech();
+}
+async function loadTTSSettings() {
+  applyTTSSettings(await api('/api/speech/settings'));
+}
+$('#speech-backend').onchange = () => updateSpeechOptions(true);
+$('#tts-save').onclick = action(async () => {
+  if (savingTTS) return;
+  savingTTS = true; $('#tts-save').disabled = true; drawSpeech();
+  try {
+    const c = await api('/api/speech/settings', {
+      backend: $('#tts-backend').value, url: $('#tts-url').value.trim(), model: $('#tts-model').value.trim(),
+      voice: $('#tts-voice').value.trim(), language: $('#tts-language').value, timeoutSeconds: Number($('#tts-timeout').value),
+      apiKey: $('#tts-key').value, clearApiKey: $('#tts-clear-key').checked
+    }, 'PUT');
+    applyTTSSettings(c); toast('配音设置已保存。');
+  } finally { savingTTS = false; $('#tts-save').disabled = !!ttsSettings?.managedByEnvironment; drawSpeech(); }
+});
 $('#speech-check').onclick = action(async()=>{
-  const c = await api('/api/speech/capabilities');
-  $('#speech-environment').textContent = c.ready ? '本机配音工具已找到；不会上传正文。语音数据可用性在实际合成时检查。' : '尚缺：' + [!c.espeakReady && 'eSpeak NG（可用 --espeak 指定）',!c.ffmpegReady && 'FFmpeg',!c.ffprobeReady && 'FFprobe'].filter(Boolean).join('、');
+  $('#speech-check').disabled = true;
+  try {
+    const c = await api('/api/speech/capabilities?backend='+encodeURIComponent($('#speech-backend').value));
+    const missing = [!c.ffmpegReady && 'FFmpeg', !c.ffprobeReady && 'FFprobe', c.backend === 'espeak-ng' && !c.espeakReady && 'eSpeak NG'].filter(Boolean);
+    $('#speech-environment').textContent = c.ready ? (c.backend === 'indextts' ? 'IndexTTS 模型接口可连接；音色与发音效果需通过实际生成验证。' : '本机预览工具已找到。') : [c.error, missing.length && '尚缺：'+missing.join('、')].filter(Boolean).join('；');
+  } finally { $('#speech-check').disabled = false; }
 });
 $('#speech-start').onclick = action(async()=>{
   if (!project || startingSpeech) return;
-  const gen = epoch, pid = project.id, voice = $('#speech-voice').value, rate = Number($('#speech-rate').value);
+  const gen = epoch, pid = project.id, voice = $('#speech-voice').value.trim(), backend = $('#speech-backend').value;
+  const options = backend === 'indextts' ? {speed:Number($('#speech-speed').value),language:$('#speech-language').value} : {rate:Number($('#speech-rate').value)};
   startingSpeech = true; drawSpeech();
   try {
     await save();
     if (gen !== epoch || dirty) throw new Error('项目仍有新编辑，请保存后重试');
-    await api('/api/projects/' + pid + '/speech',{revision:project.revision, requestId:id(), voice, rate});
+    await api('/api/projects/' + pid + '/speech',{revision:project.revision, requestId:id(), voice, backend, ...options});
     if (gen === epoch) {toast('配音任务已创建，完成后可试听并采用。');await poll();}
   } finally { startingSpeech = false; drawSpeech(); }
 });
