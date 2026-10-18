@@ -27,6 +27,9 @@ func (a *App) assetsList(w http.ResponseWriter, r *http.Request) {
 	views := []map[string]any{}
 	for _, asset := range p.Assets {
 		v := map[string]any{"id": asset.ID, "name": asset.Name, "mime": asset.MIME, "size": asset.Size, "url": "/api/projects/" + p.ID + "/assets/" + asset.ID}
+		if asset.Description != nil {
+			v["description"] = asset.Description
+		}
 		if asset.Source != nil {
 			v["source"] = asset.Source
 		}

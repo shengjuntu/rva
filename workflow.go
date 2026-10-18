@@ -15,7 +15,7 @@ type ProductionWorkflow struct {
 
 var productionSkills = map[string]string{
 	"video-narration": "Save free narration independently of shots. Generate TTS with source=narration, poll the durable job, then materialize its verified audio asset and measured cues. Re-read revision. Do not rewrite supplied facts without instruction. Synthesis cues are chunk boundaries, not word alignment; generated subtitles remain unreviewed.",
-	"video-editing":   "Inspect supplied assets before choosing them. Use stable IDs in editing DSL; choose content freely. Add materialized narration as an explicit audio clip and captions at measured cue times. Validate and save DSL, render a draft, and inspect task results. Avoid unsupported DSL fields. Missing media must be reported; image/video generation is not implemented yet.",
+	"video-editing":   "Inspect supplied assets before choosing them. Save truthful descriptions via video_asset_describe and use video_media_align for lexical candidates; scores are not semantic confidence. Unmatched text needs a deliberate content choice. Use stable IDs in editing DSL; choose content freely. Add materialized narration as an explicit audio clip and captions at measured cue times. Validate and save DSL, render a draft, and inspect task results. Avoid unsupported DSL fields. Missing media must be reported; Image/video generation uses configured http_binary_v1 adapters only.",
 	"video-review":    "Review compiler and render validation, asset coverage, caption box limits and stated factual sources. Report what was actually checked and unresolved listening/visual issues. Never claim human-reviewed captions or final acceptance automatically. Revisions use current project and retain unrelated editing objects.",
 }
 

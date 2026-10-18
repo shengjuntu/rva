@@ -26,12 +26,12 @@ const root=require('path').resolve(__dirname,'..'), testData=fs.mkdtempSync(requ
   if(!preview.result?.content?.some(x=>x.type==='image'))throw Error('MCP preview missing');
   await vm.runInContext('loadCapabilities(false)',ctx);
   if(w.document.querySelectorAll('#capability-list .capability-row').length!==7)throw Error('capability panel incomplete');
-  if(!w.document.querySelector('#capability-list').textContent.includes('未接入'))throw Error('unimplemented generators hidden');
+  if(!w.document.querySelector('#capability-list').textContent.includes('未配置'))throw Error('unimplemented generators hidden');
   const imported={name:'generated-note.txt',data:Buffer.from('素材导入契约测试').toString('base64'),requestId:'b'.repeat(24)};
   const imports=[];for(let i=0;i<2;i++)imports.push(await(await realFetch('/api/projects/'+p.id+'/assets/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(imported)})).json());
   if(imports[0].asset.id!==imports[1].asset.id||imports[0].revision!==imports[1].revision)throw Error('import receipt duplicated');
   const unsupported=await realFetch('/api/projects/'+p.id+'/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'image_generation',revision:imports[1].revision,requestId:'c'.repeat(24)})});
-  if(unsupported.status!==501)throw Error('unsupported generation created a job');
+  if(unsupported.status!==409)throw Error('unsupported generation created a job');
   await vm.runInContext('loadProductionJobs(true)',ctx);
   if(!w.document.querySelector('#production-jobs').textContent.includes('还没有'))throw Error('unexpected placeholder job');
   await vm.runInContext('openProject('+JSON.stringify(p.id)+')',ctx);

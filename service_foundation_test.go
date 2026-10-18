@@ -46,8 +46,11 @@ func TestCapabilityDiscoverySeparatesConfiguredAndProbed(t *testing.T) {
 		t.Fatal("credentials/endpoint leaked")
 	}
 	for _, c := range probed.Capabilities {
-		if c.ID == "image_generation" || c.ID == "video_generation" || c.ID == "text_media_alignment" {
-			if c.Implemented || c.Ready || len(c.Tools) > 0 {
+		if c.ID == "text_media_alignment" && (!c.Implemented || !c.Ready || len(c.Tools) != 2) {
+			t.Fatal("alignment baseline unavailable", c)
+		}
+		if c.ID == "image_generation" || c.ID == "video_generation" {
+			if !c.Implemented || c.Ready || len(c.Tools) != 3 {
 				t.Fatal("advertised unavailable generator", c)
 			}
 		}
@@ -163,7 +166,7 @@ func TestJobRejectsUnavailableAndUnknownOptions(t *testing.T) {
 	a := testApp(t)
 	p, _ := a.create("能力")
 	w := call(a, "POST", "/api/projects/"+p.ID+"/jobs", JobStartRequest{Type: "image_generation", Revision: p.Revision, RequestID: uid()})
-	if w.Code != 501 {
+	if w.Code != 409 {
 		t.Fatal(w.Code)
 	}
 	w = call(a, "POST", "/api/projects/"+p.ID+"/jobs", map[string]any{"type": "render", "revision": p.Revision, "requestId": uid(), "options": map[string]any{"invented": true}})

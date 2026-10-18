@@ -1,5 +1,5 @@
 "use strict";
-const TOOL_VERSION = "0.13.0";
+const TOOL_VERSION = "0.15.0";
 const $ = (s) => document.querySelector(s),
   el = (tag, text, cls) => {
     const n = document.createElement(tag);
@@ -1500,7 +1500,7 @@ $('#folder-files').onchange=action(async()=>{
   $('#folder-files').value='';toast('目录素材已导入');
 });
 
-const capabilityLabels={media:'素材',tts:'配音',image_generation:'图片生成',video_generation:'视频生成',text_media_alignment:'文本与素材对齐',editing:'编辑',rendering:'渲染'};
+const capabilityLabels={media:'素材',tts:'配音',image_generation:'图片生成',video_generation:'视频生成',text_media_alignment:'描述匹配（基线）',editing:'编辑',rendering:'渲染'};
 async function loadCapabilities(probe=false) {
   $('#capability-status').textContent=probe?'正在检查服务…':'正在读取能力…';
   try {

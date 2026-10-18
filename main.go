@@ -28,7 +28,7 @@ import (
 	"time"
 )
 
-const version = "0.13.0"
+const version = "0.15.0"
 
 //go:embed web/*
 var ui embed.FS
@@ -53,14 +53,15 @@ type Shot struct {
 	AssetID      string  `json:"assetId"`
 }
 type Asset struct {
-	ImportRequestID string           `json:"importRequestId,omitempty"`
-	ImportHash      string           `json:"importHash,omitempty"`
-	Source          *NewsImageSource `json:"source,omitempty"`
-	ID              string           `json:"id"`
-	Name            string           `json:"name"`
-	File            string           `json:"file"`
-	Size            int64            `json:"size"`
-	MIME            string           `json:"mime"`
+	Description     *AssetDescription `json:"description,omitempty"`
+	ImportRequestID string            `json:"importRequestId,omitempty"`
+	ImportHash      string            `json:"importHash,omitempty"`
+	Source          *NewsImageSource  `json:"source,omitempty"`
+	ID              string            `json:"id"`
+	Name            string            `json:"name"`
+	File            string            `json:"file"`
+	Size            int64             `json:"size"`
+	MIME            string            `json:"mime"`
 }
 type Render struct {
 	Engine       string  `json:"engine,omitempty"`
@@ -78,6 +79,7 @@ type Render struct {
 	HasAudio     bool    `json:"hasAudio"`
 }
 type Project struct {
+	Generation          []GenerationJob     `json:"generation,omitempty"`
 	Workflow            *ProductionWorkflow `json:"workflow,omitempty"`
 	NarrationText       string              `json:"narrationText,omitempty"`
 	EditActive          bool                `json:"editActive,omitempty"`
@@ -116,6 +118,7 @@ type App struct {
 	tts                                                      SpeechConfig
 	ttsManaged                                               bool
 	espeak                                                   string
+	generationJobs                                           map[string]context.CancelFunc
 	speechJobs                                               map[string]context.CancelFunc
 	mu                                                       sync.Mutex
 	data, rd, token, rdToken, hf, font, gsap, public, mcpURL string
@@ -203,7 +206,7 @@ func newApp(data string) (*App, error) {
 	if e = os.MkdirAll(filepath.Join(d, "projects"), 0700); e != nil {
 		return nil, e
 	}
-	a := &App{data: d, projects: map[string]*Project{}, jobs: map[string]context.CancelFunc{}, speechJobs: map[string]context.CancelFunc{}, client: &http.Client{Timeout: 25 * time.Second, CheckRedirect: func(r *http.Request, via []*http.Request) error { return http.ErrUseLastResponse }}}
+	a := &App{generationJobs: map[string]context.CancelFunc{}, data: d, projects: map[string]*Project{}, jobs: map[string]context.CancelFunc{}, speechJobs: map[string]context.CancelFunc{}, client: &http.Client{Timeout: 25 * time.Second, CheckRedirect: func(r *http.Request, via []*http.Request) error { return http.ErrUseLastResponse }}}
 	if e = a.loadSpeechConfig(); e != nil {
 		return nil, e
 	}
@@ -224,6 +227,12 @@ func newApp(data string) (*App, error) {
 		}
 		if p.ID != entry.Name() {
 			return nil, errors.New("project ID mismatch")
+		}
+		for i := range p.Generation {
+			if p.Generation[i].State == "running" || p.Generation[i].State == "stopping" {
+				p.Generation[i].State = "interrupted"
+				p.Generation[i].Error = "服务重启，远端执行状态未知；不会自动重试"
+			}
 		}
 		for i := range p.Speech {
 			if p.Speech[i].State == "running" || p.Speech[i].State == "stopping" {
@@ -500,6 +509,8 @@ func (a *App) routes() http.Handler {
 	m.HandleFunc("GET /api/environment", a.environment)
 	m.HandleFunc("POST /api/projects/{id}/connect", a.connect)
 	m.HandleFunc("POST /api/projects/{id}/messages", a.message)
+	m.HandleFunc("PUT /api/projects/{id}/assets/{aid}/description", a.assetDescribe)
+	m.HandleFunc("POST /api/projects/{id}/media/align", a.mediaAlign)
 	m.HandleFunc("GET /api/projects/{id}/workflow", a.workflowGet)
 	m.HandleFunc("PUT /api/projects/{id}/workflow", a.workflowSave)
 	m.HandleFunc("POST /api/projects/{id}/draft/instruction", a.draftInstruction)
@@ -770,6 +781,9 @@ func serve(opts serverOptions) error {
 		a.mu.Lock()
 		a.closing = true
 		for _, cancel := range a.jobs {
+			cancel()
+		}
+		for _, cancel := range a.generationJobs {
 			cancel()
 		}
 		for _, cancel := range a.speechJobs {

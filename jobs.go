@@ -36,6 +36,7 @@ type ProductionJob struct {
 	Artifacts      []JobArtifact `json:"artifacts"`
 }
 type JobOptions struct {
+	Prompt   string  `json:"prompt,omitempty"`
 	Source   string  `json:"source,omitempty"`
 	Backend  string  `json:"backend,omitempty"`
 	Voice    string  `json:"voice,omitempty"`
@@ -108,6 +109,9 @@ func renderJobView(pid string, j Render) ProductionJob {
 }
 func projectJobs(p Project) []ProductionJob {
 	jobs := []ProductionJob{}
+	for _, j := range p.Generation {
+		jobs = append(jobs, generationView(p.ID, j))
+	}
 	for _, j := range p.Speech {
 		jobs = append(jobs, speechJobView(p.ID, j))
 	}
@@ -132,7 +136,7 @@ func findJob(p Project, id string) (ProductionJob, error) {
 }
 func validJobID(id string) bool {
 	kind, native, ok := strings.Cut(id, ":")
-	return ok && (kind == "tts" || kind == "render") && identifier.MatchString(native)
+	return ok && (kind == "tts" || kind == "render" || kind == "generation") && identifier.MatchString(native)
 }
 func decodeStrict(w http.ResponseWriter, r *http.Request, v any) bool {
 	r.Body = http.MaxBytesReader(w, r.Body, 2<<20)
@@ -184,14 +188,17 @@ func (a *App) jobStart(w http.ResponseWriter, r *http.Request) {
 	}
 	var native any
 	switch in.Type {
+	case "image_generation", "video_generation":
+		a.startGeneration(w, r, in)
+		return
 	case "tts":
-		if in.Options.Kind != "" {
+		if in.Options.Prompt != "" || in.Options.Kind != "" {
 			fail(w, 400, errors.New("TTS不接受渲染kind"))
 			return
 		}
 		native = SpeechRequest{Source: in.Options.Source, Revision: in.Revision, RequestID: in.RequestID, Backend: in.Options.Backend, Voice: in.Options.Voice, Language: in.Options.Language, Speed: in.Options.Speed, Rate: in.Options.Rate}
 	case "render":
-		if in.Options.Source != "" || in.Options.Backend != "" || in.Options.Voice != "" || in.Options.Language != "" || in.Options.Speed != 0 || in.Options.Rate != 0 {
+		if in.Options.Prompt != "" || in.Options.Source != "" || in.Options.Backend != "" || in.Options.Voice != "" || in.Options.Language != "" || in.Options.Speed != 0 || in.Options.Rate != 0 {
 			fail(w, 400, errors.New("渲染仅接受kind"))
 			return
 		}
@@ -238,6 +245,10 @@ func (a *App) jobCancel(w http.ResponseWriter, r *http.Request) {
 	jid := r.PathValue("jid")
 	if !validJobID(jid) {
 		fail(w, 400, errors.New("jobId格式无效"))
+		return
+	}
+	if strings.HasPrefix(jid, "generation:") {
+		a.cancelGeneration(w, r, strings.TrimPrefix(jid, "generation:"))
 		return
 	}
 	p, e := a.get(r.PathValue("id"))
