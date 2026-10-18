@@ -1,6 +1,6 @@
 # news2douyin → 视频 APP → RunDesk
 
-news2douyin 继续负责新闻、审核稿和证据；本 APP 管制作项目；RunDesk 管 Agent 运行。接入沿用 RunDesk v0.5.4 的既有接口，没有新增或猜测 RunDesk 私有协议。三个服务不共享数据库。
+news2douyin 继续负责新闻、审核稿和证据；本 APP 管制作项目；RunDesk 管 Agent 运行。当前配套 RunDesk 0.48.0+ 的 API v1 与 HTTP MCP。三个服务不共享数据库。
 
 ## 使用步骤
 
@@ -73,3 +73,9 @@ python3 scripts/smoke-news.py \
 ```
 
 该检查实际启动 APP、RunDesk 和 stdio MCP，使用真实媒体，但 RunDesk 的 Agent 响应是演示模拟。不会读取已有 RunDesk 数据或调用付费模型。输出检查项与临时目录，退出时停止服务。
+
+## v0.7 / news2douyin 0.15.0
+
+支持短脚本生成的目标语言字段、无 event_key 的独立研究稿、可选 storyboard.json / evidence_snapshot.json 和最多 4 张已下载图片。所有文件仍逐一验证 manifest SHA256、大小与路径；图片再验证清单与格式，复制到 App 素材库，保留来源和候选标记，不自动指定到分镜。
+
+完整脚本包下载包含原始图片与证据。Agent 从 video_news_get 读取原文/快照，从 video_project_get 读取图片资产 ID 及来源。输出语言保留为 news.outputLanguage；导入不执行翻译或重复搜索。

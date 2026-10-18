@@ -1,0 +1,9 @@
+{
+  "goRace": true,
+  "testsPassed": 37,
+  "failed": false,
+  "newsHandoffPassed": true,
+  "dockerEngineTested": false,
+  "hyperframesRenderTested": false,
+  "modelTested": false
+}

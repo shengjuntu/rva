@@ -1,0 +1,43 @@
+name: rundesk-video
+services:
+  video-app:
+    image: ${VIDEO_IMAGE:-rundesk-video-app:0.7.0}
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    # Linux host network: App can reach the native RunDesk on 127.0.0.1;
+    # RunDesk-managed bridge containers reach App via host.docker.internal.
+    network_mode: host
+    user: "${VIDEO_UID:-1000}:${VIDEO_GID:-1000}"
+    init: true
+    restart: unless-stopped
+    stop_grace_period: 45s
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    shm_size: 1gb
+    tmpfs: ['/tmp:rw,nosuid,nodev,size=1g,mode=1777']
+    cpus: ${VIDEO_CPUS:-4}
+    mem_limit: ${VIDEO_MEMORY:-4g}
+    pids_limit: 512
+    environment:
+      VIDEO_LISTEN: ${VIDEO_LISTEN:-0.0.0.0:3220}
+      VIDEO_APP_PUBLIC_URL: ${VIDEO_APP_PUBLIC_URL:-http://127.0.0.1:3220}
+      VIDEO_APP_MCP_URL: ${VIDEO_APP_MCP_URL:-http://host.docker.internal:3220/api/mcp}
+      RUNDESK_URL: ${RUNDESK_URL:-http://127.0.0.1:3210}
+      RUNDESK_TOKEN: ${RUNDESK_TOKEN:-}
+    volumes:
+      - type: bind
+        source: ${VIDEO_HOST_DATA:-../.state/video}
+        target: /data
+        bind:
+          create_host_path: false
+    healthcheck:
+      test: [CMD, node, /opt/video-app/docker/doctor.mjs, --health]
+      interval: 30s
+      timeout: 10s
+      start_period: 20s
+      retries: 3
+    logging:
+      driver: local
+      options: {max-size: 10m, max-file: '3'}

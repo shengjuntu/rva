@@ -147,7 +147,7 @@ func TestRunDeskConfigurationAndSteer(t *testing.T) {
 		case "/api/v1/instances/" + iid + "/configuration":
 			writeJSON(w, 200, map[string]any{"skills": []any{map[string]any{"name": "video-project", "path": "/instance/video-project/SKILL.md", "sourceScope": "instance", "enabled": true}}})
 		case "/api/v1/sessions/" + sid:
-			writeJSON(w, 200, map[string]string{"runId": "run-1", "turnId": "turn-1"})
+			writeJSON(w, 200, map[string]string{"runId": "run-1", "turnId": "turn-1", "instanceId": iid, "workspaceId": wid, "executionMode": "local"})
 		case "/api/v1/sessions":
 			if r.Method == "GET" {
 				writeJSON(w, 200, []any{})
@@ -157,6 +157,8 @@ func TestRunDeskConfigurationAndSteer(t *testing.T) {
 				t.Error("missing application source")
 			}
 			writeJSON(w, 200, map[string]string{"id": sid})
+		case "/api/v1/applications/rundesk-video-app/runtime":
+			writeJSON(w, 200, map[string]string{"appId": "rundesk-video-app", "instanceId": iid, "workspaceId": wid, "executionMode": "local"})
 		case "/api/v1/applications/rundesk-video-app/connect":
 			defaults := body["defaults"].(map[string]any)
 			mcp := defaults["mcp"].(map[string]any)["video_project"].(map[string]any)
@@ -214,7 +216,7 @@ func TestRunDeskConfigurationAndSteer(t *testing.T) {
 	}
 	before := len(seen)
 	call(a, "POST", "/api/projects/"+p.ID+"/connect", map[string]any{})
-	if len(seen) != before+2 || seen[len(seen)-1] != "POST /api/v1/applications/rundesk-video-app/connect" {
+	if len(seen) != before+4 || seen[len(seen)-1] != "GET /api/v1/applications/rundesk-video-app/runtime" {
 		t.Fatal("connect not idempotent")
 	}
 	a.saveAgent(p.ID, func(q *Project) { q.AgentRunID = "run-1" })

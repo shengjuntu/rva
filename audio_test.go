@@ -76,9 +76,11 @@ func TestStartupFailureReleasesLock(t *testing.T) {
 			if e := serve(opts); e == nil {
 				t.Fatal("expected startup failure")
 			}
-			if _, e := os.Stat(filepath.Join(opts.Data, "server.lock")); !os.IsNotExist(e) {
-				t.Fatal("stale lock", e)
+			unlock, e := lockData(opts.Data)
+			if e != nil {
+				t.Fatal("lock was not released", e)
 			}
+			unlock()
 		})
 	}
 }

@@ -27,6 +27,10 @@ import (
 )
 
 const scriptLimit int64 = 4 << 20
+const scriptBundleLimit int64 = 32 << 20
+
+var newsImagePath = regexp.MustCompile(`^images/[a-f0-9]{64}\.(jpg|jpeg|png|webp)$`)
+
 const videoLimit int64 = 256 << 20
 
 var shaPattern = regexp.MustCompile(`^[a-f0-9]{64}$`)
@@ -36,6 +40,7 @@ type NewsFile struct {
 	Size   int64  `json:"size"`
 }
 type NewsOrigin struct {
+	OutputLanguage string              `json:"outputLanguage,omitempty"`
 	PackageKey     string              `json:"packageKey"`
 	EventKey       string              `json:"eventKey"`
 	ExportKey      string              `json:"exportKey"`
@@ -60,6 +65,7 @@ type NewsVideo struct {
 	Files         map[string]NewsFile `json:"files"`
 }
 type newsManifest struct {
+	OutputLanguage string            `json:"output_language,omitempty"`
 	Schema         int               `json:"schema_version"`
 	Kind           string            `json:"kind"`
 	ExportKey      string            `json:"export_key"`
@@ -89,12 +95,13 @@ type newsManifest struct {
 type newsSnapshot struct {
 	Schema   int `json:"schema_version"`
 	Document struct {
-		Title      string   `json:"title"`
-		Text       string   `json:"script_text"`
-		Target     int      `json:"target_duration_sec"`
-		Visual     string   `json:"visual_notes"`
-		Notes      string   `json:"notes"`
-		SourceKeys []string `json:"source_keys"`
+		OutputLanguage string   `json:"output_language,omitempty"`
+		Title          string   `json:"title"`
+		Text           string   `json:"script_text"`
+		Target         int      `json:"target_duration_sec"`
+		Visual         string   `json:"visual_notes"`
+		Notes          string   `json:"notes"`
+		SourceKeys     []string `json:"source_keys"`
 	} `json:"document"`
 	Sources []map[string]any `json:"sources"`
 }
@@ -116,7 +123,7 @@ func hashBytes(b []byte) string { s := sha256.Sum256(b); return hex.EncodeToStri
 // moving anything into a project. Never invoke an external unzip executable.
 func unpackNews(f multipart.File, size int64, dir, kind string) (newsPackage, error) {
 	out := newsPackage{Dir: dir, Files: map[string]NewsFile{}}
-	limit := scriptLimit
+	limit := scriptBundleLimit
 	names := []string{"manifest.json", "script.txt", "script.json", "revision.json", "sources.json", "assets_manifest.json", "script.md"}
 	if kind == "news2douyin.video" {
 		limit = videoLimit
@@ -133,17 +140,21 @@ func unpackNews(f multipart.File, size int64, dir, kind string) (newsPackage, er
 	for _, n := range names {
 		allowed[n] = true
 	}
-	if len(z.File) != len(names) {
+	if len(z.File) < len(names) || kind == "news2douyin.video" && len(z.File) != len(names) || kind != "news2douyin.video" && len(z.File) > len(names)+6 {
 		return out, errors.New("制作包文件数量不符")
 	}
 	total := uint64(0)
 	seen := map[string]bool{}
 	for _, entry := range z.File {
-		if !allowed[entry.Name] || seen[entry.Name] || !entry.Mode().IsRegular() {
+		optional := kind == "news2douyin.script_package" && (entry.Name == "storyboard.json" || entry.Name == "evidence_snapshot.json" || newsImagePath.MatchString(entry.Name))
+		if (!allowed[entry.Name] && !optional) || seen[entry.Name] || !entry.Mode().IsRegular() {
 			return out, errors.New("制作包含重复、未知或非普通文件")
 		}
 		seen[entry.Name] = true
 		total += entry.UncompressedSize64
+		if kind == "news2douyin.script_package" && entry.UncompressedSize64 > uint64(scriptLimit) {
+			return out, errors.New("制作包单文件超过 4 MiB")
+		}
 		if entry.UncompressedSize64 > uint64(limit) || total > uint64(limit) {
 			return out, errors.New("制作包解压大小超限")
 		}
@@ -153,6 +164,14 @@ func unpackNews(f multipart.File, size int64, dir, kind string) (newsPackage, er
 		}
 		if (strings.HasSuffix(entry.Name, ".json") || strings.HasSuffix(entry.Name, ".srt")) && entry.UncompressedSize64 > uint64(scriptLimit) {
 			return out, errors.New("制作包文字资料过大")
+		}
+		if newsImagePath.MatchString(entry.Name) {
+			if entry.UncompressedSize64 > 4<<20 {
+				return out, errors.New("图片超过 4 MiB")
+			}
+			if e = os.MkdirAll(filepath.Join(dir, "images"), 0700); e != nil {
+				return out, e
+			}
 		}
 		src, err := entry.Open()
 		if err != nil {
@@ -178,6 +197,11 @@ func unpackNews(f multipart.File, size int64, dir, kind string) (newsPackage, er
 		}
 		out.Files[entry.Name] = NewsFile{hex.EncodeToString(h.Sum(nil)), n}
 	}
+	for _, name := range names {
+		if !seen[name] {
+			return out, errors.New("制作包缺少必要文件")
+		}
+	}
 	raw, e := os.ReadFile(filepath.Join(dir, "manifest.json"))
 	if e != nil {
 		return out, e
@@ -186,7 +210,7 @@ func unpackNews(f multipart.File, size int64, dir, kind string) (newsPackage, er
 		return out, errors.New("制作清单格式错误")
 	}
 	m := out.Manifest
-	if m.Schema != 1 || m.Kind != kind || len(m.Files) != len(names)-1 {
+	if m.Schema != 1 || m.Kind != kind || len(m.Files) != len(out.Files)-1 {
 		return out, errors.New("不支持的制作包版本或类型")
 	}
 	for name, file := range out.Files {
@@ -224,7 +248,7 @@ func unpackNews(f multipart.File, size int64, dir, kind string) (newsPackage, er
 func validateNewsScript(pkg newsPackage) (newsSnapshot, error) {
 	var s newsSnapshot
 	m := pkg.Manifest
-	if m.Status != "approved" || m.Revision < 1 || m.StateVersion < 1 || m.PackageKey == "" || m.ExportKey == "" || m.EventKey == "" || len(m.PackageKey) > 200 || len(m.ExportKey) > 200 || len(m.EventKey) > 200 || m.DurationKind != "editorial_target" {
+	if m.Status != "approved" || m.Revision < 1 || m.StateVersion < 1 || m.PackageKey == "" || m.ExportKey == "" || len(m.PackageKey) > 200 || len(m.ExportKey) > 200 || len(m.EventKey) > 200 || m.DurationKind != "editorial_target" {
 		return s, errors.New("仅接受带版本和来源的已审核脚本制作包")
 	}
 	if !shaPattern.MatchString(m.ContentHash) || pkg.Files["revision.json"].SHA256 != m.ContentHash {
@@ -247,6 +271,14 @@ func validateNewsScript(pkg newsPackage) (newsSnapshot, error) {
 		return s, errors.New("脚本快照格式不正确")
 	}
 	d := s.Document
+	if d.OutputLanguage != m.OutputLanguage {
+		return s, errors.New("脚本语言与清单不一致")
+	}
+	switch d.OutputLanguage {
+	case "", "zh-CN", "en", "ja", "source":
+	default:
+		return s, errors.New("不支持的脚本语言")
+	}
 	if strings.TrimSpace(d.Title) == "" || utf8.RuneCountInString(d.Title) > 300 || strings.TrimSpace(d.Text) == "" || utf8.RuneCountInString(d.Text) > 50000 || d.Target < 10 || d.Target > 600 || d.Target != m.TargetDuration {
 		return s, errors.New("脚本标题、正文或目标时长不合法")
 	}
@@ -258,7 +290,7 @@ func validateNewsScript(pkg newsPackage) (newsSnapshot, error) {
 		return s, errors.New("口播正文与审核稿不一致")
 	}
 	selected := map[string]bool{}
-	if len(d.SourceKeys) == 0 || len(d.SourceKeys) > 10 {
+	if len(d.SourceKeys) == 0 || len(d.SourceKeys) > 32 {
 		return s, errors.New("脚本来源数量不正确")
 	}
 	for _, key := range d.SourceKeys {
@@ -331,7 +363,7 @@ func newsShots(s newsSnapshot) ([]Shot, error) {
 }
 
 func (a *App) receiveNews(w http.ResponseWriter, r *http.Request, kind string) (newsPackage, func(), error) {
-	limit := scriptLimit
+	limit := scriptBundleLimit
 	if kind == "news2douyin.video" {
 		limit = videoLimit
 	}
@@ -369,6 +401,11 @@ func (a *App) importNews(w http.ResponseWriter, r *http.Request) {
 		fail(w, 422, e)
 		return
 	}
+	images, e := newsImages(pkg)
+	if e != nil {
+		fail(w, 422, e)
+		return
+	}
 	shots, e := newsShots(snapshot)
 	if e != nil {
 		fail(w, 422, e)
@@ -394,7 +431,7 @@ func (a *App) importNews(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	m := pkg.Manifest
-	p := Project{ID: uid(), Name: shortTitle(snapshot.Document.Title), Brief: snapshot.Document.Visual + "\n" + snapshot.Document.Notes, Revision: 1, Shots: shots, Assets: []Asset{}, Renders: []Render{}, News: &NewsOrigin{PackageKey: m.PackageKey, EventKey: m.EventKey, ExportKey: m.ExportKey, Revision: m.Revision, StateVersion: m.StateVersion, ContentHash: m.ContentHash, ArchiveSHA256: pkg.ArchiveSHA256, ImportedAt: time.Now().UTC().Format(time.RFC3339Nano), TargetDuration: m.TargetDuration, Files: pkg.Files}}
+	p := Project{ID: uid(), Name: shortTitle(snapshot.Document.Title), Brief: snapshot.Document.Visual + "\n" + snapshot.Document.Notes, Revision: 1, Shots: shots, Assets: []Asset{}, Renders: []Render{}, News: &NewsOrigin{OutputLanguage: m.OutputLanguage, PackageKey: m.PackageKey, EventKey: m.EventKey, ExportKey: m.ExportKey, Revision: m.Revision, StateVersion: m.StateVersion, ContentHash: m.ContentHash, ArchiveSHA256: pkg.ArchiveSHA256, ImportedAt: time.Now().UTC().Format(time.RFC3339Nano), TargetDuration: m.TargetDuration, Files: pkg.Files}}
 	// Stage the complete directory. The single rename publishes only a complete
 	// project; a crash before it leaves an ignored import directory, not a project.
 	staged, e := os.MkdirTemp(a.data, "news-project-")
@@ -405,6 +442,14 @@ func (a *App) importNews(w http.ResponseWriter, r *http.Request) {
 	defer os.RemoveAll(staged)
 	if e = os.MkdirAll(filepath.Join(staged, "workspace", "assets"), 0700); e == nil {
 		e = os.Rename(pkg.Dir, filepath.Join(staged, "news"))
+	}
+	if e == nil {
+		for _, asset := range images {
+			if e = copyFile(filepath.Join(staged, "news", asset.Source.ArchivePath), filepath.Join(staged, "workspace", "assets", asset.File)); e != nil {
+				break
+			}
+			p.Assets = append(p.Assets, asset)
+		}
 	}
 	p.Updated = p.News.ImportedAt
 	if e == nil {

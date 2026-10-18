@@ -1,0 +1,15 @@
+**
+!go.mod
+!*.go
+!web/
+!web/**
+!runtime/
+!runtime/package.json
+!runtime/package-lock.json
+!scripts/
+!scripts/start.sh
+!scripts/smoke-render.mjs
+!docker/
+!docker/Dockerfile
+!docker/entrypoint.sh
+!docker/doctor.mjs

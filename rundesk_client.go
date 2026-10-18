@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // RunDeskError keeps uncertainty separate from a definitive rejection. Neither
@@ -57,7 +58,11 @@ func (a *App) rdRequest(ctx context.Context, method, path string, body any, key 
 	if key != "" {
 		req.Header.Set("Idempotency-Key", key)
 	}
-	resp, e := a.client.Do(req)
+	client := *a.client
+	if strings.HasSuffix(path, "/runtime/prepare") {
+		client.Timeout = 3 * time.Minute
+	}
+	resp, e := client.Do(req)
 	if e != nil {
 		return &RunDeskError{Status: 502, Message: "RunDesk 连接失败；保留原请求，等待确认", Code: "transport_error", Uncertain: method != "GET"}
 	}
@@ -105,8 +110,8 @@ func (a *App) requireV1(ctx context.Context) error {
 		}
 		return false
 	}
-	if !has(meta.APIVersions, "v1") || !has(meta.Capabilities, "idempotency") || !has(meta.Capabilities, "configuration-summary") {
-		return errors.New("需要支持 API v1、提交回执和配置总览的 RunDesk 0.6.0 或更新版本")
+	if !has(meta.APIVersions, "v1") || !has(meta.Capabilities, "idempotency") || !has(meta.Capabilities, "configuration-summary") || !has(meta.Capabilities, "application-connect") || !has(meta.Capabilities, "application-runtime") {
+		return errors.New("需要支持应用注册、Docker 准备和 API v1 回执的 RunDesk；请使用 0.48.0 或更新版本")
 	}
 	return nil
 }
@@ -256,7 +261,7 @@ func (a *App) recoverAgent(ctx context.Context, p Project, allowSend bool) (any,
 		return nil, nil
 	}
 	suffix := "/turns"
-	body := map[string]any{"text": fmt.Sprintf("[Video App projectId=%s requestId=%s] 按 RunDesk 配置的视频制作能力执行，并通过业务工具保存结果。先读取项目当前 revision。\n用户要求：\n%s", p.ID, pending.ID, pending.Text), "files": []string{}, "skills": []any{}}
+	body := map[string]any{"text": fmt.Sprintf("[Video App projectId=%s requestId=%s] 按 RunDesk 配置的视频制作能力执行，并通过业务工具保存结果。先读取项目当前 revision。素材存放在 Video App，通过 assetId 引用；Codex 工作目录不挂载 App 数据。渲染必须调用 video_render_start，由 App 容器执行。\n用户要求：\n%s", p.ID, pending.ID, pending.Text), "files": []string{}, "skills": []any{}}
 	if !a.cfg.ManagedByRunDesk && a.cfg.SkillPath != "" {
 		body["skills"] = []map[string]string{{"name": "video-project", "path": a.cfg.SkillPath}}
 	}

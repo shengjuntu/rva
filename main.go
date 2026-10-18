@@ -28,7 +28,7 @@ import (
 	"time"
 )
 
-const version = "0.6.0"
+const version = "0.7.0"
 
 //go:embed web/*
 var ui embed.FS
@@ -51,11 +51,12 @@ type Shot struct {
 	AssetID  string  `json:"assetId"`
 }
 type Asset struct {
-	ID   string `json:"id"`
-	Name string `json:"name"`
-	File string `json:"file"`
-	Size int64  `json:"size"`
-	MIME string `json:"mime"`
+	Source *NewsImageSource `json:"source,omitempty"`
+	ID     string           `json:"id"`
+	Name   string           `json:"name"`
+	File   string           `json:"file"`
+	Size   int64            `json:"size"`
+	MIME   string           `json:"mime"`
 }
 type Render struct {
 	HasSubtitles bool    `json:"hasSubtitles,omitempty"`
@@ -68,25 +69,27 @@ type Render struct {
 	HasAudio     bool    `json:"hasAudio"`
 }
 type Project struct {
-	AgentSubmission *AgentSubmission `json:"agentSubmission,omitempty"`
-	AgentRunID      string           `json:"agentRunId,omitempty"`
-	Speech          []SpeechJob      `json:"speech,omitempty"`
-	Subtitles       *SubtitleTrack   `json:"subtitles,omitempty"`
-	News            *NewsOrigin      `json:"news,omitempty"`
-	ID              string           `json:"id"`
-	Name            string           `json:"name"`
-	Brief           string           `json:"brief"`
-	Revision        int              `json:"revision"`
-	Shots           []Shot           `json:"shots"`
-	Audio           *AudioMix        `json:"audio,omitempty"`
-	Assets          []Asset          `json:"assets"`
-	Renders         []Render         `json:"renders"`
-	WorkspaceID     string           `json:"workspaceId"`
-	SessionID       string           `json:"sessionId"`
-	Updated         string           `json:"updated"`
-	ToolsVersion    string           `json:"toolsVersion,omitempty"`
+	PreviousSessionIDs []string         `json:"previousSessionIds,omitempty"`
+	AgentSubmission    *AgentSubmission `json:"agentSubmission,omitempty"`
+	AgentRunID         string           `json:"agentRunId,omitempty"`
+	Speech             []SpeechJob      `json:"speech,omitempty"`
+	Subtitles          *SubtitleTrack   `json:"subtitles,omitempty"`
+	News               *NewsOrigin      `json:"news,omitempty"`
+	ID                 string           `json:"id"`
+	Name               string           `json:"name"`
+	Brief              string           `json:"brief"`
+	Revision           int              `json:"revision"`
+	Shots              []Shot           `json:"shots"`
+	Audio              *AudioMix        `json:"audio,omitempty"`
+	Assets             []Asset          `json:"assets"`
+	Renders            []Render         `json:"renders"`
+	WorkspaceID        string           `json:"workspaceId"`
+	SessionID          string           `json:"sessionId"`
+	Updated            string           `json:"updated"`
+	ToolsVersion       string           `json:"toolsVersion,omitempty"`
 }
 type Config struct {
+	WorkspaceID      string `json:"workspaceId,omitempty"`
 	InstallationID   string `json:"installationId,omitempty"`
 	ManagedByRunDesk bool   `json:"managedByRunDesk,omitempty"`
 	RunDeskURL       string `json:"rundeskURL,omitempty"`
@@ -94,17 +97,17 @@ type Config struct {
 	InstanceID       string `json:"instanceId"`
 }
 type App struct {
-	espeak                                           string
-	speechJobs                                       map[string]context.CancelFunc
-	mu                                               sync.Mutex
-	data, rd, token, rdToken, hf, font, gsap, public string
-	cfg                                              Config
-	projects                                         map[string]*Project
-	jobs                                             map[string]context.CancelFunc
-	client                                           *http.Client
-	closing                                          bool
-	wg                                               sync.WaitGroup
-	bridgeMu                                         sync.Mutex
+	espeak                                                   string
+	speechJobs                                               map[string]context.CancelFunc
+	mu                                                       sync.Mutex
+	data, rd, token, rdToken, hf, font, gsap, public, mcpURL string
+	cfg                                                      Config
+	projects                                                 map[string]*Project
+	jobs                                                     map[string]context.CancelFunc
+	client                                                   *http.Client
+	closing                                                  bool
+	wg                                                       sync.WaitGroup
+	bridgeMu                                                 sync.Mutex
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
@@ -340,7 +343,12 @@ func (a *App) auth(next http.Handler) http.Handler {
 }
 func (a *App) routes() http.Handler {
 	m := http.NewServeMux()
+	m.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, 200, map[string]any{"ready": true, "version": version})
+	})
 	m.HandleFunc("POST /api/mcp", a.mcpHTTP)
+	m.HandleFunc("GET /api/runtime", a.runtimeStatus)
+	m.HandleFunc("POST /api/runtime/prepare", a.runtimePrepare)
 	m.HandleFunc("GET /api/speech/capabilities", a.speechCapabilities)
 	m.HandleFunc("POST /api/projects/{id}/speech", a.startSpeech)
 	m.HandleFunc("POST /api/projects/{id}/speech/{sid}/stop", a.stopSpeech)
@@ -588,14 +596,11 @@ func serve(opts serverOptions) error {
 	if e = os.MkdirAll(opts.Data, 0700); e != nil {
 		return e
 	}
-	lockPath := filepath.Join(opts.Data, "server.lock")
-	lock, e := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
+	unlock, e := lockData(opts.Data)
 	if e != nil {
-		return fmt.Errorf("无法取得数据目录锁；确认旧服务停止后再删除残留 server.lock: %w", e)
+		return fmt.Errorf("无法取得数据目录锁，请检查是否已有实例使用此目录: %w", e)
 	}
-	fmt.Fprintln(lock, os.Getpid())
-	lock.Close()
-	defer os.Remove(lockPath)
+	defer unlock()
 	a, e := newApp(opts.Data)
 	if e != nil {
 		return e
@@ -639,6 +644,14 @@ func serve(opts serverOptions) error {
 			return errors.New("VIDEO_APP_PUBLIC_URL 无效")
 		}
 		a.public = strings.TrimRight(override, "/")
+	}
+	a.mcpURL = a.public + "/api/mcp"
+	if override := os.Getenv("VIDEO_APP_MCP_URL"); override != "" {
+		u, err := url.Parse(override)
+		if err != nil || (u.Scheme != "http" && u.Scheme != "https") || u.Hostname() == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" || !strings.HasSuffix(u.Path, "/api/mcp") {
+			return errors.New("VIDEO_APP_MCP_URL 需要有效 HTTP(S) 地址并以 /api/mcp 结尾")
+		}
+		a.mcpURL = strings.TrimRight(override, "/")
 	}
 	srv := &http.Server{Addr: opts.Listen, Handler: a.routes(), ReadHeaderTimeout: 10 * time.Second}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

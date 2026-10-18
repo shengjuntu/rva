@@ -1,3 +1,18 @@
+# 升级到 v0.7.0
+
+配套 RunDesk 0.48.0+，推荐 0.48.1。停止旧 App，备份完整 data，替换二进制或构建新镜像，沿用原数据目录、RunDesk URL、Token 与安装身份。Docker 配置和步骤见 [DOCKER](DOCKER.md)。
+
+项目新增 previousSessionIds，config.json 新增 workspaceId；原请求回执、成片、素材和历史会话保留。新版采用系统文件锁，server.lock 文件存在不代表服务仍运行，**不要删除运行中实例的锁文件**。
+
+首次更换为 Docker 后，在 RunDesk 的当前容器配置视频 MCP 和 Skill，再回 App 重新连接：空会话会更换为 Docker 会话；已有原生对话须点“新建当前环境对话”，不会搬迁或删除旧历史。与旧版本一致，默认配置不会覆盖管理员编辑。
+
+news2douyin 制作包可新增 storyboard.json、evidence_snapshot.json 和 images/；单文件 4 MiB、整个脚本包 32 MiB、最多 4 张候选图片。保存或渲染前应确认素材适用性。旧平面脚本包继续可导入。
+
+降级前恢复原版完整数据备份，避免旧版本忽略新字段。
+
+---
+以下为旧版升级历史。
+
 # 从 v0.5.0 升级到 v0.5.1
 
 1. 先将 RunDesk 升级到 0.6.0 或更新版本；本次联调版本为 0.6.1。等待活动 Agent 任务结束，停止 App，备份完整数据目录。

@@ -12,7 +12,7 @@ import (
 )
 
 func v1Meta() any {
-	return map[string]any{"apiVersions": []string{"v1"}, "capabilities": []string{"api-v1", "idempotency", "configuration-summary"}}
+	return map[string]any{"apiVersions": []string{"v1"}, "capabilities": []string{"api-v1", "idempotency", "configuration-summary", "application-connect", "application-runtime"}}
 }
 
 func TestDurableOperationLostAckAndRestart(t *testing.T) {

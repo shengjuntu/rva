@@ -1,5 +1,5 @@
 "use strict";
-const TOOL_VERSION = "0.5.1";
+const TOOL_VERSION = "0.7.0";
 const $ = (s) => document.querySelector(s),
   el = (tag, text, cls) => {
     const n = document.createElement(tag);
@@ -153,6 +153,7 @@ function drawProject() {
     : "已保存 · 修订 " + project.revision;
   $("#connect").disabled = !!project.sessionId;
   $("#refresh-tools").hidden = !project.sessionId;
+  $("#new-session").hidden = !project.sessionId;
   $("#refresh-tools").textContent =
     project.toolsVersion === TOOL_VERSION
       ? "重新配置工具"
@@ -191,6 +192,7 @@ function drawAssets() {
     }
     const d = el("div");
     d.append(el("strong", a.name));
+    if (a.source) d.append(el("small", "新闻配图候选 · 使用前确认版权与内容", "muted"));
     const link = el(
       "a",
       "查看 · " + (a.size / 1024 / 1024).toFixed(1) + " MiB",
@@ -836,6 +838,22 @@ $("#environment").onclick = action(async () => {
       for (const error of Object.values(config.errors || {})) box.append(el("div", "配置检查 · " + (typeof error === "string" ? error : JSON.stringify(error)), "check"));
     } catch (err) { box.append(el("div", "配置检查 · " + err.message, "check")); }
   }
+  if (env.instanceId) {
+    const line = el("p", "读取执行环境…", "check"); box.append(line);
+    try {
+      const runtime = await api("/api/runtime");
+      line.textContent = "Agent 环境 · " + runtime.executionMode + " · " + (runtime.environment?.state || "尚未启动") + (runtime.image ? " · " + runtime.image : "");
+      if (runtime.executionMode === "docker") {
+        const prepare = el("button", "启动并检查 Codex 容器"); box.append(prepare);
+        prepare.onclick = action(async () => {
+          prepare.disabled = true; line.textContent = "正在启动并检查认证、MCP…";
+          try { await api("/api/runtime/prepare", {}); line.textContent = "✓ 容器运行、模型认证与视频 MCP 工具发现通过；尚未调用模型。"; }
+          catch (err) { line.textContent = err.message; }
+          finally { prepare.disabled = false; }
+        });
+      }
+    } catch (err) { line.textContent = err.message; }
+  }
   for (const [name, c] of Object.entries(env.checks)) {
     box.append(
       el(
@@ -1283,4 +1301,18 @@ $('#speech-start').onclick = action(async()=>{
     await api('/api/projects/' + pid + '/speech',{revision:project.revision, requestId:id(), voice, rate});
     if (gen === epoch) {toast('配音任务已创建，完成后可试听并采用。');await poll();}
   } finally { startingSpeech = false; drawSpeech(); }
+});
+
+$('#new-session').onclick = action(async () => {
+  if (!project?.sessionId) return;
+  await save();
+  const gen = epoch, pid = project.id, expected = project.sessionId;
+  $('#new-session').disabled = true;
+  try {
+    await api(path('/connect?new=1&expectedSessionId='+encodeURIComponent(expected)), {});
+    if (gen !== epoch) return;
+    rememberMessage(pid, null);
+    await openProject(pid);
+    toast('已新建对话；原对话历史保留在 RunDesk。');
+  } finally { $('#new-session').disabled = false; }
 });

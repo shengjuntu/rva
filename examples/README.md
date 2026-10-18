@@ -13,3 +13,5 @@ subtitled-app.mp4 是 Go APP v0.4.0 采用本目录原片配音/SRT 后重新渲
 ## APP 自动配音演示
 
 tts-app.mp4 为 v0.5.0 从脚本正文调用本机 eSpeak NG 重新配音、生成分句字幕后渲染的成片，1080×1920/30 fps，约 7.83 秒；tts-narration.wav 为本次生成的 24 kHz 单声道 PCM 配音。内容仍是软件流程验证，不是真实新闻。
+
+`short_script_bundle.zip` 是 news2douyin 0.15.0 导出器生成的测试制作包：中文目标语言、分段证据、蓝色图片候选。全部为测试数据，非真实新闻。

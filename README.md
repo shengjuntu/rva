@@ -1,86 +1,67 @@
-# RunDesk Video App · v0.6.0
+# RunDesk Video App · v0.7.0
 
-一个使用 **Go + HTML/CSS/原生 JavaScript** 的本地视频工作台。通过 RunDesk HTTP API 使用 Codex；项目、素材、分镜和渲染任务由视频 App 管理。
+独立的视频制作工作台：管理项目、素材、分镜、音轨、字幕、预览配音和成片。通过 RunDesk 调用 Codex，通过 HTTP MCP 让 Agent 读取和更新项目、启动渲染；RunDesk 保留会话、审批和执行轨迹。
 
-本仓库是独立 App 原型，不改变 RunDesk 的通用定位。暂用工作名称“视频工作台”。主程序只使用 Go 标准库，页面嵌入二进制。渲染器是独立安装的 HyperFrames CLI；它需要 Node.js、Chrome 和 FFmpeg。
+推荐配套 **RunDesk 0.48.1**（0.48.0 也有所需运行环境 API）与 **news2douyin 0.15.0**。Go 主程序只使用标准库，WebUI 嵌入二进制；视频渲染使用锁定的 HyperFrames 0.8.87 / GSAP 3.15.0，以及 Chromium、FFmpeg、Noto CJK。eSpeak NG 提供机械预览配音，不是专业 TTS。
 
-v0.6.0 要求 RunDesk 0.15.0+。连接时自动登记应用，复用旧实例和会话，初始能力由 RunDesk 安装；重连不重写后台配置。新增 HTTP MCP，模型、Skills、MCP、Docker 在 RunDesk 中管理。参见 [本次升级](docs/APPLICATION-CONNECT.md)。
+## 本版变化
 
-![界面截图](docs/preview.png)
+- 补齐 App/渲染 Dockerfile、Linux Compose、持久数据挂载和统一生命周期脚本；依赖在构建阶段安装，启动不再下载安装。
+- 分离浏览器入口 `VIDEO_APP_PUBLIC_URL` 与 Codex 容器回调 `VIDEO_APP_MCP_URL`。
+- 新任务提交前检查并启动已选 Docker 环境，核对模型认证与 10 个视频 MCP 工具；不构建镜像、不改管理员设置、不消耗模型请求。
+- 更换运行方式后，重连自动更换空会话；已有对话使用“新建当前环境对话”，历史留在 RunDesk。新建操作带原会话校验，重试不重复创建。
+- 前后端工具版本号统一为 0.7.0；数据锁在进程异常退出后由系统释放。
+- 支持 news2douyin 0.15.0 短脚本 ZIP：保留目标语言、证据和最多 4 张图片候选；图片保留出处，先选入分镜再渲染。支持不属于聚类事件的短脚本。
 
-![音轨配置](docs/audio-preview.png)
+## Docker 启动（Linux）
 
-## 本机自动配音
-
-v0.5.0 可从当前分镜正文生成 eSpeak NG 预览配音，并按真实音频样本生成分句字幕和逐镜头时长。任务可取消、保留进度与日志；完成后试听并采用，不覆盖生成期间的新编辑。机械音适合流程验证，尚未接入高自然度配音和逐字对齐。
-
-![本机配音任务](docs/speech-preview.png)
-
-详见 [配音使用、安装与接口](docs/SPEECH.md) 和 [v0.5 验证记录](docs/VALIDATION-0.5.md)。examples/tts-app.mp4 为本 APP 自动配音后生成的真实示例。
-
-## 配音与字幕时间轴
-
-v0.4.0 可直接采用新闻原片的 WAV/SRT，调整镜头总长；支持字幕导入、编辑、配音试听定位、人工核对和渲染烧录。改正文、换配音或移动音轨后会提示重新核对，避免旧字幕进入新成片。原片采用的镜头切点仍需人工检查；新版本可为改稿生成本机预览配音。
-
-![字幕编辑与试听](docs/subtitle-preview.png)
-
-详见 [字幕使用与接口](docs/SUBTITLES.md) 和 [v0.4 验证记录](docs/VALIDATION-0.4.md)。examples/subtitled-app.mp4 是配套演示经本 APP 重新渲染的 1080×1920 / 30 fps 成片。
-
-## 新闻工作台接入
-
-v0.3.0 可导入 news2douyin 已审核脚本制作包，保留原稿、审核记录和来源证据；可接收同一稿件版本的成片 ZIP，播放原始视频并下载 WAV/SRT。RunDesk 配置的 MCP 新增 `video_news_get`，让 Agent 读取这些依据后修改制作草稿。
-
-导入分镜时长是估算值，原始交接成片不会随分镜编辑更新。安装 App 即可导入脚本；接收成片还需 FFprobe。只有从分镜重新渲染时才需要 HyperFrames/Node/Chrome 等依赖。
-
-详见 [新闻交接步骤与限制](docs/NEWS-HANDOFF.md) 和 [v0.3 验证记录](docs/VALIDATION-0.3.md)。
-
-## 当前可用
-
-- 项目管理、素材上传、分镜编辑、镜头排序、时长和画面素材选择。
-- 图片/视频/音频/文本/Markdown/PDF 上传；单文件 256 MiB。音频支持 WAV、MP3、M4A、FLAC、OGG。
-- 一键在 RunDesk 创建专用实例、项目工作区、实例 Skill 和 stdio MCP 配置。
-- 对话、运行中补充指令、停止 Agent、命令授权和可展开的工具记录。
-- 分镜修订号检查，发现 Agent 与界面并发编辑时保留本地草稿、拒绝覆盖。
-- 配音与背景音乐双音轨、视频起点、素材截取起点、0–200% 音量、背景音乐循环和素材试听。
-- 独立后台渲染任务、取消任务、版本快照、日志、MP4 播放与下载。
-- 固定竖版 1080×1920 / 30 fps 模板，使用真实 HyperFrames 渲染及 FFprobe 检查。
-
-**v0.2 支持上传配音和背景音乐并混音输出。** 视频素材原声保持静音；未选音轨时输出无声视频。每个镜头 1–60 秒，最多 80 个镜头，总长不超过 10 分钟。一次运行一个渲染任务。v0.5 支持本机预览 TTS；尚无神经网络音色、逐字强制对齐、自由时间线、多模板、自定义 HTML 双向编辑、断点续渲染和多人权限。
-
-## 安装
-
-按 [Ubuntu 安装指南](docs/UBUNTU.md) 准备依赖，然后运行：
+完整步骤、地址和升级说明见 [Docker 与联调](docs/DOCKER.md)。需要 Docker Engine 和 Compose v2，RunDesk 默认运行在同一 Linux 宿主机。
 
 ```bash
-chmod +x bin/video-app scripts/*.sh
-./scripts/setup-renderer.sh
-# RunDesk 开启令牌验证时，先设置同一个 RUNDESK_TOKEN。
-./scripts/start.sh
+bash scripts/docker.sh init
+# 编辑 docker/.env，填写 RunDesk Token、入口、数据目录及用户映射
+bash scripts/docker.sh build
+bash scripts/docker.sh up
+bash scripts/docker.sh token
+bash scripts/docker.sh doctor
+bash scripts/docker.sh smoke
 ```
 
-打开 http://127.0.0.1:3220 。默认登录令牌位于 `data/access-token`；也可以提前设置至少 24 个字符的 `VIDEO_APP_TOKEN`。RunDesk 默认在 3210 端口。
+`build` 构建 `rundesk-video-app:0.7.0`；`up` 只启动已有镜像。`smoke` 创建两秒中文标题与测试音视频，检查实际 MP4。`logs / status / stop` 提供日常运维入口。数据默认保存到 `.state/video`，升级须保留原完整数据目录。
 
-从旧版本升级请先阅读 [升级说明](docs/UPGRADING.md)，保留原数据目录，并在项目中更新工具配置。
+RunDesk 中的 `video-build` 是另一个 **Codex 工具镜像**，通过初始化向导准备一次并选给视频应用。它不包含本 App 的 HyperFrames 渲染服务。首次切换到 Docker，需要为该容器配置视频 MCP/Skill 和 Codex 认证，详见联调文档。
 
-新建项目 → 连接 RunDesk → 在 RunDesk 的“视频制作 App”实例完成 Codex 登录/模型配置 → 添加素材 → 对话规划分镜 → 配置音轨 → 保存 → 生成视频。
+## 本机运行
 
-**新实例不复制其他实例的凭据。** 单击“已配置”仅表示 Skill/MCP 配置已写入，不能代替 Codex 登录，也不能保证每个外部工具已启动。原生运行和复杂交互的完整诊断仍在 RunDesk 页面。
-
-## 开发
-
-需要 Go 1.25+：
+Linux/Windows amd64 二进制在 `bin/`；Windows 仅完成交叉编译。本机渲染需要 Node.js 22+、FFmpeg/FFprobe、Chrome/Chromium、中文字体。Linux eSpeak NG 可选。
 
 ```bash
-go test -race ./...
-./scripts/build.sh
-./bin/video-app --version
+# 从源码构建时需要 Go 1.25.12 或兼容版本
+bash scripts/build.sh
+bash scripts/setup-renderer.sh
+# 使用已安装的浏览器可设置 HYPERFRAMES_BROWSER_PATH
+bash scripts/start.sh
 ```
 
-没有 npm 前端构建。`runtime/package-lock.json` 固定渲染工具依赖，安装使用 `npm ci`。运行时通过 HyperFrames 官方环境开关关闭遥测。
+默认打开 `http://127.0.0.1:3220`。App Token 自动写入 `data/access-token`，也可设置不少于 24 字符的 `VIDEO_APP_TOKEN`。`VIDEO_DATA`、`VIDEO_LISTEN`、`RUNDESK_URL`、`RUNDESK_TOKEN`、`VIDEO_FONT` 可配置；部署 Token 不写入镜像。
 
-- [音轨使用说明](docs/AUDIO.md)
-- [架构与接口](docs/ARCHITECTURE.md)
-- [验证记录与限制](docs/VALIDATION.md)
-- [依赖说明](THIRD_PARTY.md)
+## 制作流程
 
-MIT License。渲染器、字体和其他外部依赖遵循各自许可。
+1. 创建项目、上传素材；或从 news2douyin 导入已审核制作包。
+2. 连接 RunDesk，在应用实例配置 Codex、Skill、MCP 和运行环境；点击环境准备检查。
+3. 让 Agent 读取项目并保存分镜。通过素材 ID 选图，业务素材不直接挂载到 Codex 的工作目录。
+4. 按需要导入/生成配音、采用音轨、核对字幕；发送制作要求或点渲染。
+5. 查看渲染日志与进度，播放成片，检查中文排版、画面、音频和字幕。Agent 完成与视频渲染完成分开记录。
+
+当前固定竖屏 1080×1920、30fps，单镜头 1–60 秒、最多 80 镜头，总长不超过 10 分钟。一次只执行一个渲染。没有接入生成视频模型、专业配音服务或自动逐字校对。
+
+## 文档与验证
+
+- [升级](docs/UPGRADING.md)、[Docker 联调](docs/DOCKER.md)、[架构](docs/ARCHITECTURE.md)
+- [新闻交接](docs/NEWS-HANDOFF.md)、[音轨](docs/AUDIO.md)、[配音](docs/SPEECH.md)、[字幕](docs/SUBTITLES.md)
+- [v0.7 验证结果与未验证项](docs/VALIDATION-0.7.md)
+- `integrations/video-project/SKILL.md`：可安装到 RunDesk 当前容器环境的业务 Skill。
+- `scripts/integration_rundesk.py`：真实 App/RunDesk HTTP + Docker/Codex 测试替身；不是实际模型或 Docker 验收。
+- `examples/short_script_bundle.zip`：news2douyin 0.15.0 实际导出器生成的协议样例，新闻和图片均为测试数据。
+
+旧版本验证文档仅说明当时版本的检查结果，不代表本版镜像已实机构建或完成视频验收。

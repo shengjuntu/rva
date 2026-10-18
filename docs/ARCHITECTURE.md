@@ -1,3 +1,13 @@
+# v0.7 架构补充（当前约定）
+
+Video App/HyperFrames 在独立渲染容器运行；RunDesk 在宿主机管理 Codex 容器。业务 API 与 HTTP MCP 均由 App 提供。两容器不共享 App 数据；Codex 用 assetId 操作分镜，App 自己读取素材与保存成片。RunDesk 注册应用创建一个工作区供该应用项目使用，项目分别关联会话。项目工作区目录不是 Codex 的 cwd。
+
+新增 `GET /api/health`（认证后的进程健康）、`GET /api/runtime`（只读运行状态）、`POST /api/runtime/prepare`（启动并探测当前 Docker 环境）。注册/检查不等于模型可执行，探测结果不等于媒体渲染已通过。
+
+`POST /api/projects/{id}/connect?new=1&expectedSessionId=...` 明确新建当前环境对话，保留历史；只允许非活动且无待确认提交的项目，原会话 ID 校验使重试安全。发送新消息前校验项目、实例、工作区和运行方式；已接受或待确认消息仍用原回执恢复，不受重复准备影响。
+
+持久数据挂载 `/data`；构建上下文排除 Token、业务数据和旧二进制。部署拓扑及地址见 [DOCKER](DOCKER.md)。以下原有业务状态、媒体和 revision 规则继续有效。
+
 # 架构与接口
 
 视频 App → RunDesk HTTP API → Codex App Server。视频 App 不直接启动或复用 Codex App Server 连接，也不复用 Sandbox Agent。
@@ -16,8 +26,8 @@ Go 服务与嵌入式页面同源，通过 Cookie 登录。App 后端持有 RunD
 - `config.json`：RunDesk 专用实例 ID。
 - `access-token`：未用环境变量覆盖时的 App 访问令牌。
 - `projects/<id>/project.json`：项目权威状态，原子替换写入。
-- `projects/<id>/workspace/assets/`：上传素材，同时供 Agent 在其工作目录下读取。
-- `projects/<id>/workspace/.agents/skills/video-project/SKILL.md`：通过 RunDesk 写入。
+- `projects/<id>/workspace/assets/`：App 持有的上传素材；Agent 通过业务 MCP 和 assetId 引用。
+- `integrations/video-project/SKILL.md`：业务技能安装到 RunDesk 当前实例/运行环境；不在 App 素材目录执行。
 - `projects/<id>/renders/<renderId>/`：独立 index.html、GSAP、字体、素材副本、snapshot.json、render.log、validation.json、final.mp4；有音轨时还保留 silent.mp4 和解码后的 audio-N.wav。
 
 项目包含 revision、name、brief、shots、audio、subtitles、speech、news、assets、renders、workspaceId、sessionId。界面与 MCP 修改分镜都必须携带当前 revision，旧版本写入返回 409。Agent 回写后，未编辑的界面自动刷新；存在草稿时显示冲突提醒，等待用户合并，绝不无声覆盖。
