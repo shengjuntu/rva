@@ -39,6 +39,23 @@ func (a *App) startRender(w http.ResponseWriter, r *http.Request) {
 	raw, _ := json.Marshal(request)
 	requestHash := hashBytes(raw)
 	a.mu.Lock()
+	selected := a.projects[id]
+	authored := selected != nil && workflowFor(*selected).EditingBackend == "hyperframes"
+	// A retry belongs to the engine that accepted the original request, even
+	// when the user has since selected another editing backend.
+	if selected != nil && request.RequestID != "" {
+		for _, job := range selected.Renders {
+			if job.RequestID == request.RequestID {
+				authored = job.Engine == authoredHyperFramesEngine
+				break
+			}
+		}
+	}
+	if authored {
+		a.mu.Unlock()
+		a.startHyperFramesRender(w, r, request)
+		return
+	}
 	if request.RequestID != "" {
 		if p := a.projects[id]; p != nil {
 			for _, j := range p.Renders {
@@ -395,7 +412,7 @@ func (a *App) renderFile(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if !found || (file != "final.mp4" && file != "render.log" && file != "snapshot.json" && file != "validation.json" && file != "subtitles.srt" && file != "edit-ir.json" && file != "filter.ffscript" && file != "render-proof.json") {
+	if !found || (file != "final.mp4" && file != "render.log" && file != "snapshot.json" && file != "validation.json" && file != "subtitles.srt" && file != "edit-ir.json" && file != "filter.ffscript" && file != "render-proof.json" && file != "hyperframes-manifest.json") {
 		fail(w, 404, errors.New("文件不存在"))
 		return
 	}

@@ -96,7 +96,7 @@ func speechJobView(pid string, j SpeechJob) ProductionJob {
 	return v
 }
 func renderProvider(j Render) string {
-	if j.Engine == "ffmpeg_edit" || j.Engine == "video_use" {
+	if j.Engine == "ffmpeg_edit" || j.Engine == "video_use" || j.Engine == "hyperframes_authored" {
 		return j.Engine
 	}
 	return "hyperframes"
@@ -108,6 +108,9 @@ func renderJobView(pid string, j Render) ProductionJob {
 	}
 	if j.State == "completed" && (j.Engine == "ffmpeg_edit" || j.Engine == "video_use") {
 		v.Artifacts = append(v.Artifacts, JobArtifact{Name: "render-proof.json", URL: "/api/projects/" + pid + "/renders/" + j.ID + "/render-proof.json"}, JobArtifact{Name: "edit-ir.json", URL: "/api/projects/" + pid + "/renders/" + j.ID + "/edit-ir.json"})
+	}
+	if j.State == "completed" && j.Engine == "hyperframes_authored" {
+		v.Artifacts = append(v.Artifacts, JobArtifact{Name: "render-proof.json", URL: "/api/projects/" + pid + "/renders/" + j.ID + "/render-proof.json"}, JobArtifact{Name: "hyperframes-manifest.json", URL: "/api/projects/" + pid + "/renders/" + j.ID + "/hyperframes-manifest.json"})
 	}
 	return v
 }

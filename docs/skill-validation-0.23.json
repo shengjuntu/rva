@@ -1,0 +1,39 @@
+{
+  "version": "0.23.0",
+  "scope": "Skill structure, complete bundle mirror and read-only independent forward evaluation; not real model/MCP production validation",
+  "quickValidate": {
+    "video-project": "passed",
+    "build-video-artifacts": "passed"
+  },
+  "mirror": {
+    "result": "passed",
+    "identityDifferences": [
+      "frontmatter name",
+      "agents default_prompt skill reference"
+    ],
+    "files": [
+      "SKILL.md",
+      "WORKFLOW-DESIGN.md",
+      "agents/openai.yaml",
+      "references/backend-compatibility.md",
+      "references/hyperframes-authoring.md"
+    ]
+  },
+  "forwardEvaluation": {
+    "request": "120 Chinese narration characters, 6 supplied images, configured IndexTTS and image-generation, no video-generation, HyperFrames backend; read-only task without business MCP",
+    "result": "passed",
+    "observed": [
+      "Starts from saved project, board/sourceHash, capabilities, real assets, associations and authored document",
+      "Does not force 6 images into 6 shots",
+      "Uses existing images and original animation when video generation is unavailable",
+      "Requires real speech materialization/timing and actual output checks",
+      "Understands timeline and hasAudio cannot create media",
+      "Does not add routine stage approvals or claim production completion without tools"
+    ],
+    "limitations": [
+      "No real model execution",
+      "No business MCP calls",
+      "No generated draft during this evaluation"
+    ]
+  }
+}

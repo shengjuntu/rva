@@ -3,10 +3,13 @@ package main
 // Currentness belongs to the selected editing backend. An external EDL is not
 // projected into the native DSL merely to reuse a renderer status flag.
 func renderCurrent(p Project, r Render) bool {
+	if r.Engine == "hyperframes_authored" {
+		return workflowFor(p).EditingBackend == "hyperframes" && p.HyperFrames != nil && p.HyperFrames.TextSourceHash == narrationSourceHash(p) && r.ContentHash == productionHash(p) && r.SourceHash == narrationSourceHash(p)
+	}
 	if r.Engine == "video_use" {
 		return externalRenderCurrent(p, r)
 	}
-	if workflowFor(p).EditingBackend == "video_use" {
+	if workflowFor(p).EditingBackend == "video_use" || workflowFor(p).EditingBackend == "hyperframes" {
 		return false
 	}
 	return r.ContentHash == productionHash(p) && r.SourceHash == narrationSourceHash(p)

@@ -112,6 +112,9 @@ func TestVersionedSkillsInstallWithoutOverwritingLegacy(t *testing.T) {
 		if !strings.Contains(id, "-v"+strings.ReplaceAll(version, ".", "-")) || !strings.Contains(files["SKILL.md"], "name: "+id+"\n") {
 			t.Fatal(id)
 		}
+		if yaml, ok := files["agents/openai.yaml"]; ok && !strings.Contains(yaml, "$"+id+" ") {
+			t.Fatal("Skill prompt refers to a different installed identity", id)
+		}
 	}
 }
 
@@ -135,7 +138,7 @@ func TestWorkflowBackendCompatibilityAndInstruction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"剪辑后端：video_use", "素材准备和对齐", "（2）剪辑", "（3）精修", "DSL/EDL 只约束剪辑", "video_media_alignment_update", "video_production_run_prepare", "video_production_run_ingest", "video_runtime_diagnose", "video_edit_locate", "modelVisionVerified=false", "textRefs"} {
+	for _, want := range []string{"剪辑后端：video_use", "素材准备和对齐", "（2）剪辑", "（3）精修", "剪辑声明只记录时间、素材和声音，不限制内容表达", "video_media_alignment_update", "video_runtime_diagnose", "video_edit_locate", "modelVisionVerified=false", "textRefs"} {
 		if !strings.Contains(instruction, want) {
 			t.Fatal("missing actionable workflow instruction", want)
 		}
@@ -143,41 +146,70 @@ func TestWorkflowBackendCompatibilityAndInstruction(t *testing.T) {
 	if strings.Contains(instruction, "video_production_run_export") {
 		t.Fatal("instruction refers to nonexistent export tool")
 	}
+	// Detailed compatibility contracts are installed as referenced files rather
+	// than repeated in every submission prompt.
+	files := installedProductionSkills()[runtimeSkillName("video-project")].(map[string]string)
+	if !strings.Contains(instruction, runtimeSkillName("video-project")) || !strings.Contains(files["SKILL.md"], "references/backend-compatibility.md") {
+		t.Fatal("submission lost its installed compatibility guidance")
+	}
+	for _, want := range []string{"video_production_run_prepare", "video_production_run_ingest", "frozen manifest textPath", "An EDL needs no top-level textSourceHash"} {
+		if !strings.Contains(files["references/backend-compatibility.md"], want) {
+			t.Fatal("missing referenced workflow contract", want)
+		}
+	}
 }
 
 func TestInstalledSkillsKeepDiagnosticAndReferenceBoundaries(t *testing.T) {
-	// The installed bundles are the Agent's executable workflow contract. Ensure
-	// upgrades carry the real tools without teaching semantic or vision proof.
+	// The base Skill is always attached with selected stage Skills. Validate that
+	// complete installed bundle, including its reachable compatibility references,
+	// instead of requiring every detailed contract to be repeated in SKILL.md.
 	bundles := installedProductionSkills()
+	base := bundles[runtimeSkillName("video-project")].(map[string]string)
+	for _, reference := range []string{"references/backend-compatibility.md", "references/hyperframes-authoring.md"} {
+		if base[reference] == "" || !strings.Contains(base["SKILL.md"], reference) {
+			t.Fatal("installed reference is missing or unreachable", reference)
+		}
+	}
+	bundleText := func(files map[string]string) string {
+		var text strings.Builder
+		for _, body := range files {
+			text.WriteString(body)
+			text.WriteByte('\n')
+		}
+		return text.String()
+	}
+	baseText := bundleText(base)
 	checks := map[string][]string{
 		"video-project": {
-			"video_runtime_diagnose(projectId)", "passed/failed/blocked/not_checked",
-			"modelVisionVerified", "not prove the model saw an image",
-			"textSourceHash", "frozen manifest textPath", "unmappedClipIds",
-			"video_edit_locate(projectId,quote,occurrence?,renderId?)",
-			"An EDL needs no top-level textSourceHash", "do not prove semantic correctness or word-level timing",
+			"video_runtime_diagnose", "passed/failed/blocked/not_checked", "modelVisionVerified=false alone",
+			"does not prove the model saw the picture", "textSourceHash", "frozen manifest textPath",
+			"Empty matches/unmapped clips indicate gaps, not inferred associations",
+			"video_edit_locate(projectId,quote,occurrence?,renderId?)", "An EDL needs no top-level textSourceHash",
+			"not word alignment or semantic proof",
 		},
 		"video-narration": {
-			"video_runtime_diagnose(projectId)", "before paid generation",
-			"Do not rebuild environments", "not that all production is blocked",
+			"video_runtime_diagnose", "configured capabilities", "Unknown remote state is not permission to duplicate paid work",
+			"Diagnostics do not authorize rebuilding environments or switching images", "modelVisionVerified=false alone",
+			"preserve facts", "not forced word alignment, ASR or listening",
 		},
 		"video-editing": {
-			"document textSourceHash", "textRefs=[{quote,occurrence?}]",
-			"unreferenced background and legacy clips", "exact frozen-original textRefs",
+			"document textSourceHash", "textRefs=[{quote,occurrence?}]", "Allow unreferenced background and legacy clips",
+			"frozen manifest textPath", "Source implements animation, captions and audio",
+			"not an automatic animation/audio generator or measured timing", "do not silently claim parity",
 		},
 		"video-review": {
-			"video_edit_locate(projectId,quote,occurrence?,renderId?)",
-			"unmappedClipIds and empty matches", "not word timing or verified semantics",
-			"Preserve unrelated IDs, references, assets and edits",
+			"video_edit_locate(projectId,quote,occurrence?,renderId?)", "Empty matches and unmapped clips are gaps, not guessed matches",
+			"not extracted/verified playback", "Preserve unrelated source, IDs, references and accepted work",
+			"frame samples prove neither unseen motion nor audio", "Agent review is not human acceptance",
 		},
 	}
 	for logical, required := range checks {
 		t.Run(logical, func(t *testing.T) {
 			files := bundles[runtimeSkillName(logical)].(map[string]string)
-			body := files["SKILL.md"]
+			body := baseText + "\n" + bundleText(files)
 			for _, want := range required {
-				if !strings.Contains(body, want) {
-					t.Errorf("installed Skill missing workflow contract %q", want)
+				if !strings.Contains(strings.ToLower(body), strings.ToLower(want)) {
+					t.Errorf("installed Skill bundle missing workflow contract %q", want)
 				}
 			}
 			if strings.Contains(body, "rundesk_diagnostic_image(") {

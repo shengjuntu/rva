@@ -1,0 +1,20 @@
+{"Time":"2026-10-18T22:25:32.90135071+11:00","Action":"start","Package":"rundesk-video-app"}
+{"Time":"2026-10-18T22:25:32.925927097+11:00","Action":"run","Package":"rundesk-video-app","Test":"TestRootRuntimeProbeProgramWithActualAppMCP"}
+{"Time":"2026-10-18T22:25:32.925965558+11:00","Action":"output","Package":"rundesk-video-app","Test":"TestRootRuntimeProbeProgramWithActualAppMCP","Output":"=== RUN   TestRootRuntimeProbeProgramWithActualAppMCP\n"}
+{"Time":"2026-10-18T22:25:33.238839344+11:00","Action":"output","Package":"rundesk-video-app","Test":"TestRootRuntimeProbeProgramWithActualAppMCP","Output":"--- PASS: TestRootRuntimeProbeProgramWithActualAppMCP (0.31s)\n"}
+{"Time":"2026-10-18T22:25:33.240825322+11:00","Action":"pass","Package":"rundesk-video-app","Test":"TestRootRuntimeProbeProgramWithActualAppMCP","Elapsed":0.31}
+{"Time":"2026-10-18T22:25:33.240854235+11:00","Action":"run","Package":"rundesk-video-app","Test":"TestTextRefsRealAdapterArchiveAndLocator"}
+{"Time":"2026-10-18T22:25:33.24085825+11:00","Action":"output","Package":"rundesk-video-app","Test":"TestTextRefsRealAdapterArchiveAndLocator","Output":"=== RUN   TestTextRefsRealAdapterArchiveAndLocator\n"}
+{"Time":"2026-10-18T22:25:36.477760579+11:00","Action":"output","Package":"rundesk-video-app","Test":"TestTextRefsRealAdapterArchiveAndLocator","Output":"--- PASS: TestTextRefsRealAdapterArchiveAndLocator (3.24s)\n"}
+{"Time":"2026-10-18T22:25:36.477872246+11:00","Action":"pass","Package":"rundesk-video-app","Test":"TestTextRefsRealAdapterArchiveAndLocator","Elapsed":3.24}
+{"Time":"2026-10-18T22:25:36.478362925+11:00","Action":"run","Package":"rundesk-video-app","Test":"TestProductionExchangeRealAdapterArchiveLateResultAndFinalProof"}
+{"Time":"2026-10-18T22:25:36.478393391+11:00","Action":"output","Package":"rundesk-video-app","Test":"TestProductionExchangeRealAdapterArchiveLateResultAndFinalProof","Output":"=== RUN   TestProductionExchangeRealAdapterArchiveLateResultAndFinalProof\n"}
+{"Time":"2026-10-18T22:25:40.157021216+11:00","Action":"output","Package":"rundesk-video-app","Test":"TestProductionExchangeRealAdapterArchiveLateResultAndFinalProof","Output":"--- PASS: TestProductionExchangeRealAdapterArchiveLateResultAndFinalProof (3.68s)\n"}
+{"Time":"2026-10-18T22:25:40.157116553+11:00","Action":"pass","Package":"rundesk-video-app","Test":"TestProductionExchangeRealAdapterArchiveLateResultAndFinalProof","Elapsed":3.68}
+{"Time":"2026-10-18T22:25:40.157126367+11:00","Action":"run","Package":"rundesk-video-app","Test":"TestProductionExchangeNewerEditAuthoritySurvivesOlderLateIngest"}
+{"Time":"2026-10-18T22:25:40.157130197+11:00","Action":"output","Package":"rundesk-video-app","Test":"TestProductionExchangeNewerEditAuthoritySurvivesOlderLateIngest","Output":"=== RUN   TestProductionExchangeNewerEditAuthoritySurvivesOlderLateIngest\n"}
+{"Time":"2026-10-18T22:25:43.312202679+11:00","Action":"output","Package":"rundesk-video-app","Test":"TestProductionExchangeNewerEditAuthoritySurvivesOlderLateIngest","Output":"--- PASS: TestProductionExchangeNewerEditAuthoritySurvivesOlderLateIngest (3.15s)\n"}
+{"Time":"2026-10-18T22:25:43.312246416+11:00","Action":"pass","Package":"rundesk-video-app","Test":"TestProductionExchangeNewerEditAuthoritySurvivesOlderLateIngest","Elapsed":3.15}
+{"Time":"2026-10-18T22:25:43.314303135+11:00","Action":"output","Package":"rundesk-video-app","Output":"PASS\n"}
+{"Time":"2026-10-18T22:25:44.322513966+11:00","Action":"output","Package":"rundesk-video-app","Output":"ok  \trundesk-video-app\t11.420s\n"}
+{"Time":"2026-10-18T22:25:44.322571086+11:00","Action":"pass","Package":"rundesk-video-app","Elapsed":11.421}

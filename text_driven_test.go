@@ -18,6 +18,7 @@ func TestTextDrivenProductionArtifactsEndToEnd(t *testing.T) {
 	defer server.Close()
 	a.tts = indexConfig(server.URL)
 	p, _ := a.create("Text drives the cut")
+	p = nativeWorkflowFixture(t, a, p)
 	url := "/api/projects/" + p.ID
 	w := call(a, "PUT", url+"/narration", map[string]any{"revision": p.Revision, "text": "Original fact.\nSupporting detail."})
 	if w.Code != 200 {

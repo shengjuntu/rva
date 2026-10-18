@@ -93,6 +93,7 @@ func TestAssetImportConcurrentRetriesAndConflicts(t *testing.T) {
 func TestUnifiedJobsPersistAndReplayRenderReceipt(t *testing.T) {
 	a := testApp(t)
 	p, _ := a.create("任务")
+	p = nativeWorkflowFixture(t, a, p)
 	request := RenderRequest{RequestID: uid(), Revision: p.Revision, Kind: "draft"}
 	raw, _ := json.Marshal(request)
 	render := Render{ID: uid(), RequestID: request.RequestID, RequestHash: hashBytes(raw), State: "completed", Revision: p.Revision}
@@ -268,6 +269,7 @@ func TestUnifiedTTSRunsActualMediaProcessing(t *testing.T) {
 func TestConcurrentRenderSubmissionAllocatesOneTask(t *testing.T) {
 	a := testApp(t)
 	p, _ := a.create("幂等渲染")
+	p = nativeWorkflowFixture(t, a, p)
 	p.Shots = []Shot{{Title: "标题", Text: "正文", Duration: 1}}
 	p, e := a.edit(p.ID, p)
 	if e != nil {

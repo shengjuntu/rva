@@ -815,3 +815,45 @@ dialog p {
 .located-clip .row { margin-top:10px; }
 @media (max-width:1150px) { .production-materials { align-items:flex-start; flex-direction:column; } .production-materials .row { justify-content:flex-start; } }
 @media (max-width:850px) { .production-input { padding:17px; } .production-board { grid-template-columns:1fr; } }
+
+/* The review surface consumes saved editorial metadata without editing it. */
+#review-workbench { margin:26px 0; padding:20px; border:1px solid var(--line); border-radius:14px; background:#fff; min-width:0; }
+#review-workbench [hidden] { display:none !important; }
+.review-toolbar { display:flex; align-items:flex-end; gap:18px; flex-wrap:wrap; }
+.review-toolbar label { font-size:12px; flex:1; min-width:180px; }
+.review-toolbar select { display:block; width:100%; margin-top:6px; }
+.review-toolbar input { display:block; width:100%; margin-top:6px; }
+#review-status { overflow-wrap:anywhere; line-height:1.7; }
+.review-warning { color:#8a6034; background:#fff7e9; padding:9px 12px; border-radius:6px; overflow-wrap:anywhere; }
+.review-view { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:18px; margin:16px 0; }
+.review-screen { display:flex; align-items:center; justify-content:center; min-height:220px; background:#14251f; border-radius:9px; overflow:hidden; }
+.review-screen video { display:block; width:100%; max-height:420px; }
+.review-screen>p { color:#c2d4cb; padding:22px; line-height:1.7; }
+.review-script { min-width:0; }
+.review-script h3 { font-size:13px; margin:0; }
+#review-text { white-space:pre-wrap; overflow-wrap:anywhere; overflow:auto; max-height:270px; padding:0 12px; margin:10px 0; border-left:3px solid #dcebe4; font-size:13px; line-height:1.85; user-select:text; }
+#review-text mark { background:#f6e9a9; color:inherit; border-radius:2px; }
+#review-select-text { font-size:12px; }
+.review-position { display:flex; align-items:center; gap:14px; margin:14px 0; }
+.review-position output { white-space:nowrap; font:11px ui-monospace,monospace; color:#61786d; }
+.review-position input { flex:1; width:auto; }
+#review-timeline-scroll { overflow-x:auto; padding:4px 0 12px; }
+#review-timeline { min-width:100%; }
+.review-lane { margin:9px 0; }
+.review-lane-label { display:block; font-size:11px; font-weight:500; color:#536d60; margin-bottom:5px; }
+.review-strip { position:relative; height:42px; border:1px solid #e4ece7; border-radius:5px; background:#f3f6f4; overflow:hidden; }
+.review-block { position:absolute; top:3px; height:34px; min-width:0; border:1px solid #9dbab7; border-radius:3px; background:#dcebe6; font-size:10px; text-overflow:ellipsis; overflow:hidden; white-space:nowrap; padding:3px 5px; text-align:left; }
+.review-lane[data-kind="narration"] .review-block { background:#e0eaf5; border-color:#a9c0dc; }
+.review-lane[data-kind="subtitle"] .review-block { background:#f0e3f4; border-color:#cfb3d5; }
+.review-lane[data-kind="music"] .review-block { background:#f5ebd9; border-color:#d9c296; }
+.review-block.selected { outline:2px solid #286c52; outline-offset:-2px; }
+.review-lane-empty { display:block; font-size:11px; color:#7c9085; padding:12px 10px; }
+.review-playhead { position:absolute; top:0; bottom:0; width:1px; background:#da6a49; pointer-events:none; z-index:2; }
+.review-selection { border-top:1px solid var(--line); padding-top:14px; overflow-wrap:anywhere; }
+.review-selection strong { font-size:13px; }
+.review-selection blockquote { font-size:13px; margin:10px 0; padding:8px 12px; border-left:3px solid #b9d5c7; background:#f5f8f6; white-space:pre-wrap; }
+#hyperframes-project { border-top:1px solid var(--line); padding-top:14px; margin-top:18px; }
+#hyperframes-project summary { cursor:pointer; color:var(--green); font-size:12px; }
+#hyperframes-files details { margin:10px 0; }
+#hyperframes-files pre { max-height:320px; overflow:auto; white-space:pre-wrap; overflow-wrap:anywhere; background:#f4f7f5; padding:12px; font:11px/1.7 ui-monospace,monospace; border-radius:6px; }
+@media (max-width:850px) { #review-workbench { padding:16px; } .review-view { grid-template-columns:1fr; } .review-screen video { max-height:380px; } }

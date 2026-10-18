@@ -1,0 +1,4 @@
+interface:
+  display_name: "文字驱动自主视频制作"
+  short_description: "自主分镜、选材、生成配音与 HyperFrames 动画，审阅并局部精修成片"
+  default_prompt: "Use $video-project to direct a narration-led video with the configured material and generation tools, create original HyperFrames animation, render a complete draft, and record real review evidence."

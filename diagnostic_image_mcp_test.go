@@ -72,6 +72,7 @@ func TestRootDiagnosticImageMCPPayload(t *testing.T) {
 func TestRootLocateMCPPreservesOptionalOccurrence(t *testing.T) {
 	a := testApp(t)
 	p, _ := a.create("原文定位")
+	p = nativeWorkflowFixture(t, a, p)
 	p.NarrationText = "芯片发布。准备量产。"
 	d := simpleEdit()
 	d.TextSourceHash = narrationSourceHash(p)

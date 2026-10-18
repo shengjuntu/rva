@@ -303,8 +303,41 @@ func nativeLocateClips(p Project) ([]EditLocateMatch, error) {
 	}
 	return clips, nil
 }
+
+// HyperFrames review clips describe the author's intended edit. They are not
+// extracted from HTML/JavaScript or measured from rendered frames.
+const hyperFramesLocateWarning = "HyperFrames片段时间和文字关联来自作者保存的审阅标注；未逐帧核验自由动画，也不代表逐字语音对齐或语义验证。"
+
+func hyperFramesLocateClips(p Project) ([]EditLocateMatch, error) {
+	if p.HyperFrames == nil {
+		return nil, errors.New("尚未保存自由HyperFrames工程")
+	}
+	if err := validateHyperFramesProject(p, *p.HyperFrames); err != nil {
+		return nil, err
+	}
+	clips := []EditLocateMatch{}
+	for _, clip := range p.HyperFrames.Timeline {
+		clips = append(clips, EditLocateMatch{ClipID: clip.ID, TrackID: clip.Track, Start: clip.Start, End: clip.Start + clip.Duration, AssetID: clip.AssetID, TextRefs: clip.TextRefs, MatchedRefs: []TextReference{}})
+	}
+	return clips, nil
+}
+
 func (a *App) editLocateSource(p Project, renderID string) (EditLocateResult, string, []EditLocateMatch, int, error) {
 	out := EditLocateResult{ProjectID: p.ID, Revision: p.Revision, Backend: workflowFor(p).EditingBackend, SourceHash: narrationSourceHash(p), Current: true, Matches: []EditLocateMatch{}, UnmappedClipIDs: []string{}}
+	if renderID == "" && out.Backend == "hyperframes" {
+		out.Warning = hyperFramesLocateWarning
+		clips, err := hyperFramesLocateClips(p)
+		if err != nil {
+			out.Current = false
+			return out, "", nil, 409, err
+		}
+		// A saved binding whose private bytes changed is no longer a current input.
+		if _, err = a.hyperFramesAssetFiles(p, *p.HyperFrames); err != nil {
+			out.Current = false
+			return out, "", nil, 409, err
+		}
+		return out, p.NarrationText, clips, 200, nil
+	}
 	if renderID == "" && out.Backend != "video_use" {
 		clips, err := nativeLocateClips(p)
 		out.Backend = "native"
@@ -327,7 +360,7 @@ func (a *App) editLocateSource(p Project, renderID string) (EditLocateResult, st
 		}
 		return out, "", nil, 409, errors.New("尚无当前输入对应的已归档video_use剪辑；可指定renderId查询历史版本")
 	}
-	if found.State != "completed" || found.Range != nil || found.Engine != "video_use" && found.Engine != "ffmpeg_edit" {
+	if found.State != "completed" || found.Range != nil || found.Engine != "video_use" && found.Engine != "ffmpeg_edit" && found.Engine != authoredHyperFramesEngine {
 		return out, "", nil, 409, errors.New("只能定位已完成的完整剪辑渲染")
 	}
 	root, err := os.OpenRoot(filepath.Join(a.dir(p.ID), "renders", found.ID))
@@ -367,9 +400,25 @@ func (a *App) editLocateSource(p Project, renderID string) (EditLocateResult, st
 	}
 	out.RenderID = found.ID
 	out.SourceHash = found.SourceHash
+	if found.Engine == authoredHyperFramesEngine {
+		if snapshot.HyperFrames == nil || found.ContentHash != hyperFramesDocumentHash(*snapshot.HyperFrames) || !a.hyperFramesArchiveIntact(p, *found, proof) {
+			return out, "", nil, 409, errors.New("HyperFrames冻结工程或归档产物已改变")
+		}
+		out.Backend = "hyperframes"
+		out.Current = renderCurrent(p, *found)
+		if out.Current {
+			out.Current = a.hyperFramesView(p).Current
+		}
+		out.Warning = hyperFramesLocateWarning
+		if !out.Current {
+			out.Warning += "按该渲染冻结时的原文定位；结果不代表当前剪辑。"
+		}
+		clips, err := hyperFramesLocateClips(snapshot)
+		return out, snapshot.NarrationText, clips, 409, err
+	}
 	if found.Engine == "ffmpeg_edit" {
 		out.Backend = "native"
-		out.Current = workflowFor(p).EditingBackend != "video_use" && usesEditDSL(p) && productionHash(snapshot) == productionHash(p) && narrationSourceHash(p) == found.SourceHash
+		out.Current = workflowFor(p).EditingBackend == "native" && usesEditDSL(p) && productionHash(snapshot) == productionHash(p) && narrationSourceHash(p) == found.SourceHash
 		clips, err := nativeLocateClips(snapshot)
 		if !out.Current {
 			out.Warning = "按该渲染归档时的原文定位；结果不代表当前剪辑。"

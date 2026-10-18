@@ -17,7 +17,7 @@ func mcpMain(args []string) {
 	flags := flag.NewFlagSet("mcp", flag.ExitOnError)
 	base := flags.String("url", "http://127.0.0.1:3220", "video app URL")
 	_ = flags.Parse(args)
-	client := &http.Client{Timeout: 30 * time.Second, CheckRedirect: func(r *http.Request, v []*http.Request) error { return http.ErrUseLastResponse }}
+	client := &http.Client{Timeout: 2 * time.Minute, CheckRedirect: func(r *http.Request, v []*http.Request) error { return http.ErrUseLastResponse }}
 	runMCP(os.Stdin, os.Stdout, *base, os.Getenv("VIDEO_APP_TOKEN"), client)
 }
 func runMCP(input io.Reader, output io.Writer, base, token string, client *http.Client) {
@@ -236,8 +236,13 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 				}
 				tools = append(tools, tool)
 			}
+			tools = append(tools, hyperFramesMCPTools()...)
 			send(msg.ID, map[string]any{"tools": tools})
 		case "tools/call":
+			if result, handled := callHyperFramesMCP(msg.Params, base, token, client); handled {
+				send(msg.ID, result)
+				continue
+			}
 			var p struct {
 				Name      string `json:"name"`
 				Arguments struct {

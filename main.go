@@ -28,7 +28,7 @@ import (
 	"time"
 )
 
-const version = "0.22.0"
+const version = "0.23.0"
 
 //go:embed web/*
 var ui embed.FS
@@ -84,6 +84,7 @@ type Render struct {
 	HasAudio     bool         `json:"hasAudio"`
 }
 type Project struct {
+	HyperFrames         *HyperFramesDocument    `json:"hyperframes,omitempty"`
 	MediaAlignment      *MediaAlignmentDocument `json:"mediaAlignment,omitempty"`
 	ProductionRuns      []ProductionRun         `json:"productionRuns,omitempty"`
 	Checkpoints         []ProductionCheckpoint  `json:"checkpoints,omitempty"`
@@ -298,7 +299,8 @@ func (a *App) createRequested(name, requestID string) (Project, error) {
 			}
 		}
 	}
-	p := Project{CreationRequestID: requestID, CreationRequestHash: requestHash, ID: uid(), Name: name, Revision: 1, Shots: []Shot{}, Assets: []Asset{}, Renders: []Render{}}
+	wf := newProjectWorkflow()
+	p := Project{Workflow: &wf, CreationRequestID: requestID, CreationRequestHash: requestHash, ID: uid(), Name: name, Revision: 1, Shots: []Shot{}, Assets: []Asset{}, Renders: []Render{}}
 	if e := os.MkdirAll(filepath.Join(a.dir(p.ID), "workspace", "assets"), 0700); e != nil {
 		return p, e
 	}
@@ -541,6 +543,10 @@ func (a *App) routes() http.Handler {
 	m.HandleFunc("POST /api/projects/{id}/production-runs/{prid}/ingest", a.productionRunIngest)
 	m.HandleFunc("POST /api/projects/{id}/renders/{rid}/inspect", a.renderInspect)
 	m.HandleFunc("GET /api/projects/{id}/workflow", a.workflowGet)
+	m.HandleFunc("GET /api/projects/{id}/hyperframes", a.hyperFramesGet)
+	m.HandleFunc("PUT /api/projects/{id}/hyperframes", a.hyperFramesUpdate)
+	m.HandleFunc("POST /api/projects/{id}/hyperframes/check", a.hyperFramesCheck)
+	m.HandleFunc("GET /api/projects/{id}/review-timeline", a.reviewTimeline)
 	m.HandleFunc("PUT /api/projects/{id}/workflow", a.workflowSave)
 	m.HandleFunc("POST /api/projects/{id}/draft/instruction", a.draftInstruction)
 	m.HandleFunc("GET /api/projects/{id}/agent", a.agentState)

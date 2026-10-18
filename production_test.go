@@ -52,6 +52,7 @@ func TestProductionTextPreservesExactTextAndMapping(t *testing.T) {
 func TestProductionFinalRequiresCurrentCompletedRenderAndInvalidates(t *testing.T) {
 	a := testApp(t)
 	p, _ := a.create("新闻")
+	p = nativeWorkflowFixture(t, a, p)
 	p = productionCall(t, a, p, "测试正文。")
 	rid := uid()
 	a.mu.Lock()

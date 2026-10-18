@@ -6,6 +6,7 @@ COPY go.mod ./
 COPY *.go ./
 COPY comfyh3 ./comfyh3
 COPY web ./web
+COPY integrations/video-project ./integrations/video-project
 RUN CGO_ENABLED=0 go build -buildvcs=false -trimpath -ldflags='-s -w' -o /out/video-app .
 
 FROM ${NODE_IMAGE} AS renderer

@@ -13,6 +13,7 @@ func adoptedProject(t *testing.T) (*App, Project) {
 	a := testApp(t)
 	script := scriptFixture("审核稿测试。")
 	p := importFixture(t, a, script)
+	p = nativeWorkflowFixture(t, a, p)
 	w := uploadNews(a, "/api/projects/"+p.ID+"/news/video", zipFixture(realVideoFixture(t, script), ""), p.Revision)
 	if w.Code != 201 {
 		t.Fatal(w.Code, w.Body.String())

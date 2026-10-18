@@ -285,6 +285,7 @@ func TestMediaAlignmentVideoSelectionsUseActualDuration(t *testing.T) {
 func TestThreeStageBoardDoesNotTreatFilesOrPreviewAsCompletedProduction(t *testing.T) {
 	a := testApp(t)
 	p, _ := alignmentProject(t, a, "只有文字和文件。")
+	p = nativeWorkflowFixture(t, a, p)
 	w := call(a, "GET", "/api/projects/"+p.ID+"/production-board", nil)
 	var board struct {
 		Stages        []ProductionCard `json:"stages"`

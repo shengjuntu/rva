@@ -1,0 +1,33 @@
+{
+  "assetChangeInputsCurrent": false,
+  "assetChangeOutputIntact": true,
+  "audioDecodedNonSilent": true,
+  "decodedAudioPeak": 755,
+  "duration": 2,
+  "engine": "hyperframes_authored",
+  "engineVersion": "0.8.87",
+  "finalCurrentAfterTextChange": false,
+  "finalId": "c38f01ca00dffc9cf767ca66",
+  "finalVerified": true,
+  "fps": 30,
+  "hasAudio": true,
+  "height": 180,
+  "historicalTextPreserved": true,
+  "indexTTSTested": false,
+  "inputHash": "4f697e3858f248ee4f74f76cfff059fe19b448b74dc1e1ab1ad3b42b388e4392",
+  "modelTested": false,
+  "motionSamplesVerified": [
+    0.2,
+    1.5
+  ],
+  "output": "animation-audio.mp4",
+  "projectId": "5d83594c73c3cd8f08f4e55e",
+  "renderId": "c8e116b8fee57f1a46c1c9db",
+  "snapshotHash": "2b0d29cff4f8886303b0d2074332511d5f812c4f3ef33c6abc5287441367d67f",
+  "status": "passed",
+  "textChangeInputsCurrent": false,
+  "textChangeOutputIntact": true,
+  "videoHash": "9fd57416982e47d2ebfe97505f8d809f91f9b5d0bfe05df5b99b736be4cec049",
+  "width": 320,
+  "audio": "440 Hz test tone; not IndexTTS narration"
+}

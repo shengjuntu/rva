@@ -1,5 +1,5 @@
 "use strict";
-const TOOL_VERSION = "0.22.0";
+const TOOL_VERSION = "0.23.0";
 const $ = (s) => document.querySelector(s),
   el = (tag, text, cls) => {
     const n = document.createElement(tag);
@@ -144,6 +144,7 @@ async function openProject(pid) {
   serviceJobsKey="";
   boardKey="";
   resetProductionDiagnostics();
+  resetReviewTimeline();
   speechKey = "";
   approvalKey = "";
   $("#conversation").replaceChildren(
@@ -201,6 +202,7 @@ function drawProject() {
   if(!editDSLDirty)loadEditPanel().catch(()=>{});
   loadProductionJobs().catch(()=>{});
   loadProductionBoard().catch(()=>{});
+  loadReviewTimeline().catch(()=>{});
 }
 function assetURL(a) {
   return path("/assets/" + a.id);
@@ -449,7 +451,7 @@ function drawFinalRenderOptions(){
  const empty=el('option','请选择已完成的完整成片');empty.value='';select.append(empty);
  for(const render of [...(project.renders||[])].reverse()){
   if(render.state!=='completed'||render.range)continue;
-  const backend=render.engine==='video_use'?'video-use':'内置剪辑';
+  const backend=editingBackendLabel(render.engine);
   const option=el('option',`修订 ${render.revision} · ${render.duration} 秒 · ${backend} · ${render.id}`);option.value=render.id;select.append(option);
  }
  select.value=[...select.options].some(option=>option.value===selected)?selected:'';
@@ -638,6 +640,7 @@ async function poll() {
     drawRenders();
     loadProductionJobs().catch(()=>{});
     loadProductionBoard().catch(()=>{});
+    loadReviewTimeline().catch(()=>{});
     drawWorkflow();
     if (project.sessionId) {
       const [s, events, approvals] = await Promise.all([
@@ -817,7 +820,7 @@ $("#render").onclick = action(async () => {
   const pid=project.id,gen=epoch;startingRender=true;$('#render').disabled=true;
   try {
     const pending=renderSubmission.read(pid);
-    if(!pending&&project.workflow?.editingBackend==='video_use')throw Error('video-use 制作请交给 RunDesk，可在右侧对话要求重新渲染');
+    if(!pending&&['video_use','hyperframes'].includes(project.workflow?.editingBackend))throw Error(editingBackendLabel(project.workflow.editingBackend)+' 制作请交给 RunDesk，可在右侧对话要求重新渲染');
     if(!pending) {await save();if(editDSLDirty)await saveEditDSL()}
     if(gen!==epoch)return;
     const body=pending||{type:"render",revision:project.revision,requestId:id(),options:{kind:"draft"}};
@@ -1540,7 +1543,7 @@ $('#folder-files').onchange=action(async()=>{
   $('#folder-files').value='';toast('目录素材已导入');
 });
 
-const capabilityLabels={media:'素材',tts:'配音',image_generation:'图片生成',video_generation:'视频生成',text_media_alignment:'文字与素材关联',editing:'编辑',rendering:'渲染',video_use_exchange:'video-use 工作区'};
+const capabilityLabels={hyperframes:'HyperFrames 动画工程',media:'素材',tts:'配音',image_generation:'图片生成',video_generation:'视频生成',text_media_alignment:'文字与素材关联',editing:'编辑',rendering:'渲染',video_use_exchange:'video-use 工作区'};
 async function loadCapabilities(probe=false) {
   $('#capability-status').textContent=probe?'正在检查服务…':'正在读取能力…';
   try {
@@ -1595,7 +1598,7 @@ function resetProductionDiagnostics(){
 }
 function drawRuntimeDiagnostics(report){
  const box=$('#diagnostics-results');box.replaceChildren();
- const backend=report.editingBackend==='video_use'?'video-use':'内置剪辑';
+ const backend=editingBackendLabel(report.editingBackend);
  $('#diagnostics-status').textContent=backend+' · '+(report.ready===true?'当前制作依赖检查通过。':'制作环境有待处理项。')+' 模型实际看图尚未验证。'+(workflowDirty?' 工作流有未保存修改，本次检查使用已保存设置。':'');
  const labels={passed:'通过',failed:'失败',blocked:'待处理',not_checked:'未检查'};
  for(const check of report.rows||[]){
@@ -1627,12 +1630,12 @@ function drawLocatorRenderOptions(){
  const current=el('option','当前剪辑工程');current.value='';select.append(current);
  for(const render of [...(project?.renders||[])].reverse()){
   if(render.state!=='completed'||render.range)continue;
-  const option=el('option',`成片修订 ${render.revision} · ${render.engine==='video_use'?'video-use':'内置剪辑'} · ${render.id}`);option.value=render.id;select.append(option);
+  const option=el('option',`成片修订 ${render.revision} · ${editingBackendLabel(render.engine)} · ${render.id}`);option.value=render.id;select.append(option);
  }
  if([...select.options].some(option=>option.value===selected))select.value=selected;
 }
 function locatorNotice(result){
- const parts=[result.backend==='video_use'?'video-use EDL':'内置剪辑'];
+ const parts=[editingBackendLabel(result.backend)];
  if(result.renderId)parts.push('成片 '+result.renderId+' 的已保存工程与原文');
  else parts.push('已保存的当前工程');
  if(result.current!==true)parts.push('与当前输入不同或属于历史记录');
@@ -1693,22 +1696,22 @@ function invalidateLocator(){
 $('#locate-clips').onclick=action(locateClips);
 $('#locate-quote').oninput=invalidateLocator;$('#locate-occurrence').oninput=invalidateLocator;$('#locate-render').onchange=invalidateLocator;
 
+function editingBackendLabel(backend){return ['hyperframes','hyperframes_authored'].includes(backend)?'HyperFrames':backend==='video_use'?'video-use':'内置剪辑';}
 function drawEditingMode(){
- const external=project?.workflow?.editingBackend==='video_use',active=!!project?.editActive&&!external;
- $('#edit-mode').textContent=external?'video-use EDL 工程':active?'剪辑 DSL 模式':'旧镜头模式';
- $('#edit-engine-intro').textContent=external?'video-use 的剪辑工程由 RunDesk 保存，可在剪辑阶段卡片查看产物，通过对话修改。':'图片、视频、声音和文字可以自由组成多轨剪辑。启用后，成片只使用这份剪辑结构；旧镜头、音轨和字幕仍保留。';
+ const backend=project?.workflow?.editingBackend,external=['video_use','hyperframes'].includes(backend),active=!!project?.editActive&&!external;
+ const label=editingBackendLabel(backend);
+ $('#edit-mode').textContent=external?label+' 工程':active?'剪辑 DSL 模式':'旧镜头模式';
+ $('#edit-engine-intro').textContent=backend==='hyperframes'?'Codex 自由编写 HTML、CSS 和 JavaScript 动画；工程、素材引用和成片由 RunDesk 工具保存，可在作品审阅查看并通过对话修改。':external?'video-use 的剪辑工程由 RunDesk 保存，可在剪辑阶段卡片查看产物，通过对话修改。':'图片、视频、声音和文字可以自由组成多轨剪辑。启用后，成片只使用这份剪辑结构；旧镜头、音轨和字幕仍保留。';
  for(const selector of ['#edit-example','#edit-reload','#edit-activate','#edit-legacy','#edit-timeline'])$(selector).hidden=external;
  $('#edit-json').closest('details').hidden=external;$('#edit-patch').closest('details').hidden=external;
  $('#preview-start').closest('label').hidden=external;$('#preview-end').closest('label').hidden=external;$('#range-render').hidden=external;
  $('#final-tools > summary').textContent=external?'终稿':'局部预览与终稿';
- const canvas=project?.editDsl?.canvas||{};$('#preview-format').textContent=external?'以 RunDesk 成片为准':active?`${canvas.width||1080} × ${canvas.height||1920} · ${canvas.fps||30} fps`:'9:16 · 1080 × 1920 · 30 fps';
- $('#production-panel').hidden=active||external;
- $('#visual-details').hidden=active||external;
- $('#subtitle-section').hidden=active||external;
- $('#sound-section').parentElement.hidden=active||external;
- $('#save').textContent=active?'保存剪辑':'保存制作稿';
- $('#preview-label').textContent=external?'video-use 成片预览':active?'剪辑预览（以成片为准）':'镜头预览';
+ const canvas=backend==='hyperframes'?project?.hyperframes?.canvas||{}:project?.editDsl?.canvas||{};
+ $('#preview-format').textContent=external?(canvas.width?`${canvas.width} × ${canvas.height} · ${canvas.fps} fps`:'以 RunDesk 成片为准'):active?`${canvas.width||1080} × ${canvas.height||1920} · ${canvas.fps||30} fps`:'9:16 · 1080 × 1920 · 30 fps';
+ $('#production-panel').hidden=active||external;$('#visual-details').hidden=active||external;$('#subtitle-section').hidden=active||external;$('#sound-section').parentElement.hidden=active||external;
+ $('#save').textContent=active?'保存剪辑':'保存制作稿';$('#preview-label').textContent=external?label+' 成片预览':active?'剪辑预览（以成片为准）':'镜头预览';
 }
+
 function drawEditTimeline(ir){
  const box=$('#edit-timeline');box.replaceChildren();if(!ir){box.append(el('p','尚未保存剪辑，可先创建示例或交给 RunDesk 编写。','muted small'));return}
  box.append(el('p',`${ir.canvas.width} × ${ir.canvas.height} · ${ir.canvas.fps} fps · ${ir.duration.toFixed(3)} 秒`,'muted small'));
@@ -1955,7 +1958,7 @@ $('#patch-redo').onclick=action(async()=>{
 $('#range-render').onclick=action(async()=>{
  if(editDSLDirty)throw new Error('请先保存剪辑草稿');if(startingRender)return;const pid=project.id,gen=epoch;
  const pending=renderSubmission.read(pid);if(pending&&!pending.options?.range)throw new Error('完整渲染提交仍待确认，请先确认原任务');
- if(!pending&&project.workflow?.editingBackend==='video_use')throw Error('video-use 的局部预览请通过右侧对话交给 RunDesk');
+ if(!pending&&['video_use','hyperframes'].includes(project.workflow?.editingBackend))throw Error(editingBackendLabel(project.workflow.editingBackend)+' 的局部预览请通过右侧对话交给 RunDesk');
  const body=pending||{type:'render',revision:project.revision,requestId:id(),options:{kind:'draft',range:{start:Number($('#preview-start').value),end:Number($('#preview-end').value)}}};
  startingRender=true;let job;try{job=await renderSubmission.submit(pid,body,original=>api('/api/projects/'+pid+'/jobs',original));}finally{startingRender=false}if(gen!==epoch)return;$('#final-status').textContent='局部预览任务：'+job.nativeId+'；不能用于终稿';await loadProductionJobs(true);
 });
@@ -1967,3 +1970,5 @@ $('#final-designate').onclick=action(async()=>{
 $('#final-render-id').onchange=()=>{$('#final-reviewed').checked=false;};
 
 $('#final-verify').onclick=action(async()=>{const pid=project.id,gen=epoch;$('#final-status').textContent='正在读取素材和成片进行复核…';const result=await api('/api/projects/'+pid+'/final/verify');if(gen!==epoch)return;$('#final-status').textContent='输入仍有效：'+(result.inputsCurrent?'是':'否')+'；成片与快照完整：'+(result.outputIntact?'是':'否');});
+
+initReviewTimeline();

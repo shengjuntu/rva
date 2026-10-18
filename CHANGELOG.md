@@ -1,3 +1,14 @@
+# v0.23.0
+
+- 主路径调整为 Codex 自主导演与 HyperFrames 动画：保留自由分镜、选材、图片/视频生成、TTS 与局部修改。
+- 增加 HyperFrames 工程读取、修订保存和校验工具；统一渲染任务保存独立工程快照与实际成片。
+- 增加画面、音频、字幕、音乐的多轨只读审阅，以同一工程/输出的数据联动定位。
+- 原创制作 Skill 明确工具组合、真实产物、精确文字引用与能力边界；阶段记录不再成为重复确认门槛。
+- native DSL、video_use 及旧镜头工程继续兼容；HyperFrames 主流程不要求共享私人数据或 video-use。
+- 配套 RunDesk 0.49.5、video-build 1.4.0，默认提供 HyperFrames 工具，video-use 改为按需启用。
+- 设计参考 OpenMontage 的阶段/素材组织，以及 video-use 的文字驱动、剪辑定位与预览自检；自有 HyperFrames 主路径原创，没有引入 OpenMontage 的代码、Schema 或 Skill。
+- 既有可选 video_use 适配保留；相关上游资源继续遵循原 MIT 许可和各依赖条款，设计参考与直接引入分别说明。
+
 # v0.22.0
 
 - 新增运行诊断：当前项目绑定、认证配置、MCP工具、容器内真实PNG传输；video_use额外验证共享目录双向挑战、profile1.3.0、adapter2与固定上游版本。

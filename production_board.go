@@ -69,6 +69,9 @@ func checkpointBasis(p Project, stage, renderID string) string {
 		}
 	}
 	if stage == "review" {
+		if workflowFor(p).EditingBackend == "hyperframes" {
+			v["hyperframes"] = p.HyperFrames
+		}
 		if workflowFor(p).EditingBackend != "video_use" {
 			v["dsl"] = p.EditDSL
 			v["active"] = p.EditActive
@@ -282,6 +285,19 @@ func (a *App) productionBoard(w http.ResponseWriter, r *http.Request) {
 				edit.State = "blocked"
 				edit.Summary = "输入快照已准备，等待RunDesk完成EDL、渲染及归档"
 			}
+		}
+	}
+	if workflowFor(p).EditingBackend == "hyperframes" {
+		edit = ProductionCard{ID: "edit", Title: "HyperFrames动画工程", State: "empty", Summary: "等待Codex提交自由编写的HTML/CSS/JavaScript工程", Items: []ProductionItem{}}
+		if p.HyperFrames != nil {
+			view := a.hyperFramesView(p)
+			edit.State = "ready"
+			edit.Summary = fmt.Sprintf("%d个源文件 · %d份素材 · %.2f秒；%dx%d；轨道标注由Agent提供", len(p.HyperFrames.Files), len(p.HyperFrames.Assets), p.HyperFrames.Canvas.Duration, p.HyperFrames.Canvas.Width, p.HyperFrames.Canvas.Height)
+			if !view.Current {
+				edit.State = "stale"
+				edit.Summary += "；需重新核对正文或素材"
+			}
+			edit.Items = append(edit.Items, ProductionItem{ID: "hyperframes", Title: "查看源工程", Kind: "json", URL: "/api/projects/" + p.ID + "/hyperframes"})
 		}
 	}
 	render := ProductionCard{ID: "render", Title: "初稿与调整", State: "empty", Summary: "尚无渲染任务", Items: []ProductionItem{}}

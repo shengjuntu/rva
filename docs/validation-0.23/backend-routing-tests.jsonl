@@ -1,0 +1,16 @@
+{"Time":"2026-10-18T22:23:14.226482781+11:00","Action":"start","Package":"rundesk-video-app"}
+{"Time":"2026-10-18T22:23:14.250249604+11:00","Action":"run","Package":"rundesk-video-app","Test":"TestHyperFramesRenderFreezesBeforeAcceptanceAndCancelsIdempotently"}
+{"Time":"2026-10-18T22:23:14.250277271+11:00","Action":"output","Package":"rundesk-video-app","Test":"TestHyperFramesRenderFreezesBeforeAcceptanceAndCancelsIdempotently","Output":"=== RUN   TestHyperFramesRenderFreezesBeforeAcceptanceAndCancelsIdempotently\n"}
+{"Time":"2026-10-18T22:23:14.268011268+11:00","Action":"output","Package":"rundesk-video-app","Test":"TestHyperFramesRenderFreezesBeforeAcceptanceAndCancelsIdempotently","Output":"--- PASS: TestHyperFramesRenderFreezesBeforeAcceptanceAndCancelsIdempotently (0.02s)\n"}
+{"Time":"2026-10-18T22:23:14.268033575+11:00","Action":"pass","Package":"rundesk-video-app","Test":"TestHyperFramesRenderFreezesBeforeAcceptanceAndCancelsIdempotently","Elapsed":0.02}
+{"Time":"2026-10-18T22:23:14.268042861+11:00","Action":"run","Package":"rundesk-video-app","Test":"TestHyperFramesRenderRejectsUnpinnedRuntimeAndStaleText"}
+{"Time":"2026-10-18T22:23:14.268079429+11:00","Action":"output","Package":"rundesk-video-app","Test":"TestHyperFramesRenderRejectsUnpinnedRuntimeAndStaleText","Output":"=== RUN   TestHyperFramesRenderRejectsUnpinnedRuntimeAndStaleText\n"}
+{"Time":"2026-10-18T22:23:14.274786048+11:00","Action":"output","Package":"rundesk-video-app","Test":"TestHyperFramesRenderRejectsUnpinnedRuntimeAndStaleText","Output":"--- PASS: TestHyperFramesRenderRejectsUnpinnedRuntimeAndStaleText (0.01s)\n"}
+{"Time":"2026-10-18T22:23:14.274807882+11:00","Action":"pass","Package":"rundesk-video-app","Test":"TestHyperFramesRenderRejectsUnpinnedRuntimeAndStaleText","Elapsed":0.01}
+{"Time":"2026-10-18T22:23:14.274817244+11:00","Action":"run","Package":"rundesk-video-app","Test":"TestHyperFramesDirectRenderRequiresBackendButReplaysExistingRequest"}
+{"Time":"2026-10-18T22:23:14.274819584+11:00","Action":"output","Package":"rundesk-video-app","Test":"TestHyperFramesDirectRenderRequiresBackendButReplaysExistingRequest","Output":"=== RUN   TestHyperFramesDirectRenderRequiresBackendButReplaysExistingRequest\n"}
+{"Time":"2026-10-18T22:23:14.29472612+11:00","Action":"output","Package":"rundesk-video-app","Test":"TestHyperFramesDirectRenderRequiresBackendButReplaysExistingRequest","Output":"--- PASS: TestHyperFramesDirectRenderRequiresBackendButReplaysExistingRequest (0.02s)\n"}
+{"Time":"2026-10-18T22:23:14.294748992+11:00","Action":"pass","Package":"rundesk-video-app","Test":"TestHyperFramesDirectRenderRequiresBackendButReplaysExistingRequest","Elapsed":0.02}
+{"Time":"2026-10-18T22:23:14.294755037+11:00","Action":"output","Package":"rundesk-video-app","Output":"PASS\n"}
+{"Time":"2026-10-18T22:23:15.302467358+11:00","Action":"output","Package":"rundesk-video-app","Output":"ok  \trundesk-video-app\t1.076s\n"}
+{"Time":"2026-10-18T22:23:15.302517889+11:00","Action":"pass","Package":"rundesk-video-app","Elapsed":1.076}

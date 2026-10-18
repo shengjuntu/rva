@@ -38,6 +38,12 @@ func productionNarrationCurrent(p Project) bool {
 	return b.AssetID == n.AssetID && b.TextHash == hashBytes([]byte(storyboardText(p))) && b.ScriptHash == speechScriptHash(p) && b.Start == n.Start && b.SourceStart == n.SourceStart && b.SHA256 != ""
 }
 func productionHash(p Project) string {
+	if workflowFor(p).EditingBackend == "hyperframes" {
+		if p.HyperFrames == nil {
+			return hashBytes([]byte("hyperframes:empty"))
+		}
+		return hyperFramesDocumentHash(*p.HyperFrames)
+	}
 	if usesEditDSL(p) {
 		b, _ := json.Marshal(p.EditDSL)
 		return hashBytes(b)

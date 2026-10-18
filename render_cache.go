@@ -175,6 +175,19 @@ func (a *App) verifyFinal(w http.ResponseWriter, r *http.Request) {
 	}
 	f := p.Final
 	for _, render := range p.Renders {
+		if render.ID != f.RenderID || render.Engine != authoredHyperFramesEngine {
+			continue
+		}
+		dir := filepath.Join(a.dir(p.ID), "renders", render.ID)
+		proof, pe := readRenderProof(dir)
+		vh, n, ve := hashLocal(filepath.Join(dir, "final.mp4"))
+		sh, _, se := hashLocal(filepath.Join(dir, "snapshot.json"))
+		inputsCurrent := finalCurrent(p) && a.hyperFramesRenderInputsIntact(p, render)
+		outputIntact := pe == nil && ve == nil && se == nil && vh == f.VideoHash && n == f.VideoBytes && sh == f.SnapshotHash && a.hyperFramesArchiveIntact(p, render, proof)
+		writeJSON(w, 200, map[string]any{"revision": p.Revision, "final": f, "inputsCurrent": inputsCurrent, "outputIntact": outputIntact, "verified": inputsCurrent && outputIntact})
+		return
+	}
+	for _, render := range p.Renders {
 		if render.ID != f.RenderID || render.Engine != "video_use" {
 			continue
 		}

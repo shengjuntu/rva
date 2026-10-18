@@ -1,3 +1,22 @@
+# 升级到 v0.23.0
+
+保留并备份完整 data、访问令牌、RunDesk 身份/会话、TTS 与生成服务配置。等待活动任务结束后替换 App 或重建镜像；旧 docker/.env 显式改 VIDEO_IMAGE=rundesk-video-app:0.23.0。刷新项目工具到本版版本化 Skill，保留旧版及用户自定义 Skill。
+
+新项目默认 HyperFrames 自由动画，旧项目保留原 native/video_use/旧镜头后端，不静默转换。需要将旧项目用于新路径时，在高级制作设置显式选择 hyperframes，由 Codex 读取旧稿/素材，生成原创工程并保存；原工程和历史成片继续保留。后端选择不会把旧 DSL 自动翻译成 HTML，也不会自动安装依赖。
+
+HyperFrames 使用固定 0.8.87 与 GSAP 3.15.0，需要 Node.js、Chromium、FFmpeg/FFprobe 和字体。已有 App Docker 渲染镜像包含这组依赖；本机先使用 scripts/setup-renderer.sh 准备依赖。App 检查/渲染时不安装包。新的工程通过 MCP 提交源文件与素材 ID，再由 App 冻结渲染，无需为此增加共享目录或安装 video-use。
+
+配套 RunDesk 升到 0.49.5 后重新准备 video-build 1.4.0，并在运行环境中明确选择新镜像、按已有流程重建容器，保留 HOME、认证和工作区。仅替换源码 ZIP、镜像标签或更新 App 不会替换运行中的容器。工具镜像默认包含 HyperFrames/GSAP，video-use 改为显式按需安装；既有 video_use 项目应沿用已安装它的镜像或用 --with-video-use 构建配方，同时保留旧专用共享生产目录和权限。
+
+多轨审阅根据同一工程或冻结输出展示画面、配音、字幕和音乐。HyperFrames timeline 是作者声明的编辑元数据，不能独立验证 DOM、字幕或音频；查看实际输出仍需抽帧与播放。首版时间线只读，精确修改继续通过对话交给 Codex；不会把浏览器试听静音当成工程混音设置。
+
+先用短稿和已有图片验证保存工程、校验、完整渲染、查看版本和局部修改，再用真实材料验收自主制作质量。check 通过不是成片，PNG 传输不是模型视觉，终稿仍需要明确的人审。Windows 仍仅交叉编译；降级应恢复完整升级前备份。
+
+[本版接口与边界](HYPERFRAMES-0.23.md) · [原创制作 Skill](../integrations/video-project/SKILL.md)
+
+---
+以下为历史说明。
+
 # 升级到 v0.22.0
 
 备份并保留完整data、RunDesk/TTS配置、访问令牌、账户与原会话，等待活动任务结束后停止旧App，替换程序或重建App镜像。旧docker/.env中的VIDEO_IMAGE需显式改为rundesk-video-app:0.22.0。新版补装并显式选用v0.22.0版本化Skills，共48项MCP；保留旧版本及自定义文件。

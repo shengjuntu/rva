@@ -66,7 +66,7 @@ func (a *App) finalSave(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 	}
-	if found == nil || found.State != "completed" || (found.Engine != "ffmpeg_edit" && found.Engine != "video_use") || found.Range != nil || !renderCurrent(p, *found) {
+	if found == nil || found.State != "completed" || (found.Engine != "ffmpeg_edit" && found.Engine != "video_use" && found.Engine != authoredHyperFramesEngine) || found.Range != nil || !renderCurrent(p, *found) {
 		fail(w, 409, errors.New("需要当前完整剪辑的已完成渲染，局部预览不能作为终稿"))
 		return
 	}
@@ -110,7 +110,12 @@ func (a *App) finalSave(w http.ResponseWriter, r *http.Request) {
 		fail(w, 409, errors.New("渲染校验记录缺失或产物已改变，请重新渲染"))
 		return
 	}
-	if found.Engine == "video_use" {
+	if found.Engine == authoredHyperFramesEngine {
+		if !a.hyperFramesRenderInputsIntact(p, *found) || !a.hyperFramesArchiveIntact(p, *found, proof) {
+			fail(w, 409, errors.New("HyperFrames工程、素材、运行依赖或归档产物已改变，请重新渲染"))
+			return
+		}
+	} else if found.Engine == "video_use" {
 		if !a.externalRenderInputsIntact(p, *found) || !a.externalArchiveIntact(p, *found, proof) {
 			fail(w, 409, errors.New("外部剪辑的素材或归档依据已改变，请重新制作"))
 			return

@@ -27,6 +27,7 @@ func textRefProject(t *testing.T) (*App, Project) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	p = nativeWorkflowFixture(t, a, p)
 	p.NarrationText = "甲乙甲乙🙂发布。\n计划量产。"
 	d := simpleEdit()
 	d.TextSourceHash = narrationSourceHash(p)

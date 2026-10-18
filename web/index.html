@@ -6,6 +6,7 @@
     <title>视频工作台 · RunDesk App</title>
     <link rel="stylesheet" href="/style.css" />
     <script src="/speech-submit.js" defer></script>
+    <script src="/review.js" defer></script>
     <script src="/app.js" defer></script>
   </head>
   <body>
@@ -26,7 +27,7 @@
     </div>
     <div id="app" hidden>
       <header>
-        <div class="brand">视频工作台 <span>v0.20.0</span></div>
+        <div class="brand">视频工作台 <span>v0.23.0</span></div>
         <div class="top-actions">
           <button id="environment">环境准备</button
           ><button id="toggle-assets">素材栏</button
@@ -88,12 +89,22 @@
             <p id="workflow-status" class="muted small" role="status"></p>
           </section>
           <section id="production-results" aria-labelledby="production-results-title"><div class="section-head"><div><h2 id="production-results-title">制作进度与产物</h2><p class="muted small">素材准备和对齐 → 剪辑 → 精修。修改要求直接发到右侧对话。</p></div><button id="refresh-board">刷新</button></div><div class="production-version"><span class="muted small">版本状态</span><span id="production-version-status" class="version-status" role="status">初稿</span></div><p id="production-board-status" class="muted small" role="status">加载制作记录…</p><div id="production-board" class="production-board"></div></section>
+          <section id="review-workbench" aria-labelledby="review-title">
+            <div class="section-head"><div><h2 id="review-title">作品审阅</h2><p class="muted small">文稿、画面和多轨时间线联动；选中片段后通过对话调整。</p></div><button id="review-refresh">刷新作品</button></div>
+            <div class="review-toolbar"><label>查看版本<select id="review-version"><option value="">当前工程</option></select></label><label>时间线缩放<input id="review-zoom" type="range" min="1" max="5" step="0.5" value="1" aria-label="时间线缩放"></label></div>
+            <p id="review-status" class="muted small" role="status">尚未加载作品。</p><div id="review-warnings" role="status"></div>
+            <div class="review-view"><div class="review-screen"><video id="review-player" controls playsinline preload="metadata" hidden></video><p id="review-no-video" class="muted small">当前工程尚无对应的已完成成片。时间线展示已保存的数据。</p></div><div class="review-script"><h3>正文</h3><p class="muted small">可选中文字加入调整草稿；画面关联仅使用已记录的引用。</p><div id="review-text"></div><button id="review-select-text" disabled>将所选文字加入调整草稿</button></div></div>
+            <div class="review-position"><output id="review-position">00:00.000 / 00:00.000</output><input id="review-seek" type="range" min="0" max="0" step="0.01" value="0" aria-label="定位作品时间"></div>
+            <div id="review-timeline-scroll"><div id="review-timeline"></div></div>
+            <div id="review-selection" class="review-selection"><p class="muted small">选择片段查看时间和原文引用。这里提供只读审阅，修改交给 RunDesk。</p></div>
+            <details id="hyperframes-project" hidden><summary>HyperFrames 工程与动画源文件</summary><p id="hyperframes-summary" class="muted small"></p><div id="hyperframes-files"></div><p class="muted small">源文件作为文本展示。动画效果请查看渲染结果；工程存在不代表已通过成片检查。</p></details>
+          </section>
           <details id="advanced-workspace" class="advanced-workspace"><summary>高级工具与诊断</summary><p class="muted small advanced-intro">手动剪辑、服务配置和任务诊断。日常制作可直接使用上方按钮和右侧对话。</p>
             <div class="advanced-save-actions">            <div class="row">
               <button id="save">保存制作稿</button
               ><button id="render" class="primary">生成初稿</button>
             </div></div>
-            <section class="production-panel"><h2>正文与工作流设置</h2><div class="row"><button id="narration-save">保存正文</button><button id="workflow-save">保存制作要求</button></div><div class="workflow-skills"><label><input type="checkbox" id="skill-narration" checked>口播与时序</label><label><input type="checkbox" id="skill-editing" checked>素材与剪辑</label><label><input type="checkbox" id="skill-review" checked>精修检查</label></div><label class="workflow-backend">剪辑引擎<select id="workflow-backend"><option value="native">内置剪辑</option><option value="video_use">video-use</option></select></label><p class="muted small">video-use 需要配置共享工作目录和对应的 RunDesk 制作环境。</p></section>
+            <section class="production-panel"><h2>正文与工作流设置</h2><div class="row"><button id="narration-save">保存正文</button><button id="workflow-save">保存制作要求</button></div><div class="workflow-skills"><label><input type="checkbox" id="skill-narration" checked>口播与时序</label><label><input type="checkbox" id="skill-editing" checked>素材与剪辑</label><label><input type="checkbox" id="skill-review" checked>精修检查</label></div><label class="workflow-backend">剪辑引擎<select id="workflow-backend"><option value="hyperframes">HyperFrames 动画与合成</option><option value="native">内置剪辑</option><option value="video_use">video-use（兼容旧工程）</option></select></label><p class="muted small">HyperFrames 支持 Codex 自由编写 HTML、CSS 和 JavaScript 动画；需要共享工作目录及 RunDesk 制作环境。</p></section>
           <section id="runtime-diagnostics" class="production-panel">
             <div class="section-head"><h2>制作环境诊断</h2><button id="diagnose-production">检查制作环境</button></div>
             <p id="diagnostics-status" class="muted small" role="status">按当前项目的剪辑引擎检查依赖和连接。</p>

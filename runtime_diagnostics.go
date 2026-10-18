@@ -281,13 +281,13 @@ func (a *App) diagnoseRuntime(ctx context.Context, projectID string) (RuntimeDia
 	// MCP probe. Only the new read-only diagnostic POST supplies this evidence.
 	var observedProbe *runDeskDiagnosticResponse
 	if backend != "video_use" {
-		add("video_use_runtime", "video-use 运行时", "not_checked", "当前使用原生剪辑后端，无需 video-use 运行时", "backend_not_selected", "", false)
-		add("shared_workspace", "共享目录双向读写", "not_checked", "原生剪辑通过 App MCP 操作素材，无需共享目录", "backend_not_selected", "", false)
+		add("video_use_runtime", "video-use 运行时", "not_checked", "当前后端通过 App MCP 制作，无需 video-use 运行时", "backend_not_selected", "", false)
+		add("shared_workspace", "共享目录双向读写", "not_checked", "当前后端通过 App MCP 操作素材，无需共享目录", "backend_not_selected", "", false)
 	}
 	if v.ExecutionMode != "docker" || v.Environment == nil || v.Environment.State != "running" || v.Environment.PendingUpdate {
 		add("mcp_image_transport", "MCP 图片传输", "not_checked", "尚未进入可诊断的 Docker 环境，未检查容器接收 PNG", "docker_environment_required", "准备 Docker 运行环境后重新诊断；本机模式需另行验收图片传递", v.ExecutionMode == "docker" || backend == "video_use")
 		if backend == "video_use" {
-			add("video_use_runtime", "video-use 运行时", "blocked", "video-use 需要已准备的 Docker video-build 环境", "docker_environment_required", "选择并准备 video-build 1.3.0 镜像", true)
+			add("video_use_runtime", "video-use 运行时", "blocked", "video-use 需要已准备的 Docker video-build 环境", "docker_environment_required", "选择 video-build 1.3.0，或带 --with-video-use 的 1.4.0 镜像", true)
 			add("shared_workspace", "共享目录双向读写", "blocked", "运行环境尚未就绪，未执行跨容器读写", "docker_environment_required", "准备运行环境后重新诊断", true)
 		}
 	} else {
@@ -311,7 +311,7 @@ func (a *App) diagnoseRuntime(ctx context.Context, projectID string) (RuntimeDia
 			code, summary, remedy := "runtime_diagnostic_failed", err.Error(), "核对 RunDesk 运行环境和共享目录挂载"
 			var rdErr *RunDeskError
 			if errors.As(err, &rdErr) && rdErr.Status == 404 {
-				code, summary, remedy = "rundesk_upgrade_required", "RunDesk 尚未提供运行环境诊断接口", "升级到包含 runtime/diagnostics 接口的 RunDesk，并重建 video-build 1.3.0 镜像"
+				code, summary, remedy = "rundesk_upgrade_required", "RunDesk 尚未提供运行环境诊断接口", "升级 RunDesk，并准备带 video-use 的 video-build 1.4.0 镜像"
 			}
 			add("mcp_image_transport", "MCP 图片传输", "blocked", summary, code, remedy, true)
 			if backend == "video_use" {
@@ -352,14 +352,15 @@ func (a *App) diagnoseRuntime(ctx context.Context, projectID string) (RuntimeDia
 						incomplete = append(incomplete, name)
 					}
 				}
-				if rt.Status == "ready" && checksReady && rt.ProfileID == "video-build" && rt.ProfileVersion == "1.3.0" && rt.AdapterContractVersion == 2 && rt.VideoUseCommit == exchangeVideoUseCommit && rt.PythonVersion != "" && rt.FFmpegVersion != "" && rt.FFprobeVersion != "" {
-					add("video_use_runtime", "video-use 运行时", "passed", "已核对 video-build 1.3.0、适配器 v2、固定上游版本、Python 依赖及 FFmpeg/ffprobe", "", "", true)
+				profileSupported := rt.ProfileVersion == "1.3.0" || rt.ProfileVersion == "1.4.0"
+				if rt.Status == "ready" && checksReady && rt.ProfileID == "video-build" && profileSupported && rt.AdapterContractVersion == 2 && rt.VideoUseCommit == exchangeVideoUseCommit && rt.PythonVersion != "" && rt.FFmpegVersion != "" && rt.FFprobeVersion != "" {
+					add("video_use_runtime", "video-use 运行时", "passed", "已核对 video-build "+rt.ProfileVersion+"、适配器 v2、固定上游版本、Python 依赖及 FFmpeg/ffprobe", "", "", true)
 				} else {
 					summary := fmt.Sprintf("实际 profile=%s %s，适配器=%d；运行时与所需版本或依赖不一致", rt.ProfileID, rt.ProfileVersion, rt.AdapterContractVersion)
 					if len(incomplete) > 0 {
 						summary += "；未通过：" + strings.Join(incomplete, "、")
 					}
-					add("video_use_runtime", "video-use 运行时", "blocked", summary, "video_use_runtime_mismatch", "重建 video-build 1.3.0，并在 RunDesk 应用镜像更新；仅修改镜像标签无效", true)
+					add("video_use_runtime", "video-use 运行时", "blocked", summary, "video_use_runtime_mismatch", "以 --with-video-use 重建 video-build 1.4.0，并在 RunDesk 应用镜像更新；仅修改镜像标签无效", true)
 				}
 				if probe != nil {
 					if err = probe.verify(remote); err != nil {

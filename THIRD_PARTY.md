@@ -14,3 +14,11 @@
 
 - [IndexTTS](https://github.com/index-tts/index-tts)：可选外部语音模型与推理实现。本包仅提供自行编写的 HTTP 适配器，不分发模型权重或上游推理源码。模型及原项目遵循其各自许可。
 - [vLLM-Omni IndexTTS-2.5 recipe](https://recipes.vllm.ai/IndexTeam/IndexTTS-2.5)：语音请求协议、语言与语速映射参考。
+
+## 设计参考与兼容路径
+
+同时感谢 [OpenMontage](https://github.com/calesthio/OpenMontage) 和 [browser-use/video-use](https://github.com/browser-use/video-use) 的设计启发：前者用于阶段产物、素材组织和检查方法参考，后者用于文字驱动剪辑、精确定位、预览与自检方法参考。设计参考与直接引入实现分别记录，不将参考项目的许可替换成本项目许可。
+
+v0.23 的 HyperFrames 主路径自有代码、数据契约和制作 Skill 独立编写；本包没有包含 OpenMontage 的代码、Schema、Skill 或其他发行资源。这里的感谢和设计说明不是对上游许可证的重新授权。
+
+既有 video_use 是显式选择的可选兼容后端，其生产交换、归档与脚本素材适配保留；不将它描述为新 HyperFrames 主路径的依赖。App 包不包含 video-use 源码归档，RunDesk 可选工具构建提供其固定版本源码、原 MIT 许可证与依赖声明；使用和再分发这些上游资源时须保留适用许可及声明，其他组件继续遵循各自许可。自有适配代码不改变被调用上游组件的许可证。

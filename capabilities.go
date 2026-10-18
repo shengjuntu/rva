@@ -107,7 +107,7 @@ func (a *App) capabilityEnvelope(ctx context.Context, probe bool) CapabilityEnve
 
 	envelope.Capabilities = append(envelope.Capabilities, ProductionCapability{ID: "text_media_alignment", Implemented: true, Ready: true, Providers: []ProviderCapability{}, Tools: []string{"video_asset_describe", "video_media_align", "video_media_alignment_get", "video_media_alignment_update"}, Notes: []string{"描述与标签可作词项检索；实际画面语义由具备视觉能力的Agent查看后判断", "关联表保存精确原文引用、真实素材、理由、用途和缺口；不要求一段一镜，未覆盖内容仍显示未完成"}})
 	envelope.Capabilities = append(envelope.Capabilities, ProductionCapability{ID: "editing", Implemented: true, Ready: true, Providers: []ProviderCapability{}, Tools: []string{"video_edit_get", "video_edit_locate", "video_edit_validate", "video_edit_update", "video_edit_activate", "video_edit_patch_preview", "video_edit_patch_apply", "video_edit_undo", "video_edit_redo", "video_project_update"}, Notes: []string{"剪辑DSL v1：多轨、片段裁剪/速度、布局、淡入淡出、时间引用；内容通过素材引用自由组合", "旧镜头与DSL分别保存，渲染采用明确激活的模式", "可选textRefs关联原文与稳定片段；精确引用定位支持当前剪辑与历史归档，不推断逐字时序"}})
-	renderer := ProviderCapability{ID: "hyperframes", Runtime: "local", State: "blocked", Verified: "dependency_check", Reasons: missingCommands("node", "ffmpeg", "ffprobe"), Supports: []string{"legacy_storyboard", "html_gsap", "vertical_1080x1920_30fps"}}
+	renderer := ProviderCapability{ID: "hyperframes", Runtime: "local", State: "blocked", Verified: "dependency_check", Reasons: missingCommands("node", "ffmpeg", "ffprobe"), Supports: []string{"freeform_html_css_js", "html_gsap", "local_asset_bindings", "immutable_source_snapshot", "full_render_only", "legacy_storyboard"}}
 	for name, path := range map[string]string{"HyperFrames CLI": hf, "字体": font, "GSAP": gsap} {
 		if path == "" || !regularFile(path) {
 			renderer.Reasons = append(renderer.Reasons, "未配置可读的 "+name+" 文件")
@@ -151,6 +151,7 @@ func (a *App) capabilityEnvelope(ctx context.Context, probe bool) CapabilityEnve
 		editRenderer.State = "available"
 	}
 	envelope.Capabilities = append(envelope.Capabilities, ProductionCapability{ID: "rendering", Implemented: true, Ready: renderer.Ready || editRenderer.Ready, Providers: []ProviderCapability{renderer, editRenderer}, Tools: []string{"video_job_start", "video_render_start"}, Notes: []string{"激活DSL时使用FFmpeg，无需Node/浏览器；文字片段另需配置字体", "就绪表示依赖检查通过；实际合成由任务执行与MP4验证确认"}})
+	envelope.Capabilities = append(envelope.Capabilities, ProductionCapability{ID: "composition_authoring", Implemented: true, Ready: true, Providers: []ProviderCapability{renderer}, Tools: []string{"video_hyperframes_get", "video_hyperframes_update", "video_hyperframes_check", "video_review_timeline_get"}, Notes: []string{"保存自由HTML/CSS/JavaScript不执行源代码；实际check/render需要已配置HyperFrames0.8.87、Node22+、浏览器、FFmpeg与字体", "冻结工程提供runtime/gsap.min.js及runtime/font.css（VideoFont）；声音由工程显式audio/video声明，hasAudio是校验预期", "timeline是Agent声明的审阅标注，不代表已逐帧验证；原文引用不是逐字时间对齐"}, Limits: map[string]any{"sourceBytes": 1 << 20, "sourceFiles": 128, "durationSeconds": 600, "widthMaximum": 4096, "heightMaximum": 4096}})
 	exchangeReady := false
 	exchangeReasons := []string{}
 	if dir := strings.TrimSpace(os.Getenv("VIDEO_EXCHANGE_ROOT")); dir == "" {
@@ -166,7 +167,7 @@ func (a *App) capabilityEnvelope(ctx context.Context, probe bool) CapabilityEnve
 		exchangeState = "configured"
 	}
 	exchange := ProviderCapability{ID: "video_use", Runtime: "rundesk_shared_workspace", State: exchangeState, Configured: exchangeReady, Ready: false, Verified: "local_path_only", Reasons: exchangeReasons, Supports: []string{"script_media_edl", "continuous_narration", "images", "generated_video", "external_artifact_ingest"}}
-	envelope.Capabilities = append(envelope.Capabilities, ProductionCapability{ID: "video_use_exchange", Implemented: true, Ready: false, Providers: []ProviderCapability{exchange}, Tools: []string{"video_runtime_diagnose", "video_production_run_prepare", "video_production_run_get", "video_production_run_ingest"}, Notes: []string{"需要RunDesk video-build 1.3.0及adapter contract 2运行环境；video_runtime_diagnose校验实际容器版本、共享目录双向挑战和MCP图片传输，不验证模型视觉理解", "由Agent验证返回的快照指纹后运行适配器；MP4经实际探测和复制校验后才归档，不复写原生DSL"}})
+	envelope.Capabilities = append(envelope.Capabilities, ProductionCapability{ID: "video_use_exchange", Implemented: true, Ready: false, Providers: []ProviderCapability{exchange}, Tools: []string{"video_runtime_diagnose", "video_production_run_prepare", "video_production_run_get", "video_production_run_ingest"}, Notes: []string{"需要RunDesk video-build 1.3.0，或以 --with-video-use 构建的1.4.0，以及adapter contract 2；video_runtime_diagnose校验实际容器版本、共享目录双向挑战和MCP图片传输，不验证模型视觉理解", "由Agent验证返回的快照指纹后运行适配器；MP4经实际探测和复制校验后才归档，不复写原生DSL"}})
 	return envelope
 }
 func (a *App) capabilities(w http.ResponseWriter, r *http.Request) {

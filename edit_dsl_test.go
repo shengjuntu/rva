@@ -17,6 +17,22 @@ import (
 	"time"
 )
 
+// nativeWorkflowFixture explicitly selects the legacy renderer for tests that
+// exercise native DSL or template semantics. New project defaults remain tested
+// independently through the public API.
+func nativeWorkflowFixture(t *testing.T, a *App, p Project) Project {
+	t.Helper()
+	workflow := defaultWorkflow()
+	p.Workflow = &workflow
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	if err := a.save(&p); err != nil {
+		t.Fatal(err)
+	}
+	a.projects[p.ID] = &p
+	return clone(&p)
+}
+
 func editTime(v float64) *float64 { return &v }
 func simpleEdit() EditDocument {
 	return EditDocument{Version: 1, Canvas: EditCanvas{Width: 320, Height: 180, FPS: 30}, Tracks: []EditTrack{{ID: "titles", Kind: "text"}}, Clips: []EditClip{{ID: "title", Track: "titles", Start: editTime(0), Duration: 1, Text: "自由内容"}}}
@@ -142,6 +158,7 @@ func TestEditFFmpegActuallyRendersTracksTrimSpeedLayoutAndAudio(t *testing.T) {
 	a := testApp(t)
 	a.font = font
 	p, _ := a.create("DSL真实渲染")
+	p = nativeWorkflowFixture(t, a, p)
 	redImage := image.NewRGBA(image.Rect(0, 0, 32, 32))
 	blueImage := image.NewRGBA(image.Rect(0, 0, 32, 32))
 	for y := 0; y < 32; y++ {

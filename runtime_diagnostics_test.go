@@ -49,11 +49,14 @@ func diagnosticFixture(t *testing.T, backend string) (*App, Project, string) {
 }
 
 func TestRuntimeDiagnosticsBoundaries(t *testing.T) {
-	for _, kind := range []string{"ready", "native", "missing_exchange", "older_rundesk", "different_mount", "stale_nonce", "wrong_digest", "symlink_response", "oversized_response", "trailing_json", "changed_request", "wrong_binding", "old_adapter", "wrong_image", "image_not_checked", "binding_changed", "unprobed", "auth_missing", "mcp_missing", "mcp_error", "missing_probe_fields", "missing_ffprobe", "python_dependencies_missing"} {
+	for _, kind := range []string{"ready", "profile_1_4_compat", "profile_1_4_no_video_use", "unknown_profile", "native", "hyperframes", "missing_exchange", "older_rundesk", "different_mount", "stale_nonce", "wrong_digest", "symlink_response", "oversized_response", "trailing_json", "changed_request", "wrong_binding", "old_adapter", "wrong_image", "image_not_checked", "binding_changed", "unprobed", "auth_missing", "mcp_missing", "mcp_error", "missing_probe_fields", "missing_ffprobe", "python_dependencies_missing"} {
 		t.Run(kind, func(t *testing.T) {
 			backend := "video_use"
 			if kind == "native" {
 				backend = "native"
+			}
+			if kind == "hyperframes" {
+				backend = "hyperframes"
 			}
 			a, p, exchange := diagnosticFixture(t, backend)
 			otherMount := t.TempDir()
@@ -91,7 +94,7 @@ func TestRuntimeDiagnosticsBoundaries(t *testing.T) {
 					im, _ := diagnosticImage(in.Nonce)
 					out.ImageTransport.State, out.ImageTransport.Nonce, out.ImageTransport.ImageSHA256 = "passed", in.Nonce, hashBytes(im)
 					out.ImageTransport.MIMEType, out.ImageTransport.Width, out.ImageTransport.Height = "image/png", 32, 32
-					if kind == "native" {
+					if kind == "native" || kind == "hyperframes" {
 						if in.Challenge != nil {
 							t.Error("native backend requested exchange challenge")
 						}
@@ -142,6 +145,15 @@ func TestRuntimeDiagnosticsBoundaries(t *testing.T) {
 						}
 					}
 					switch kind {
+					case "profile_1_4_compat":
+						out.Runtime.ProfileVersion = "1.4.0"
+					case "profile_1_4_no_video_use":
+						out.Runtime.ProfileVersion = "1.4.0"
+						out.Runtime.VideoUseCommit = ""
+						out.Runtime.Checks["sourcePin"] = "not_required"
+						out.Runtime.Checks["pythonDependencies"] = "not_required"
+					case "unknown_profile":
+						out.Runtime.ProfileVersion = "9.0.0"
 					case "wrong_binding":
 						out.WorkspaceID = "other-workspace"
 					case "old_adapter":
@@ -181,14 +193,14 @@ func TestRuntimeDiagnosticsBoundaries(t *testing.T) {
 			}))
 			defer server.Close()
 			a.rd = server.URL
-			if kind == "native" || kind == "missing_exchange" {
+			if kind == "native" || kind == "hyperframes" || kind == "missing_exchange" {
 				t.Setenv("VIDEO_EXCHANGE_ROOT", "")
 			}
 			v, err := a.diagnoseRuntime(context.Background(), p.ID)
 			if err != nil {
 				t.Fatal(err)
 			}
-			if posts != 1 || v.ModelVisionVerified || v.Ready != (kind == "ready" || kind == "native") {
+			if posts != 1 || v.ModelVisionVerified || v.Ready != (kind == "ready" || kind == "profile_1_4_compat" || kind == "native" || kind == "hyperframes") {
 				t.Fatalf("posts=%d result=%+v", posts, v)
 			}
 			if diagnosticRow(t, v, "model_vision").State != "not_checked" {

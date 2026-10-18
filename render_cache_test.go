@@ -12,6 +12,7 @@ func TestCacheReuseAndTamperDetection(t *testing.T) {
 	a := testApp(t)
 	a.font = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 	p, _ := a.create("cache")
+	p = nativeWorkflowFixture(t, a, p)
 	d := simpleEdit()
 	d.Clips[0].Text = "Cache"
 	p.EditDSL = &d

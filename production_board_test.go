@@ -181,6 +181,7 @@ func TestRenderedFrameMCPReturnsImageEvidence(t *testing.T) {
 func TestReviewStaysBoundToReviewedRender(t *testing.T) {
 	a := testApp(t)
 	p, _ := a.create("review provenance")
+	p = nativeWorkflowFixture(t, a, p)
 	d := simpleEdit()
 	p.NarrationText = "original"
 	p.EditDSL = &d

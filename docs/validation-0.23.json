@@ -1,0 +1,97 @@
+{
+  "version": "0.23.0",
+  "checkedAt": "2026-10-18",
+  "goRace": {
+    "passed": 395,
+    "topLevelPassed": 171,
+    "skipped": [
+      "TestRootRuntimeProbeProgramWithActualAppMCP",
+      "TestTextRefsRealAdapterArchiveAndLocator",
+      "TestHyperFramesRealAnimationAudioRender",
+      "TestProductionExchangeRealAdapterArchiveLateResultAndFinalProof",
+      "TestProductionExchangeNewerEditAuthoritySurvivesOlderLateIngest",
+      "TestSpeechSnapshotGenerationAndAdoption"
+    ],
+    "failures": [],
+    "log": "tests-0.23.jsonl",
+    "optInTestsCoveredBySeparateRuns": [
+      "TestRootRuntimeProbeProgramWithActualAppMCP",
+      "TestTextRefsRealAdapterArchiveAndLocator",
+      "TestHyperFramesRealAnimationAudioRender",
+      "TestProductionExchangeRealAdapterArchiveLateResultAndFinalProof",
+      "TestProductionExchangeNewerEditAuthoritySurvivesOlderLateIngest"
+    ]
+  },
+  "goVet": true,
+  "nodeTestsPassed": 12,
+  "domHttp": {
+    "passed": true,
+    "checks": 49,
+    "report": "dom-validation-0.23.json"
+  },
+  "graphicalBrowser": {
+    "inspected": true,
+    "browser": "Chrome Headless Shell 155",
+    "scope": "Local main workbench and saved readonly review, Chinese font and layout; no model or media playback claims"
+  },
+  "realAuthoredRender": {
+    "passed": true,
+    "report": "validation-0.23/real-render.json",
+    "sample": "validation-0.23/animation-audio.mp4",
+    "engine": "HyperFrames 0.8.87",
+    "gsap": "3.15.0",
+    "canvas": "320x180/30fps/2s",
+    "video": "H.264",
+    "audio": "AAC test tone decoded non-silent",
+    "motionSamples": [
+      0.2,
+      1.5
+    ],
+    "finalVerified": true,
+    "currentInputsBecomeStaleAfterTextOrAssetChange": true,
+    "historicalOutputRemainsIntact": true,
+    "historicalTextPreserved": true
+  },
+  "mcpTools": 52,
+  "companion": {
+    "rundeskVersion": "0.49.5",
+    "videoBuildProfile": "1.4.0",
+    "adapterContractVersion": 2,
+    "kunVersion": "0.17.0",
+    "workerProtocol": 16
+  },
+  "builds": {
+    "linuxAmd64": "built and actual --version checked",
+    "windowsAmd64": "cross-compiled only",
+    "sha256": {
+      "video-app": "6a061cb9d933ae000898ea9a585dc941da24a26d0da25332598a6ba197dadf89",
+      "video-app-windows-amd64.exe": "10b17b3ebfaef6d9d6b70c6bc05d3c470704c67185880876d84cec926cac54c8"
+    }
+  },
+  "notTested": [
+    "Docker image build and deployment",
+    "real Codex autonomous production and model vision",
+    "actual image/video generation models",
+    "actual IndexTTS voice quality",
+    "Windows runtime"
+  ],
+  "limits": [
+    "HyperFrames currently accepts full renders only",
+    "HyperFrames timeline is authored annotation, not inferred or frame-measured edit timing",
+    "Text references preserve editorial associations, not semantic truth or word-level forced alignment",
+    "Check success does not designate a completed draft or human-reviewed final"
+  ],
+  "separateLegacyRaceIntegration": {
+    "passed": 4,
+    "skipped": 0,
+    "failed": 0,
+    "log": "validation-0.23/legacy-integration-tests.jsonl",
+    "scope": [
+      "Current RunDesk Python probe to actual App MCP HTTP PNG challenge",
+      "Pinned video-use adapter actual FFmpeg renders, archive and original-text locator",
+      "Late-result final proof",
+      "Newer edit authority retained after late older ingest"
+    ],
+    "modelsTested": false
+  }
+}

@@ -11,6 +11,7 @@ func TestRangeRenderAndFinalSnapshot(t *testing.T) {
 	a := testApp(t)
 	a.font = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
 	p, _ := a.create("release")
+	p = nativeWorkflowFixture(t, a, p)
 	d := simpleEdit()
 	d.Clips[0].Text = "Preview"
 	d.Clips[0].Duration = 3
