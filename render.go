@@ -15,9 +15,44 @@ import (
 	"time"
 )
 
+type RenderRequest struct {
+	Kind      string `json:"kind,omitempty"`
+	Revision  int    `json:"revision,omitempty"`
+	RequestID string `json:"requestId,omitempty"`
+}
+
 func (a *App) startRender(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	var request RenderRequest
+	if !decodeStrict(w, r, &request) {
+		return
+	}
+	if request.Kind != "" && request.Kind != "draft" {
+		fail(w, 400, errors.New("kind must be draft or omitted"))
+		return
+	}
+	if request.RequestID != "" && (!identifier.MatchString(request.RequestID) || request.Revision < 1) {
+		fail(w, 400, errors.New("幂等渲染需要24位requestId和revision"))
+		return
+	}
+	raw, _ := json.Marshal(request)
+	requestHash := hashBytes(raw)
 	a.mu.Lock()
+	if request.RequestID != "" {
+		if p := a.projects[id]; p != nil {
+			for _, j := range p.Renders {
+				if j.RequestID == request.RequestID {
+					a.mu.Unlock()
+					if j.RequestHash != requestHash {
+						fail(w, 409, errors.New("同一requestId不能用于不同渲染请求"))
+						return
+					}
+					writeJSON(w, 200, j)
+					return
+				}
+			}
+		}
+	}
 	if a.closing {
 		a.mu.Unlock()
 		fail(w, 503, errors.New("服务正在停止"))
@@ -29,13 +64,18 @@ func (a *App) startRender(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, errors.New("项目不存在"))
 		return
 	}
+	if request.Revision != 0 && request.Revision != p.Revision {
+		a.mu.Unlock()
+		fail(w, 409, errors.New("项目版本冲突，请重新载入"))
+		return
+	}
 	if len(p.Shots) == 0 {
 		a.mu.Unlock()
 		fail(w, 409, errors.New("请先保存至少一个镜头"))
 		return
 	}
 	refreshSubtitleState(p)
-	if p.Subtitles != nil && p.Subtitles.Enabled && p.Subtitles.Status != "ready" {
+	if p.Subtitles != nil && p.Subtitles.Enabled && p.Subtitles.Status != "ready" && !(request.Kind == "draft" && draftSubtitlePreviewAllowed(*p)) {
 		reason := p.Subtitles.Reason
 		a.mu.Unlock()
 		fail(w, 409, errors.New(reason))
@@ -54,7 +94,7 @@ func (a *App) startRender(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	q := clone(p)
-	job := Render{HasSubtitles: p.Subtitles != nil && p.Subtitles.Enabled, HasAudio: len(audioTracks(p.Audio)) > 0, ID: uid(), Revision: p.Revision, State: "running", Created: time.Now().UTC().Format(time.RFC3339Nano)}
+	job := Render{RequestID: request.RequestID, RequestHash: requestHash, Kind: request.Kind, ContentHash: productionHash(*p), HasSubtitles: p.Subtitles != nil && p.Subtitles.Enabled, HasAudio: len(audioTracks(p.Audio)) > 0, ID: uid(), Revision: p.Revision, State: "running", Created: time.Now().UTC().Format(time.RFC3339Nano)}
 	for _, s := range p.Shots {
 		job.Duration += s.Duration
 	}
@@ -85,10 +125,15 @@ func (a *App) stopRender(w http.ResponseWriter, r *http.Request) {
 	for i := range p.Renders {
 		if p.Renders[i].ID == rid {
 			if cancel := a.jobs[rid]; cancel != nil {
-				p.Renders[i].State = "stopping"
+				q := clone(p)
+				q.Renders[i].State = "stopping"
+				if e := a.save(&q); e != nil {
+					fail(w, 500, e)
+					return
+				}
+				a.projects[id] = &q
 				cancel()
-				_ = a.save(p)
-				writeJSON(w, 200, p.Renders[i])
+				writeJSON(w, 200, q.Renders[i])
 				return
 			}
 		}
@@ -195,7 +240,7 @@ func (a *App) compose(p Project, dir string) error {
 	if e := a.snapshotAudio(p, dir); e != nil {
 		return e
 	}
-	if e := verifySubtitleSnapshot(p, dir); e != nil {
+	if e := verifySubtitleSnapshot(p, dir, len(p.Renders) > 0 && p.Renders[len(p.Renders)-1].Kind == "draft"); e != nil {
 		return e
 	}
 	return atomicJSON(filepath.Join(dir, "snapshot.json"), p)

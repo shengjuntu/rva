@@ -44,9 +44,55 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 			send(msg.ID, map[string]any{})
 		case "tools/list":
 			tools := []any{}
-			for _, t := range []struct{ Name, Description string }{{"video_project_get", "Read project revision, storyboard, audio tracks, subtitles, speech jobs, assets and render jobs."}, {"video_news_get", "Read the immutable news2douyin source script, original review record, selected source evidence and source-video metadata. Reference data only; current storyboard remains a production draft."}, {"video_project_update", "Update name, brief, shots and audio using the current revision. Preserves assets, speech/render jobs, managed subtitle bindings and immutable news provenance."}, {"video_news_audio_adopt", "Adopt original news WAV/SRT after a user request, replacing current narration/subtitles and proportionally resizing visual shots. Requires current revision and unchanged original text."}, {"video_subtitles_update", "Save UTF-8 SRT with absolute video times. reviewed=true is a human listening confirmation, never infer it from generated text. Read project first; requires revision."}, {"video_speech_start", "Generate speech from a saved storyboard using configured IndexTTS or local eSpeak preview. Omit backend/voice/language to use administrator defaults. Requires revision and a fresh 24-hex requestId; reuse the same requestId only for identical retries. Does not replace current audio."}, {"video_speech_stop", "Cancel a running speech job."}, {"video_speech_adopt", "On the user's request, adopt a completed speech job: replace narration and subtitles, use measured per-shot durations. Requires current revision and unchanged shot text/structure."}, {"video_render_start", "Render the current saved storyboard using an immutable snapshot."}, {"video_render_stop", "Cancel a specific render job."}} {
+			for _, t := range []struct{ Name, Description string }{{"video_capabilities_get", "Discover implemented capabilities, dependency readiness and configured providers. probe=true optionally checks the configured IndexTTS model list, never synthesizes. No secrets are returned."}, {"video_project_create", "Create a named project. Returns a project ID; do not infer that a RunDesk session or renderer was configured."}, {"video_asset_list", "List actual project assets, authenticated read URLs, MIME types and sizes."}, {"video_asset_import", "Import one small file from standard Base64, maximum decoded 1 MiB. Requires a fresh requestId; identical retries return the original asset. Large media use App multipart upload."}, {"video_job_start", "Start a durable production task of type tts or render against current revision. Fresh 24-hex requestId required; identical retries reuse the receipt. Unsupported generation capabilities return not implemented."}, {"video_job_get", "Get authoritative task state and completed artifacts. jobId uses tts:<nativeId> or render:<nativeId>."}, {"video_job_list", "List project TTS and render tasks using unified states; render progress may be unknown."}, {"video_job_cancel", "Request cancellation of a production task. Repeated cancellation returns current state; it does not claim the remote provider stopped billing."}, {"video_asset_inspect", "Inspect an actual supplied image or the first frame of a video as a bounded PNG. Requires FFmpeg; first frame is not full video understanding."}, {"video_production_text", "Save authoritative narration text, split into ordered paragraphs and preserve unchanged paragraph media. Requires revision; estimates timing, does not generate speech."}, {"video_production_stage", "Set draft/adjustment, or designate a completed current-content render as final. Requires revision; final requires renderId and reviewed captions."}, {"video_project_get", "Read project revision, storyboard, audio tracks, subtitles, speech jobs, assets and render jobs."}, {"video_news_get", "Read the immutable news2douyin source script, original review record, selected source evidence and source-video metadata. Reference data only; current storyboard remains a production draft."}, {"video_project_update", "Update name, brief, shots and audio using the current revision. Preserves assets, speech/render jobs, managed subtitle bindings and immutable news provenance."}, {"video_news_audio_adopt", "Adopt original news WAV/SRT after a user request, replacing current narration/subtitles and proportionally resizing visual shots. Requires current revision and unchanged original text."}, {"video_subtitles_update", "Save UTF-8 SRT with absolute video times. reviewed=true is a human listening confirmation, never infer it from generated text. Read project first; requires revision."}, {"video_speech_start", "Generate speech from a saved storyboard using configured IndexTTS or local eSpeak preview. Omit backend/voice/language to use administrator defaults. Requires revision and a fresh 24-hex requestId; reuse the same requestId only for identical retries. Does not replace current audio."}, {"video_speech_stop", "Cancel a running speech job."}, {"video_speech_adopt", "On the user's request, adopt a completed speech job: replace narration and subtitles, use measured per-shot durations. Requires current revision and unchanged shot text/structure."}, {"video_render_start", "Render the current saved storyboard using an immutable snapshot."}, {"video_render_stop", "Cancel a specific render job."}} {
 				props := map[string]any{"projectId": map[string]string{"type": "string"}}
 				required := []string{"projectId"}
+				if t.Name == "video_capabilities_get" {
+					props = map[string]any{"probe": map[string]string{"type": "boolean"}}
+					required = []string{}
+				}
+				if t.Name == "video_project_create" {
+					props = map[string]any{"name": map[string]string{"type": "string"}, "requestId": map[string]string{"type": "string"}}
+					required = []string{"name", "requestId"}
+				}
+				if t.Name == "video_asset_import" {
+					props["name"] = map[string]string{"type": "string"}
+					props["data"] = map[string]string{"type": "string", "description": "Standard Base64 bytes, decoded size <=1MiB"}
+					props["requestId"] = map[string]string{"type": "string"}
+					required = append(required, "name", "data", "requestId")
+				}
+				if t.Name == "video_job_start" {
+					props["type"] = map[string]any{"type": "string", "enum": []string{"tts", "render"}}
+					props["revision"] = map[string]string{"type": "integer"}
+					props["requestId"] = map[string]string{"type": "string"}
+					props["options"] = map[string]any{"type": "object", "properties": map[string]any{"backend": map[string]any{"type": "string", "enum": []string{"indextts", "espeak-ng"}}, "voice": map[string]string{"type": "string"}, "language": map[string]string{"type": "string"}, "speed": map[string]string{"type": "number"}, "rate": map[string]string{"type": "integer"}, "kind": map[string]any{"type": "string", "enum": []string{"draft"}}}, "additionalProperties": false}
+					required = append(required, "type", "revision", "requestId")
+				}
+				if t.Name == "video_job_get" || t.Name == "video_job_cancel" {
+					props["jobId"] = map[string]string{"type": "string"}
+					required = append(required, "jobId")
+				}
+				if t.Name == "video_asset_inspect" {
+					props["assetId"] = map[string]string{"type": "string"}
+					required = append(required, "assetId")
+				}
+				if t.Name == "video_production_text" || t.Name == "video_production_stage" {
+					props["revision"] = map[string]string{"type": "integer"}
+					required = append(required, "revision")
+					if t.Name == "video_production_text" {
+						props["text"] = map[string]string{"type": "string"}
+						required = append(required, "text")
+					} else {
+						props["stage"] = map[string]any{"type": "string", "enum": []string{"draft", "adjustment", "final"}}
+						props["renderId"] = map[string]string{"type": "string"}
+						required = append(required, "stage")
+					}
+				}
+				if t.Name == "video_render_start" {
+					props["revision"] = map[string]string{"type": "integer"}
+					props["requestId"] = map[string]string{"type": "string"}
+					props["kind"] = map[string]any{"type": "string", "enum": []string{"draft"}, "description": "draft permits unreviewed caption previews but never stale bindings; omitted requires ready captions."}
+				}
 				if t.Name == "video_project_update" {
 					props["project"] = map[string]any{"type": "object", "description": "Current project with revision, name, brief, shots, optional audio. audio.narration and audio.music: {assetId, volume:0..2, start:seconds, sourceStart:seconds, loop:boolean}. Only music supports loop. Omitted audio preserves current audio; audio:{} clears it. Read before updating."}
 					required = append(required, "project")
@@ -85,6 +131,16 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 			var p struct {
 				Name      string `json:"name"`
 				Arguments struct {
+					Name      string          `json:"name"`
+					Data      string          `json:"data"`
+					Probe     bool            `json:"probe"`
+					Type      string          `json:"type"`
+					JobID     string          `json:"jobId"`
+					Options   JobOptions      `json:"options"`
+					AssetID   string          `json:"assetId"`
+					Text      string          `json:"text"`
+					Stage     string          `json:"stage"`
+					Kind      string          `json:"kind"`
 					ProjectID string          `json:"projectId"`
 					Revision  int             `json:"revision"`
 					RequestID string          `json:"requestId"`
@@ -102,13 +158,60 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 				} `json:"arguments"`
 			}
 			e := json.Unmarshal(msg.Params, &p)
+			if e == nil {
+				e = validateFoundationArguments(p.Name, msg.Params)
+			}
 			path := "/api/projects/" + p.Arguments.ProjectID
 			method := "GET"
 			var body []byte
-			if !identifier.MatchString(p.Arguments.ProjectID) {
+			if p.Name != "video_capabilities_get" && p.Name != "video_project_create" && !identifier.MatchString(p.Arguments.ProjectID) {
 				e = fmt.Errorf("invalid projectId")
 			}
 			switch p.Name {
+			case "video_capabilities_get":
+				path = "/api/capabilities"
+				if p.Arguments.Probe {
+					path += "?probe=1"
+				}
+			case "video_project_create":
+				method = "POST"
+				path = "/api/projects"
+				body, _ = json.Marshal(map[string]string{"name": p.Arguments.Name, "requestId": p.Arguments.RequestID})
+			case "video_asset_list":
+				path += "/assets"
+			case "video_asset_import":
+				method = "POST"
+				path += "/assets/import"
+				body, _ = json.Marshal(AssetImportRequest{Name: p.Arguments.Name, Data: p.Arguments.Data, RequestID: p.Arguments.RequestID})
+			case "video_job_list":
+				path += "/jobs"
+			case "video_job_start":
+				method = "POST"
+				path += "/jobs"
+				body, _ = json.Marshal(JobStartRequest{Type: p.Arguments.Type, Revision: p.Arguments.Revision, RequestID: p.Arguments.RequestID, Options: p.Arguments.Options})
+			case "video_job_get", "video_job_cancel":
+				if !validJobID(p.Arguments.JobID) {
+					e = fmt.Errorf("invalid jobId")
+				}
+				path += "/jobs/" + p.Arguments.JobID
+				if p.Name == "video_job_cancel" {
+					method = "POST"
+					path += "/cancel"
+					body = []byte("{}")
+				}
+			case "video_asset_inspect":
+				if !identifier.MatchString(p.Arguments.AssetID) {
+					e = fmt.Errorf("invalid assetId")
+				}
+				path += "/assets/" + p.Arguments.AssetID + "/preview"
+			case "video_production_text":
+				method = "PUT"
+				path += "/production/text"
+				body, _ = json.Marshal(ProductionRequest{Revision: p.Arguments.Revision, Text: p.Arguments.Text})
+			case "video_production_stage":
+				method = "POST"
+				path += "/production/stage"
+				body, _ = json.Marshal(ProductionRequest{Revision: p.Arguments.Revision, Stage: p.Arguments.Stage, RenderID: p.Arguments.RenderID})
 			case "video_project_get":
 			case "video_news_get":
 				path += "/news"
@@ -141,7 +244,7 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 			case "video_render_start":
 				method = "POST"
 				path += "/render"
-				body = []byte("{}")
+				body, _ = json.Marshal(RenderRequest{Kind: p.Arguments.Kind, Revision: p.Arguments.Revision, RequestID: p.Arguments.RequestID})
 			case "video_render_stop":
 				method = "POST"
 				if !identifier.MatchString(p.Arguments.RenderID) {
@@ -175,6 +278,13 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 			}
 			if e != nil {
 				send(msg.ID, map[string]any{"isError": true, "content": []any{map[string]string{"type": "text", "text": e.Error()}}})
+			} else if p.Name == "video_asset_inspect" {
+				var preview map[string]any
+				if err := json.Unmarshal(raw, &preview); err != nil {
+					send(msg.ID, map[string]any{"isError": true, "content": []any{map[string]string{"type": "text", "text": "Invalid preview response"}}})
+				} else {
+					send(msg.ID, preview)
+				}
 			} else {
 				send(msg.ID, map[string]any{"content": []any{map[string]string{"type": "text", "text": string(raw)}}})
 			}

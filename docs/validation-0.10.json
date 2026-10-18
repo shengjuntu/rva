@@ -1,0 +1,39 @@
+{
+  "version": "0.10.0",
+  "phase": 1,
+  "goRaceTests": {
+    "passed": 122,
+    "failed": 0,
+    "skipped": [
+      "TestSpeechSnapshotGenerationAndAdoption"
+    ]
+  },
+  "javascriptSyntax": "passed",
+  "nodeSubmissionTests": 6,
+  "domAndHTTP": {
+    "passed": true,
+    "environment": "JSDOM + real Go HTTP API, not a graphical browser",
+    "checks": [
+      "load embedded UI",
+      "save narration text",
+      "build paragraph alignment table",
+      "protect canonical text",
+      "assign actual uploaded image",
+      "preserve mapping after new lead",
+      "persist text",
+      "return actual MCP image content",
+      "capability status panel",
+      "actual HTTP import deduplication",
+      "unsupported generation rejection",
+      "unified task panel"
+    ]
+  },
+  "notTested": [
+    "graphical browser layout and playback",
+    "real Codex orchestration",
+    "real IndexTTS model inference",
+    "complete HyperFrames MP4 output",
+    "Docker build",
+    "Windows runtime"
+  ]
+}

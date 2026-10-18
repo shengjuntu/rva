@@ -1,3 +1,11 @@
+# v0.10 制作服务基础
+
+能力发现(capabilities.go)、统一任务投影(jobs.go)、小素材导入(media_service.go)均在Go服务内。任务使用原Speech/Render记录作为唯一状态来源；不增加重复队列或Agent编排器。render增加请求哈希和revision校验，创建项目及素材导入保留请求身份。
+
+Capabilities将工具存在、配置检查、远端模型列表与真实输出验收分开。未接入生成工具明确不可用。MCP、页面与现有HTTP使用同一业务服务，统一任务响应不带部署密钥或本地文件路径。
+
+未来内容产物与剪辑DSL分开，旧镜头渲染只作为兼容执行器。详见PRODUCTION-SERVICE.md与ROADMAP.md。
+
 # v0.8 配音服务补充
 
 Video App 直接调用独立 IndexTTS HTTP 服务；RunDesk 负责 Agent 编排和轨迹。服务在任务创建时形成配置快照，进行中的任务不会被设置更改影响；设置页在任务运行时拒绝变更。普通 Agent MCP 不能设置服务 URL、API Key 或任意服务端路径。Go App 保持标准库依赖，Python/GPU 仅属于独立推理服务。

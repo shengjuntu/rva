@@ -28,7 +28,7 @@ import (
 	"time"
 )
 
-const version = "0.8.1"
+const version = "0.10.0"
 
 //go:embed web/*
 var ui embed.FS
@@ -44,21 +44,29 @@ func uid() string {
 }
 
 type Shot struct {
-	ID       string  `json:"id"`
-	Title    string  `json:"title"`
-	Text     string  `json:"text"`
-	Duration float64 `json:"duration"`
-	AssetID  string  `json:"assetId"`
+	VisualReason string  `json:"visualReason,omitempty"`
+	SegmentID    string  `json:"segmentId,omitempty"`
+	ID           string  `json:"id"`
+	Title        string  `json:"title"`
+	Text         string  `json:"text"`
+	Duration     float64 `json:"duration"`
+	AssetID      string  `json:"assetId"`
 }
 type Asset struct {
-	Source *NewsImageSource `json:"source,omitempty"`
-	ID     string           `json:"id"`
-	Name   string           `json:"name"`
-	File   string           `json:"file"`
-	Size   int64            `json:"size"`
-	MIME   string           `json:"mime"`
+	ImportRequestID string           `json:"importRequestId,omitempty"`
+	ImportHash      string           `json:"importHash,omitempty"`
+	Source          *NewsImageSource `json:"source,omitempty"`
+	ID              string           `json:"id"`
+	Name            string           `json:"name"`
+	File            string           `json:"file"`
+	Size            int64            `json:"size"`
+	MIME            string           `json:"mime"`
 }
 type Render struct {
+	RequestID    string  `json:"requestId,omitempty"`
+	RequestHash  string  `json:"requestHash,omitempty"`
+	ContentHash  string  `json:"contentHash,omitempty"`
+	Kind         string  `json:"kind,omitempty"`
 	HasSubtitles bool    `json:"hasSubtitles,omitempty"`
 	ID           string  `json:"id"`
 	Revision     int     `json:"revision"`
@@ -69,24 +77,27 @@ type Render struct {
 	HasAudio     bool    `json:"hasAudio"`
 }
 type Project struct {
-	PreviousSessionIDs []string         `json:"previousSessionIds,omitempty"`
-	AgentSubmission    *AgentSubmission `json:"agentSubmission,omitempty"`
-	AgentRunID         string           `json:"agentRunId,omitempty"`
-	Speech             []SpeechJob      `json:"speech,omitempty"`
-	Subtitles          *SubtitleTrack   `json:"subtitles,omitempty"`
-	News               *NewsOrigin      `json:"news,omitempty"`
-	ID                 string           `json:"id"`
-	Name               string           `json:"name"`
-	Brief              string           `json:"brief"`
-	Revision           int              `json:"revision"`
-	Shots              []Shot           `json:"shots"`
-	Audio              *AudioMix        `json:"audio,omitempty"`
-	Assets             []Asset          `json:"assets"`
-	Renders            []Render         `json:"renders"`
-	WorkspaceID        string           `json:"workspaceId"`
-	SessionID          string           `json:"sessionId"`
-	Updated            string           `json:"updated"`
-	ToolsVersion       string           `json:"toolsVersion,omitempty"`
+	CreationRequestID   string           `json:"creationRequestId,omitempty"`
+	CreationRequestHash string           `json:"creationRequestHash,omitempty"`
+	Production          *Production      `json:"production,omitempty"`
+	PreviousSessionIDs  []string         `json:"previousSessionIds,omitempty"`
+	AgentSubmission     *AgentSubmission `json:"agentSubmission,omitempty"`
+	AgentRunID          string           `json:"agentRunId,omitempty"`
+	Speech              []SpeechJob      `json:"speech,omitempty"`
+	Subtitles           *SubtitleTrack   `json:"subtitles,omitempty"`
+	News                *NewsOrigin      `json:"news,omitempty"`
+	ID                  string           `json:"id"`
+	Name                string           `json:"name"`
+	Brief               string           `json:"brief"`
+	Revision            int              `json:"revision"`
+	Shots               []Shot           `json:"shots"`
+	Audio               *AudioMix        `json:"audio,omitempty"`
+	Assets              []Asset          `json:"assets"`
+	Renders             []Render         `json:"renders"`
+	WorkspaceID         string           `json:"workspaceId"`
+	SessionID           string           `json:"sessionId"`
+	Updated             string           `json:"updated"`
+	ToolsVersion        string           `json:"toolsVersion,omitempty"`
 }
 type Config struct {
 	WorkspaceID      string `json:"workspaceId,omitempty"`
@@ -169,11 +180,13 @@ func clone(p *Project) Project {
 	var q Project
 	_ = json.Unmarshal(b, &q)
 	refreshSubtitleState(&q)
+	refreshProduction(&q)
 	return q
 }
 func (a *App) dir(id string) string { return filepath.Join(a.data, "projects", id) }
 func (a *App) save(p *Project) error {
 	refreshSubtitleState(p)
+	refreshProduction(p)
 	p.Updated = time.Now().UTC().Format(time.RFC3339Nano)
 	return atomicJSON(filepath.Join(a.dir(p.ID), "project.json"), p)
 }
@@ -235,14 +248,32 @@ func (a *App) get(id string) (Project, error) {
 	}
 	return clone(p), nil
 }
-func (a *App) create(name string) (Project, error) {
+
+var errCreateRequestConflict = errors.New("同一requestId不能用于不同新建项目请求")
+
+func (a *App) create(name string) (Project, error) { return a.createRequested(name, "") }
+func (a *App) createRequested(name, requestID string) (Project, error) {
 	name = strings.TrimSpace(name)
 	if name == "" || len([]rune(name)) > 80 {
 		return Project{}, errors.New("项目名不能为空，最多 80 字")
 	}
 	a.mu.Lock()
 	defer a.mu.Unlock()
-	p := Project{ID: uid(), Name: name, Revision: 1, Shots: []Shot{}, Assets: []Asset{}, Renders: []Render{}}
+	if requestID != "" && !identifier.MatchString(requestID) {
+		return Project{}, errors.New("新建项目requestId无效")
+	}
+	requestHash := hashBytes([]byte(name))
+	if requestID != "" {
+		for _, old := range a.projects {
+			if old.CreationRequestID == requestID {
+				if old.CreationRequestHash != requestHash {
+					return Project{}, errCreateRequestConflict
+				}
+				return clone(old), nil
+			}
+		}
+	}
+	p := Project{CreationRequestID: requestID, CreationRequestHash: requestHash, ID: uid(), Name: name, Revision: 1, Shots: []Shot{}, Assets: []Asset{}, Renders: []Render{}}
 	if e := os.MkdirAll(filepath.Join(a.dir(p.ID), "workspace", "assets"), 0700); e != nil {
 		return p, e
 	}
@@ -268,6 +299,9 @@ func (a *App) edit(id string, in Project) (Project, error) {
 	if len(in.Shots) > 80 || len(in.Brief) > 128*1024 || len([]rune(in.Name)) > 80 || strings.TrimSpace(in.Name) == "" {
 		return clone(p), errors.New("项目内容超出范围")
 	}
+	if e := validateTextProjection(p.Production, in.Shots); e != nil {
+		return clone(p), e
+	}
 	seen := map[string]bool{}
 	assets := map[string]bool{}
 	for _, asset := range p.Assets {
@@ -279,7 +313,7 @@ func (a *App) edit(id string, in Project) (Project, error) {
 		if s.ID == "" {
 			s.ID = uid()
 		}
-		if !identifier.MatchString(s.ID) || seen[s.ID] || !finite(s.Duration) || s.Duration < 1 || s.Duration > 60 || len([]rune(s.Title)) > 80 || len([]rune(s.Text)) > 220 {
+		if !identifier.MatchString(s.ID) || seen[s.ID] || !finite(s.Duration) || s.Duration < 1 || s.Duration > 60 || len([]rune(s.Title)) > 80 || len([]rune(s.Text)) > 220 || len([]rune(s.VisualReason)) > 300 {
 			return clone(p), errors.New("镜头 ID、时长或文字长度不合法（标题80字，正文220字，1–60秒）")
 		}
 		if s.AssetID != "" && !assets[s.AssetID] {
@@ -348,6 +382,11 @@ func (a *App) auth(next http.Handler) http.Handler {
 }
 func (a *App) routes() http.Handler {
 	m := http.NewServeMux()
+	m.HandleFunc("GET /api/capabilities", a.capabilities)
+	m.HandleFunc("GET /api/projects/{id}/jobs", a.jobsList)
+	m.HandleFunc("POST /api/projects/{id}/jobs", a.jobStart)
+	m.HandleFunc("GET /api/projects/{id}/jobs/{jid}", a.jobGet)
+	m.HandleFunc("POST /api/projects/{id}/jobs/{jid}/cancel", a.jobCancel)
 	m.HandleFunc("GET /api/health", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]any{"ready": true, "version": version})
 	})
@@ -400,13 +439,18 @@ func (a *App) routes() http.Handler {
 	})
 	m.HandleFunc("POST /api/projects", func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
-			Name string `json:"name"`
+			Name      string `json:"name"`
+			RequestID string `json:"requestId"`
 		}
 		if !decode(w, r, &in) {
 			return
 		}
-		p, e := a.create(in.Name)
+		p, e := a.createRequested(in.Name, in.RequestID)
 		if e != nil {
+			if errors.Is(e, errCreateRequestConflict) {
+				fail(w, 409, e)
+				return
+			}
 			fail(w, 400, e)
 			return
 		}
@@ -432,8 +476,13 @@ func (a *App) routes() http.Handler {
 		}
 		writeJSON(w, 200, q)
 	})
+	m.HandleFunc("GET /api/projects/{id}/assets", a.assetsList)
+	m.HandleFunc("POST /api/projects/{id}/assets/import", a.assetImport)
 	m.HandleFunc("POST /api/projects/{id}/assets", a.upload)
 	m.HandleFunc("GET /api/projects/{id}/assets/{aid}", a.asset)
+	m.HandleFunc("GET /api/projects/{id}/assets/{aid}/preview", a.assetPreview)
+	m.HandleFunc("PUT /api/projects/{id}/production/text", a.production)
+	m.HandleFunc("POST /api/projects/{id}/production/stage", a.production)
 	m.HandleFunc("POST /api/projects/{id}/render", a.startRender)
 	m.HandleFunc("POST /api/projects/{id}/renders/{rid}/stop", a.stopRender)
 	m.HandleFunc("GET /api/projects/{id}/renders/{rid}/{file}", a.renderFile)
@@ -481,6 +530,23 @@ func (a *App) upload(w http.ResponseWriter, r *http.Request) {
 	}
 	asset := Asset{ID: uid(), Name: filepath.Base(strings.ReplaceAll(h.Filename, "\\", "/")), Size: h.Size, MIME: mime}
 	asset.File = asset.ID + ext
+	if requestID := r.FormValue("requestId"); requestID != "" {
+		if !identifier.MatchString(requestID) {
+			fail(w, 400, errors.New("素材requestId无效"))
+			return
+		}
+		digest, _, err := hashReader(f)
+		if err != nil {
+			fail(w, 500, err)
+			return
+		}
+		if _, err = f.Seek(0, io.SeekStart); err != nil {
+			fail(w, 500, err)
+			return
+		}
+		asset.ImportRequestID = requestID
+		asset.ImportHash = hashBytes([]byte(asset.Name + "\x00" + digest))
+	}
 	root, e := os.OpenRoot(filepath.Join(a.dir(id), "workspace", "assets"))
 	if e != nil {
 		fail(w, 500, e)
@@ -501,6 +567,20 @@ func (a *App) upload(w http.ResponseWriter, r *http.Request) {
 	}
 	a.mu.Lock()
 	p := clone(a.projects[id])
+	if asset.ImportRequestID != "" {
+		for _, old := range p.Assets {
+			if old.ImportRequestID == asset.ImportRequestID {
+				a.mu.Unlock()
+				root.Remove(asset.File)
+				if old.ImportHash != asset.ImportHash {
+					fail(w, 409, errors.New("同一requestId不能用于不同素材"))
+					return
+				}
+				writeJSON(w, 200, p)
+				return
+			}
+		}
+	}
 	p.Assets = append(p.Assets, asset)
 	p.Revision++
 	e = a.save(&p)

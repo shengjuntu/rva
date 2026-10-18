@@ -2,8 +2,8 @@
  * Session storage survives reloads in this tab; it contains no script or key. */
 (function (root) {
   'use strict';
-  function create(getStorage) {
-    const key = pid => 'video-speech-pending-v1:' + pid;
+  function create(getStorage, namespace = "video-speech-pending-v1", label = "配音") {
+    const key = pid => namespace + ':' + pid;
     function read(pid) {
       try {
         const raw = getStorage().getItem(key(pid));
@@ -12,7 +12,7 @@
         if (!body || !/^[a-f0-9]{24}$/.test(body.requestId) || !Number.isInteger(body.revision)) throw new Error();
         return body;
       } catch (_) {
-        throw new Error('无法读取待确认配音请求，请允许此站点使用会话存储后重试。');
+        throw new Error('无法读取待确认'+label+'请求，请允许此站点使用会话存储后重试。');
       }
     }
     function clear(pid, requestId) {
@@ -28,11 +28,11 @@
       if (!pending) {
         pending = JSON.parse(JSON.stringify(body));
         try { getStorage().setItem(key(pid), JSON.stringify(pending)); }
-        catch (_) { throw new Error('无法保存配音请求；尚未提交。请允许此站点使用会话存储。'); }
+        catch (_) { throw new Error('无法保存'+label+'请求；尚未提交。请允许此站点使用会话存储。'); }
       }
       try {
         const job = await send(pending);
-        if (job?.requestId !== pending.requestId) throw new Error('配音响应缺少匹配的回执');
+        if (job?.requestId !== pending.requestId) throw new Error(label+'响应缺少匹配的回执');
         clear(pid, pending.requestId);
         return job;
       } catch (error) {

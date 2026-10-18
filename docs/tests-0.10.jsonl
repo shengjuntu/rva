@@ -1,0 +1,499 @@
+{"Time":"2026-10-14T17:44:01.745055489+09:00","Action":"start","Package":"rundesk-video-app"}
+{"Time":"2026-10-14T17:44:01.75721918+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestMCPVisualEvidenceIsRealImage"}
+{"Time":"2026-10-14T17:44:01.757250476+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestMCPVisualEvidenceIsRealImage","Output":"=== RUN   TestMCPVisualEvidenceIsRealImage\n"}
+{"Time":"2026-10-14T17:44:01.827436498+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestMCPVisualEvidenceIsRealImage","Output":"--- PASS: TestMCPVisualEvidenceIsRealImage (0.07s)\n"}
+{"Time":"2026-10-14T17:44:01.827563675+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestMCPVisualEvidenceIsRealImage","Elapsed":0.07}
+{"Time":"2026-10-14T17:44:01.827578407+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestMCPProductionToolsHaveWorkingContracts"}
+{"Time":"2026-10-14T17:44:01.827581722+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestMCPProductionToolsHaveWorkingContracts","Output":"=== RUN   TestMCPProductionToolsHaveWorkingContracts\n"}
+{"Time":"2026-10-14T17:44:01.829781097+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestMCPProductionToolsHaveWorkingContracts","Output":"--- PASS: TestMCPProductionToolsHaveWorkingContracts (0.00s)\n"}
+{"Time":"2026-10-14T17:44:01.829790921+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestMCPProductionToolsHaveWorkingContracts","Elapsed":0}
+{"Time":"2026-10-14T17:44:01.829807786+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestAudioValidationAndCompatibility"}
+{"Time":"2026-10-14T17:44:01.82981053+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestAudioValidationAndCompatibility","Output":"=== RUN   TestAudioValidationAndCompatibility\n"}
+{"Time":"2026-10-14T17:44:01.83485562+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestAudioValidationAndCompatibility","Output":"--- PASS: TestAudioValidationAndCompatibility (0.00s)\n"}
+{"Time":"2026-10-14T17:44:01.834871273+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestAudioValidationAndCompatibility","Elapsed":0}
+{"Time":"2026-10-14T17:44:01.834878344+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestStartupFailureReleasesLock"}
+{"Time":"2026-10-14T17:44:01.834881148+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestStartupFailureReleasesLock","Output":"=== RUN   TestStartupFailureReleasesLock\n"}
+{"Time":"2026-10-14T17:44:01.83490292+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestStartupFailureReleasesLock/token"}
+{"Time":"2026-10-14T17:44:01.834905544+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestStartupFailureReleasesLock/token","Output":"=== RUN   TestStartupFailureReleasesLock/token\n"}
+{"Time":"2026-10-14T17:44:01.835278622+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestStartupFailureReleasesLock/token","Output":"--- PASS: TestStartupFailureReleasesLock/token (0.00s)\n"}
+{"Time":"2026-10-14T17:44:01.835289138+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestStartupFailureReleasesLock/token","Elapsed":0}
+{"Time":"2026-10-14T17:44:01.835307185+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestStartupFailureReleasesLock/url"}
+{"Time":"2026-10-14T17:44:01.835309718+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestStartupFailureReleasesLock/url","Output":"=== RUN   TestStartupFailureReleasesLock/url\n"}
+{"Time":"2026-10-14T17:44:01.83588237+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestStartupFailureReleasesLock/url","Output":"--- PASS: TestStartupFailureReleasesLock/url (0.00s)\n"}
+{"Time":"2026-10-14T17:44:01.835967516+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestStartupFailureReleasesLock/url","Elapsed":0}
+{"Time":"2026-10-14T17:44:01.836009778+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestStartupFailureReleasesLock/port"}
+{"Time":"2026-10-14T17:44:01.836013614+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestStartupFailureReleasesLock/port","Output":"=== RUN   TestStartupFailureReleasesLock/port\n"}
+{"Time":"2026-10-14T17:44:01.838319585+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestStartupFailureReleasesLock/port","Output":"2026/10/14 17:44:01 Video App 0.10.0: http://127.0.0.1:36917; token source: VIDEO_APP_TOKEN\n"}
+{"Time":"2026-10-14T17:44:01.839875834+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestStartupFailureReleasesLock/port","Output":"--- PASS: TestStartupFailureReleasesLock/port (0.00s)\n"}
+{"Time":"2026-10-14T17:44:01.839887141+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestStartupFailureReleasesLock/port","Elapsed":0}
+{"Time":"2026-10-14T17:44:01.839925868+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestStartupFailureReleasesLock","Output":"--- PASS: TestStartupFailureReleasesLock (0.01s)\n"}
+{"Time":"2026-10-14T17:44:01.839942051+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestStartupFailureReleasesLock","Elapsed":0.01}
+{"Time":"2026-10-14T17:44:01.840003332+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestRendererDoesNotInheritAppTokens"}
+{"Time":"2026-10-14T17:44:01.840006286+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRendererDoesNotInheritAppTokens","Output":"=== RUN   TestRendererDoesNotInheritAppTokens\n"}
+{"Time":"2026-10-14T17:44:01.840156877+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRendererDoesNotInheritAppTokens","Output":"--- PASS: TestRendererDoesNotInheritAppTokens (0.00s)\n"}
+{"Time":"2026-10-14T17:44:01.840176626+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestRendererDoesNotInheritAppTokens","Elapsed":0}
+{"Time":"2026-10-14T17:44:01.84019244+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestMixAudioIntegration"}
+{"Time":"2026-10-14T17:44:01.840194953+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestMixAudioIntegration","Output":"=== RUN   TestMixAudioIntegration\n"}
+{"Time":"2026-10-14T17:44:02.5428903+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestMixAudioIntegration","Output":"    audio_test.go:171: PCM verified: initial silence, narration gain/start/end, music gain/loop; invalid trim rejected\n"}
+{"Time":"2026-10-14T17:44:02.543186045+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestMixAudioIntegration","Output":"--- PASS: TestMixAudioIntegration (0.70s)\n"}
+{"Time":"2026-10-14T17:44:02.543195859+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestMixAudioIntegration","Elapsed":0.7}
+{"Time":"2026-10-14T17:44:02.543214517+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestLegacyProjectAndBusyToolUpgrade"}
+{"Time":"2026-10-14T17:44:02.543219694+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestLegacyProjectAndBusyToolUpgrade","Output":"=== RUN   TestLegacyProjectAndBusyToolUpgrade\n"}
+{"Time":"2026-10-14T17:44:02.550632928+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestLegacyProjectAndBusyToolUpgrade","Output":"--- PASS: TestLegacyProjectAndBusyToolUpgrade (0.01s)\n"}
+{"Time":"2026-10-14T17:44:02.550667709+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestLegacyProjectAndBusyToolUpgrade","Elapsed":0.01}
+{"Time":"2026-10-14T17:44:02.550673768+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestRevisionConflictPreservesAgentEdit"}
+{"Time":"2026-10-14T17:44:02.550676732+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRevisionConflictPreservesAgentEdit","Output":"=== RUN   TestRevisionConflictPreservesAgentEdit\n"}
+{"Time":"2026-10-14T17:44:02.551973229+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRevisionConflictPreservesAgentEdit","Output":"--- PASS: TestRevisionConflictPreservesAgentEdit (0.00s)\n"}
+{"Time":"2026-10-14T17:44:02.551982593+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestRevisionConflictPreservesAgentEdit","Elapsed":0}
+{"Time":"2026-10-14T17:44:02.551999708+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestAuthAndOrigin"}
+{"Time":"2026-10-14T17:44:02.55200777+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestAuthAndOrigin","Output":"=== RUN   TestAuthAndOrigin\n"}
+{"Time":"2026-10-14T17:44:02.554894571+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestAuthAndOrigin","Output":"--- PASS: TestAuthAndOrigin (0.00s)\n"}
+{"Time":"2026-10-14T17:44:02.55490743+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestAuthAndOrigin","Elapsed":0}
+{"Time":"2026-10-14T17:44:02.554913138+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestAssetCannotEscapeWorkspace"}
+{"Time":"2026-10-14T17:44:02.554915271+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestAssetCannotEscapeWorkspace","Output":"=== RUN   TestAssetCannotEscapeWorkspace\n"}
+{"Time":"2026-10-14T17:44:02.556347738+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestAssetCannotEscapeWorkspace","Output":"--- PASS: TestAssetCannotEscapeWorkspace (0.00s)\n"}
+{"Time":"2026-10-14T17:44:02.55635613+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestAssetCannotEscapeWorkspace","Elapsed":0}
+{"Time":"2026-10-14T17:44:02.556371513+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestRenderRestartAndSnapshots"}
+{"Time":"2026-10-14T17:44:02.556373646+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRenderRestartAndSnapshots","Output":"=== RUN   TestRenderRestartAndSnapshots\n"}
+{"Time":"2026-10-14T17:44:02.558492407+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRenderRestartAndSnapshots","Output":"--- PASS: TestRenderRestartAndSnapshots (0.00s)\n"}
+{"Time":"2026-10-14T17:44:02.558505206+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestRenderRestartAndSnapshots","Elapsed":0}
+{"Time":"2026-10-14T17:44:02.558512186+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestRunDeskConfigurationAndSteer"}
+{"Time":"2026-10-14T17:44:02.55851491+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRunDeskConfigurationAndSteer","Output":"=== RUN   TestRunDeskConfigurationAndSteer\n"}
+{"Time":"2026-10-14T17:44:02.575147513+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRunDeskConfigurationAndSteer","Output":"--- PASS: TestRunDeskConfigurationAndSteer (0.02s)\n"}
+{"Time":"2026-10-14T17:44:02.575190436+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestRunDeskConfigurationAndSteer","Elapsed":0.02}
+{"Time":"2026-10-14T17:44:02.575198208+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestUploadAndMediaRange"}
+{"Time":"2026-10-14T17:44:02.575201302+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestUploadAndMediaRange","Output":"=== RUN   TestUploadAndMediaRange\n"}
+{"Time":"2026-10-14T17:44:02.579545452+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestUploadAndMediaRange","Output":"--- PASS: TestUploadAndMediaRange (0.00s)\n"}
+{"Time":"2026-10-14T17:44:02.579560424+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestUploadAndMediaRange","Elapsed":0}
+{"Time":"2026-10-14T17:44:02.579565752+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestHTTPMCPRegistrationTools"}
+{"Time":"2026-10-14T17:44:02.579567885+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestHTTPMCPRegistrationTools","Output":"=== RUN   TestHTTPMCPRegistrationTools\n"}
+{"Time":"2026-10-14T17:44:02.587245452+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestHTTPMCPRegistrationTools","Output":"--- PASS: TestHTTPMCPRegistrationTools (0.01s)\n"}
+{"Time":"2026-10-14T17:44:02.587269187+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestHTTPMCPRegistrationTools","Elapsed":0.01}
+{"Time":"2026-10-14T17:44:02.587275075+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsImagesAndLanguageHandoff"}
+{"Time":"2026-10-14T17:44:02.587277489+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsImagesAndLanguageHandoff","Output":"=== RUN   TestNewsImagesAndLanguageHandoff\n"}
+{"Time":"2026-10-14T17:44:02.611540634+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsImagesAndLanguageHandoff","Output":"--- PASS: TestNewsImagesAndLanguageHandoff (0.02s)\n"}
+{"Time":"2026-10-14T17:44:02.611573042+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsImagesAndLanguageHandoff","Elapsed":0.02}
+{"Time":"2026-10-14T17:44:02.61157847+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsImageArchiveRejectsInvalidEntries"}
+{"Time":"2026-10-14T17:44:02.611581414+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsImageArchiveRejectsInvalidEntries","Output":"=== RUN   TestNewsImageArchiveRejectsInvalidEntries\n"}
+{"Time":"2026-10-14T17:44:02.61158528+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsImageArchiveRejectsInvalidEntries/traversal"}
+{"Time":"2026-10-14T17:44:02.611587303+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsImageArchiveRejectsInvalidEntries/traversal","Output":"=== RUN   TestNewsImageArchiveRejectsInvalidEntries/traversal\n"}
+{"Time":"2026-10-14T17:44:02.637287557+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsImageArchiveRejectsInvalidEntries/traversal","Output":"--- PASS: TestNewsImageArchiveRejectsInvalidEntries/traversal (0.03s)\n"}
+{"Time":"2026-10-14T17:44:02.637321627+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsImageArchiveRejectsInvalidEntries/traversal","Elapsed":0.03}
+{"Time":"2026-10-14T17:44:02.637327466+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsImageArchiveRejectsInvalidEntries/undeclared"}
+{"Time":"2026-10-14T17:44:02.63733023+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsImageArchiveRejectsInvalidEntries/undeclared","Output":"=== RUN   TestNewsImageArchiveRejectsInvalidEntries/undeclared\n"}
+{"Time":"2026-10-14T17:44:02.664632706+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsImageArchiveRejectsInvalidEntries/undeclared","Output":"--- PASS: TestNewsImageArchiveRejectsInvalidEntries/undeclared (0.03s)\n"}
+{"Time":"2026-10-14T17:44:02.664711512+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsImageArchiveRejectsInvalidEntries/undeclared","Elapsed":0.03}
+{"Time":"2026-10-14T17:44:02.664720245+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsImageArchiveRejectsInvalidEntries/wrong_image_hash"}
+{"Time":"2026-10-14T17:44:02.664723009+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsImageArchiveRejectsInvalidEntries/wrong_image_hash","Output":"=== RUN   TestNewsImageArchiveRejectsInvalidEntries/wrong_image_hash\n"}
+{"Time":"2026-10-14T17:44:02.682093136+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsImageArchiveRejectsInvalidEntries/wrong_image_hash","Output":"--- PASS: TestNewsImageArchiveRejectsInvalidEntries/wrong_image_hash (0.02s)\n"}
+{"Time":"2026-10-14T17:44:02.682125304+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsImageArchiveRejectsInvalidEntries/wrong_image_hash","Elapsed":0.02}
+{"Time":"2026-10-14T17:44:02.682135128+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsImageArchiveRejectsInvalidEntries/wrong_language"}
+{"Time":"2026-10-14T17:44:02.682137932+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsImageArchiveRejectsInvalidEntries/wrong_language","Output":"=== RUN   TestNewsImageArchiveRejectsInvalidEntries/wrong_language\n"}
+{"Time":"2026-10-14T17:44:02.699208294+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsImageArchiveRejectsInvalidEntries/wrong_language","Output":"--- PASS: TestNewsImageArchiveRejectsInvalidEntries/wrong_language (0.02s)\n"}
+{"Time":"2026-10-14T17:44:02.699249024+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsImageArchiveRejectsInvalidEntries/wrong_language","Elapsed":0.02}
+{"Time":"2026-10-14T17:44:02.699255533+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsImageArchiveRejectsInvalidEntries/fake_png"}
+{"Time":"2026-10-14T17:44:02.699263034+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsImageArchiveRejectsInvalidEntries/fake_png","Output":"=== RUN   TestNewsImageArchiveRejectsInvalidEntries/fake_png\n"}
+{"Time":"2026-10-14T17:44:02.725537018+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsImageArchiveRejectsInvalidEntries/fake_png","Output":"--- PASS: TestNewsImageArchiveRejectsInvalidEntries/fake_png (0.02s)\n"}
+{"Time":"2026-10-14T17:44:02.725570487+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsImageArchiveRejectsInvalidEntries/fake_png","Elapsed":0.02}
+{"Time":"2026-10-14T17:44:02.725576616+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsImageArchiveRejectsInvalidEntries","Output":"--- PASS: TestNewsImageArchiveRejectsInvalidEntries (0.11s)\n"}
+{"Time":"2026-10-14T17:44:02.725580041+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsImageArchiveRejectsInvalidEntries","Elapsed":0.11}
+{"Time":"2026-10-14T17:44:02.725582435+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsImportPreservesNarrationAndProvenance"}
+{"Time":"2026-10-14T17:44:02.725584478+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsImportPreservesNarrationAndProvenance","Output":"=== RUN   TestNewsImportPreservesNarrationAndProvenance\n"}
+{"Time":"2026-10-14T17:44:02.753297768+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsImportPreservesNarrationAndProvenance","Output":"--- PASS: TestNewsImportPreservesNarrationAndProvenance (0.03s)\n"}
+{"Time":"2026-10-14T17:44:02.753336725+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsImportPreservesNarrationAndProvenance","Elapsed":0.03}
+{"Time":"2026-10-14T17:44:02.753342464+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing"}
+{"Time":"2026-10-14T17:44:02.753345088+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing","Output":"=== RUN   TestNewsRejectsInvalidPackagesWithoutPublishing\n"}
+{"Time":"2026-10-14T17:44:02.753350485+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/draft"}
+{"Time":"2026-10-14T17:44:02.753352278+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/draft","Output":"=== RUN   TestNewsRejectsInvalidPackagesWithoutPublishing/draft\n"}
+{"Time":"2026-10-14T17:44:02.77041258+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/draft","Output":"--- PASS: TestNewsRejectsInvalidPackagesWithoutPublishing/draft (0.02s)\n"}
+{"Time":"2026-10-14T17:44:02.770442924+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/draft","Elapsed":0.02}
+{"Time":"2026-10-14T17:44:02.770450766+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/missing_review"}
+{"Time":"2026-10-14T17:44:02.770453059+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/missing_review","Output":"=== RUN   TestNewsRejectsInvalidPackagesWithoutPublishing/missing_review\n"}
+{"Time":"2026-10-14T17:44:02.789549826+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/missing_review","Output":"--- PASS: TestNewsRejectsInvalidPackagesWithoutPublishing/missing_review (0.02s)\n"}
+{"Time":"2026-10-14T17:44:02.789583085+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/missing_review","Elapsed":0.02}
+{"Time":"2026-10-14T17:44:02.789591357+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/wrong_review_revision"}
+{"Time":"2026-10-14T17:44:02.789594592+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/wrong_review_revision","Output":"=== RUN   TestNewsRejectsInvalidPackagesWithoutPublishing/wrong_review_revision\n"}
+{"Time":"2026-10-14T17:44:02.806018128+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/wrong_review_revision","Output":"--- PASS: TestNewsRejectsInvalidPackagesWithoutPublishing/wrong_review_revision (0.02s)\n"}
+{"Time":"2026-10-14T17:44:02.806048022+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/wrong_review_revision","Elapsed":0.02}
+{"Time":"2026-10-14T17:44:02.806054171+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/hash"}
+{"Time":"2026-10-14T17:44:02.806056945+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/hash","Output":"=== RUN   TestNewsRejectsInvalidPackagesWithoutPublishing/hash\n"}
+{"Time":"2026-10-14T17:44:02.814853282+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/hash","Output":"--- PASS: TestNewsRejectsInvalidPackagesWithoutPublishing/hash (0.01s)\n"}
+{"Time":"2026-10-14T17:44:02.814874894+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/hash","Elapsed":0.01}
+{"Time":"2026-10-14T17:44:02.814880713+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/snapshot_hash"}
+{"Time":"2026-10-14T17:44:02.814882715+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/snapshot_hash","Output":"=== RUN   TestNewsRejectsInvalidPackagesWithoutPublishing/snapshot_hash\n"}
+{"Time":"2026-10-14T17:44:02.82127662+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/snapshot_hash","Output":"--- PASS: TestNewsRejectsInvalidPackagesWithoutPublishing/snapshot_hash (0.01s)\n"}
+{"Time":"2026-10-14T17:44:02.821296669+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/snapshot_hash","Elapsed":0.01}
+{"Time":"2026-10-14T17:44:02.821301456+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/script_mismatch"}
+{"Time":"2026-10-14T17:44:02.82130382+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/script_mismatch","Output":"=== RUN   TestNewsRejectsInvalidPackagesWithoutPublishing/script_mismatch\n"}
+{"Time":"2026-10-14T17:44:02.844293181+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/script_mismatch","Output":"--- PASS: TestNewsRejectsInvalidPackagesWithoutPublishing/script_mismatch (0.02s)\n"}
+{"Time":"2026-10-14T17:44:02.844330246+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/script_mismatch","Elapsed":0.02}
+{"Time":"2026-10-14T17:44:02.844336495+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/source_mismatch"}
+{"Time":"2026-10-14T17:44:02.844339399+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/source_mismatch","Output":"=== RUN   TestNewsRejectsInvalidPackagesWithoutPublishing/source_mismatch\n"}
+{"Time":"2026-10-14T17:44:02.857759047+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/source_mismatch","Output":"--- PASS: TestNewsRejectsInvalidPackagesWithoutPublishing/source_mismatch (0.01s)\n"}
+{"Time":"2026-10-14T17:44:02.857947554+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/source_mismatch","Elapsed":0.01}
+{"Time":"2026-10-14T17:44:02.85795823+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/path"}
+{"Time":"2026-10-14T17:44:02.857967123+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/path","Output":"=== RUN   TestNewsRejectsInvalidPackagesWithoutPublishing/path\n"}
+{"Time":"2026-10-14T17:44:02.867553132+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/path","Output":"--- PASS: TestNewsRejectsInvalidPackagesWithoutPublishing/path (0.01s)\n"}
+{"Time":"2026-10-14T17:44:02.867581654+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/path","Elapsed":0.01}
+{"Time":"2026-10-14T17:44:02.867590977+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/duplicate"}
+{"Time":"2026-10-14T17:44:02.867595053+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/duplicate","Output":"=== RUN   TestNewsRejectsInvalidPackagesWithoutPublishing/duplicate\n"}
+{"Time":"2026-10-14T17:44:02.882484272+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/duplicate","Output":"--- PASS: TestNewsRejectsInvalidPackagesWithoutPublishing/duplicate (0.01s)\n"}
+{"Time":"2026-10-14T17:44:02.882513465+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/duplicate","Elapsed":0.01}
+{"Time":"2026-10-14T17:44:02.882521707+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/unknown_version"}
+{"Time":"2026-10-14T17:44:02.882525182+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/unknown_version","Output":"=== RUN   TestNewsRejectsInvalidPackagesWithoutPublishing/unknown_version\n"}
+{"Time":"2026-10-14T17:44:02.899247968+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/unknown_version","Output":"--- PASS: TestNewsRejectsInvalidPackagesWithoutPublishing/unknown_version (0.02s)\n"}
+{"Time":"2026-10-14T17:44:02.89926997+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/unknown_version","Elapsed":0.02}
+{"Time":"2026-10-14T17:44:02.899275288+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/capacity"}
+{"Time":"2026-10-14T17:44:02.899283209+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/capacity","Output":"=== RUN   TestNewsRejectsInvalidPackagesWithoutPublishing/capacity\n"}
+{"Time":"2026-10-14T17:44:02.929269022+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/capacity","Output":"--- PASS: TestNewsRejectsInvalidPackagesWithoutPublishing/capacity (0.03s)\n"}
+{"Time":"2026-10-14T17:44:02.929311594+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing/capacity","Elapsed":0.03}
+{"Time":"2026-10-14T17:44:02.92932254+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing","Output":"--- PASS: TestNewsRejectsInvalidPackagesWithoutPublishing (0.18s)\n"}
+{"Time":"2026-10-14T17:44:02.929326877+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsRejectsInvalidPackagesWithoutPublishing","Elapsed":0.18}
+{"Time":"2026-10-14T17:44:02.929330632+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsConcurrentImportCreatesOneProject"}
+{"Time":"2026-10-14T17:44:02.929334808+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsConcurrentImportCreatesOneProject","Output":"=== RUN   TestNewsConcurrentImportCreatesOneProject\n"}
+{"Time":"2026-10-14T17:44:02.950888063+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsConcurrentImportCreatesOneProject","Output":"--- PASS: TestNewsConcurrentImportCreatesOneProject (0.02s)\n"}
+{"Time":"2026-10-14T17:44:02.950923976+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsConcurrentImportCreatesOneProject","Elapsed":0.02}
+{"Time":"2026-10-14T17:44:02.950929715+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsDownloadRejectsCorruptionAndSymlinks"}
+{"Time":"2026-10-14T17:44:02.950931587+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsDownloadRejectsCorruptionAndSymlinks","Output":"=== RUN   TestNewsDownloadRejectsCorruptionAndSymlinks\n"}
+{"Time":"2026-10-14T17:44:02.980314422+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsDownloadRejectsCorruptionAndSymlinks","Output":"--- PASS: TestNewsDownloadRejectsCorruptionAndSymlinks (0.03s)\n"}
+{"Time":"2026-10-14T17:44:02.980364726+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsDownloadRejectsCorruptionAndSymlinks","Elapsed":0.03}
+{"Time":"2026-10-14T17:44:02.980372939+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsArchiveBoundsAndSymlinkEntry"}
+{"Time":"2026-10-14T17:44:02.980375592+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsArchiveBoundsAndSymlinkEntry","Output":"=== RUN   TestNewsArchiveBoundsAndSymlinkEntry\n"}
+{"Time":"2026-10-14T17:44:02.980378997+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsArchiveBoundsAndSymlinkEntry/oversized"}
+{"Time":"2026-10-14T17:44:02.980381721+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsArchiveBoundsAndSymlinkEntry/oversized","Output":"=== RUN   TestNewsArchiveBoundsAndSymlinkEntry/oversized\n"}
+{"Time":"2026-10-14T17:44:03.25350473+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsArchiveBoundsAndSymlinkEntry/oversized","Output":"--- PASS: TestNewsArchiveBoundsAndSymlinkEntry/oversized (0.27s)\n"}
+{"Time":"2026-10-14T17:44:03.253537678+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsArchiveBoundsAndSymlinkEntry/oversized","Elapsed":0.27}
+{"Time":"2026-10-14T17:44:03.25354546+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsArchiveBoundsAndSymlinkEntry/symlink"}
+{"Time":"2026-10-14T17:44:03.253548424+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsArchiveBoundsAndSymlinkEntry/symlink","Output":"=== RUN   TestNewsArchiveBoundsAndSymlinkEntry/symlink\n"}
+{"Time":"2026-10-14T17:44:03.260503303+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsArchiveBoundsAndSymlinkEntry/symlink","Output":"--- PASS: TestNewsArchiveBoundsAndSymlinkEntry/symlink (0.01s)\n"}
+{"Time":"2026-10-14T17:44:03.260524534+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsArchiveBoundsAndSymlinkEntry/symlink","Elapsed":0.01}
+{"Time":"2026-10-14T17:44:03.260568519+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsArchiveBoundsAndSymlinkEntry","Output":"--- PASS: TestNewsArchiveBoundsAndSymlinkEntry (0.28s)\n"}
+{"Time":"2026-10-14T17:44:03.260574668+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsArchiveBoundsAndSymlinkEntry","Elapsed":0.28}
+{"Time":"2026-10-14T17:44:03.260608828+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsVideoBindingProbeRangeAndRestart"}
+{"Time":"2026-10-14T17:44:03.260611382+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsVideoBindingProbeRangeAndRestart","Output":"=== RUN   TestNewsVideoBindingProbeRangeAndRestart\n"}
+{"Time":"2026-10-14T17:44:03.630053928+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsVideoBindingProbeRangeAndRestart","Output":"--- PASS: TestNewsVideoBindingProbeRangeAndRestart (0.37s)\n"}
+{"Time":"2026-10-14T17:44:03.630099285+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsVideoBindingProbeRangeAndRestart","Elapsed":0.37}
+{"Time":"2026-10-14T17:44:03.630104903+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams"}
+{"Time":"2026-10-14T17:44:03.630111633+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams","Output":"=== RUN   TestNewsVideoRejectsWrongScriptAndShortStreams\n"}
+{"Time":"2026-10-14T17:44:03.872582413+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams/wrong_export"}
+{"Time":"2026-10-14T17:44:03.872662571+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams/wrong_export","Output":"=== RUN   TestNewsVideoRejectsWrongScriptAndShortStreams/wrong_export\n"}
+{"Time":"2026-10-14T17:44:03.895252806+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams/wrong_export","Output":"--- PASS: TestNewsVideoRejectsWrongScriptAndShortStreams/wrong_export (0.02s)\n"}
+{"Time":"2026-10-14T17:44:03.895285905+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams/wrong_export","Elapsed":0.02}
+{"Time":"2026-10-14T17:44:03.895307226+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams/wrong_hash"}
+{"Time":"2026-10-14T17:44:03.895310251+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams/wrong_hash","Output":"=== RUN   TestNewsVideoRejectsWrongScriptAndShortStreams/wrong_hash\n"}
+{"Time":"2026-10-14T17:44:03.915471754+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams/wrong_hash","Output":"--- PASS: TestNewsVideoRejectsWrongScriptAndShortStreams/wrong_hash (0.02s)\n"}
+{"Time":"2026-10-14T17:44:03.915526074+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams/wrong_hash","Elapsed":0.02}
+{"Time":"2026-10-14T17:44:03.915532844+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams/short_stream"}
+{"Time":"2026-10-14T17:44:03.915536119+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams/short_stream","Output":"=== RUN   TestNewsVideoRejectsWrongScriptAndShortStreams/short_stream\n"}
+{"Time":"2026-10-14T17:44:03.987873501+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams/short_stream","Output":"--- PASS: TestNewsVideoRejectsWrongScriptAndShortStreams/short_stream (0.07s)\n"}
+{"Time":"2026-10-14T17:44:03.987991825+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams/short_stream","Elapsed":0.07}
+{"Time":"2026-10-14T17:44:03.988053866+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams/wrong_subtitles"}
+{"Time":"2026-10-14T17:44:03.988057942+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams/wrong_subtitles","Output":"=== RUN   TestNewsVideoRejectsWrongScriptAndShortStreams/wrong_subtitles\n"}
+{"Time":"2026-10-14T17:44:04.121207365+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams/wrong_subtitles","Output":"--- PASS: TestNewsVideoRejectsWrongScriptAndShortStreams/wrong_subtitles (0.13s)\n"}
+{"Time":"2026-10-14T17:44:04.121289976+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams/wrong_subtitles","Elapsed":0.13}
+{"Time":"2026-10-14T17:44:04.121339279+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams/invalid_wav"}
+{"Time":"2026-10-14T17:44:04.121342484+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams/invalid_wav","Output":"=== RUN   TestNewsVideoRejectsWrongScriptAndShortStreams/invalid_wav\n"}
+{"Time":"2026-10-14T17:44:04.192227019+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams/invalid_wav","Output":"--- PASS: TestNewsVideoRejectsWrongScriptAndShortStreams/invalid_wav (0.07s)\n"}
+{"Time":"2026-10-14T17:44:04.192286496+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams/invalid_wav","Elapsed":0.07}
+{"Time":"2026-10-14T17:44:04.19229558+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams/invalid_cover"}
+{"Time":"2026-10-14T17:44:04.192298203+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams/invalid_cover","Output":"=== RUN   TestNewsVideoRejectsWrongScriptAndShortStreams/invalid_cover\n"}
+{"Time":"2026-10-14T17:44:04.321456111+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams/invalid_cover","Output":"--- PASS: TestNewsVideoRejectsWrongScriptAndShortStreams/invalid_cover (0.13s)\n"}
+{"Time":"2026-10-14T17:44:04.321497221+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams/invalid_cover","Elapsed":0.13}
+{"Time":"2026-10-14T17:44:04.321670185+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams","Output":"--- PASS: TestNewsVideoRejectsWrongScriptAndShortStreams (0.69s)\n"}
+{"Time":"2026-10-14T17:44:04.321742101+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsVideoRejectsWrongScriptAndShortStreams","Elapsed":0.69}
+{"Time":"2026-10-14T17:44:04.321749742+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsImportAuthentication"}
+{"Time":"2026-10-14T17:44:04.321754309+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsImportAuthentication","Output":"=== RUN   TestNewsImportAuthentication\n"}
+{"Time":"2026-10-14T17:44:04.322752262+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsImportAuthentication","Output":"--- PASS: TestNewsImportAuthentication (0.00s)\n"}
+{"Time":"2026-10-14T17:44:04.322774965+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsImportAuthentication","Elapsed":0}
+{"Time":"2026-10-14T17:44:04.322788575+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewsSRTValidation"}
+{"Time":"2026-10-14T17:44:04.322791409+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsSRTValidation","Output":"=== RUN   TestNewsSRTValidation\n"}
+{"Time":"2026-10-14T17:44:04.323978816+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewsSRTValidation","Output":"--- PASS: TestNewsSRTValidation (0.00s)\n"}
+{"Time":"2026-10-14T17:44:04.32409377+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewsSRTValidation","Elapsed":0}
+{"Time":"2026-10-14T17:44:04.324102964+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestProductionTextPreservesExactTextAndMapping"}
+{"Time":"2026-10-14T17:44:04.324105097+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestProductionTextPreservesExactTextAndMapping","Output":"=== RUN   TestProductionTextPreservesExactTextAndMapping\n"}
+{"Time":"2026-10-14T17:44:04.330048883+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestProductionTextPreservesExactTextAndMapping","Output":"--- PASS: TestProductionTextPreservesExactTextAndMapping (0.01s)\n"}
+{"Time":"2026-10-14T17:44:04.330061882+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestProductionTextPreservesExactTextAndMapping","Elapsed":0.01}
+{"Time":"2026-10-14T17:44:04.33006675+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestProductionFinalRequiresCurrentCompletedRenderAndInvalidates"}
+{"Time":"2026-10-14T17:44:04.330077155+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestProductionFinalRequiresCurrentCompletedRenderAndInvalidates","Output":"=== RUN   TestProductionFinalRequiresCurrentCompletedRenderAndInvalidates\n"}
+{"Time":"2026-10-14T17:44:04.335840021+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestProductionFinalRequiresCurrentCompletedRenderAndInvalidates","Output":"--- PASS: TestProductionFinalRequiresCurrentCompletedRenderAndInvalidates (0.01s)\n"}
+{"Time":"2026-10-14T17:44:04.335857797+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestProductionFinalRequiresCurrentCompletedRenderAndInvalidates","Elapsed":0.01}
+{"Time":"2026-10-14T17:44:04.335862083+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestProductionLimitsAndRoundTrip"}
+{"Time":"2026-10-14T17:44:04.335864327+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestProductionLimitsAndRoundTrip","Output":"=== RUN   TestProductionLimitsAndRoundTrip\n"}
+{"Time":"2026-10-14T17:44:04.341954083+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestProductionLimitsAndRoundTrip","Output":"--- PASS: TestProductionLimitsAndRoundTrip (0.01s)\n"}
+{"Time":"2026-10-14T17:44:04.341969416+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestProductionLimitsAndRoundTrip","Elapsed":0.01}
+{"Time":"2026-10-14T17:44:04.341974944+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestDraftCaptionPreviewKeepsReviewAndRejectsStaleBinding"}
+{"Time":"2026-10-14T17:44:04.341976927+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestDraftCaptionPreviewKeepsReviewAndRejectsStaleBinding","Output":"=== RUN   TestDraftCaptionPreviewKeepsReviewAndRejectsStaleBinding\n"}
+{"Time":"2026-10-14T17:44:04.827710141+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestDraftCaptionPreviewKeepsReviewAndRejectsStaleBinding","Output":"--- PASS: TestDraftCaptionPreviewKeepsReviewAndRejectsStaleBinding (0.49s)\n"}
+{"Time":"2026-10-14T17:44:04.827751161+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestDraftCaptionPreviewKeepsReviewAndRejectsStaleBinding","Elapsed":0.49}
+{"Time":"2026-10-14T17:44:04.827763389+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestFinalCannotUseStaleNarrationWhenCaptionsDisabled"}
+{"Time":"2026-10-14T17:44:04.827767015+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestFinalCannotUseStaleNarrationWhenCaptionsDisabled","Output":"=== RUN   TestFinalCannotUseStaleNarrationWhenCaptionsDisabled\n"}
+{"Time":"2026-10-14T17:44:05.288959808+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestFinalCannotUseStaleNarrationWhenCaptionsDisabled","Output":"--- PASS: TestFinalCannotUseStaleNarrationWhenCaptionsDisabled (0.46s)\n"}
+{"Time":"2026-10-14T17:44:05.288999286+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestFinalCannotUseStaleNarrationWhenCaptionsDisabled","Elapsed":0.46}
+{"Time":"2026-10-14T17:44:05.289005645+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestDurableOperationLostAckAndRestart"}
+{"Time":"2026-10-14T17:44:05.289008008+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestDurableOperationLostAckAndRestart","Output":"=== RUN   TestDurableOperationLostAckAndRestart\n"}
+{"Time":"2026-10-14T17:44:05.293510387+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestDurableOperationLostAckAndRestart","Output":"--- PASS: TestDurableOperationLostAckAndRestart (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.293529686+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestDurableOperationLostAckAndRestart","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.293533672+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestReceiptStatesNeverResubmit"}
+{"Time":"2026-10-14T17:44:05.293536215+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestReceiptStatesNeverResubmit","Output":"=== RUN   TestReceiptStatesNeverResubmit\n"}
+{"Time":"2026-10-14T17:44:05.293579068+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestReceiptStatesNeverResubmit/processing"}
+{"Time":"2026-10-14T17:44:05.293581552+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestReceiptStatesNeverResubmit/processing","Output":"=== RUN   TestReceiptStatesNeverResubmit/processing\n"}
+{"Time":"2026-10-14T17:44:05.295005686+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestReceiptStatesNeverResubmit/processing","Output":"--- PASS: TestReceiptStatesNeverResubmit/processing (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.295020267+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestReceiptStatesNeverResubmit/processing","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.295024764+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestReceiptStatesNeverResubmit/unconfirmed"}
+{"Time":"2026-10-14T17:44:05.295026686+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestReceiptStatesNeverResubmit/unconfirmed","Output":"=== RUN   TestReceiptStatesNeverResubmit/unconfirmed\n"}
+{"Time":"2026-10-14T17:44:05.296360107+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestReceiptStatesNeverResubmit/unconfirmed","Output":"--- PASS: TestReceiptStatesNeverResubmit/unconfirmed (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.296371553+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestReceiptStatesNeverResubmit/unconfirmed","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.296388739+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestReceiptStatesNeverResubmit/failed"}
+{"Time":"2026-10-14T17:44:05.296391092+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestReceiptStatesNeverResubmit/failed","Output":"=== RUN   TestReceiptStatesNeverResubmit/failed\n"}
+{"Time":"2026-10-14T17:44:05.297733856+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestReceiptStatesNeverResubmit/failed","Output":"--- PASS: TestReceiptStatesNeverResubmit/failed (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.297745292+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestReceiptStatesNeverResubmit/failed","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.297778381+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestReceiptStatesNeverResubmit","Output":"--- PASS: TestReceiptStatesNeverResubmit (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.297782086+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestReceiptStatesNeverResubmit","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.297799742+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestPendingMessageRecoveryAndFencedStop"}
+{"Time":"2026-10-14T17:44:05.297802116+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestPendingMessageRecoveryAndFencedStop","Output":"=== RUN   TestPendingMessageRecoveryAndFencedStop\n"}
+{"Time":"2026-10-14T17:44:05.311302653+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestPendingMessageRecoveryAndFencedStop","Output":"--- PASS: TestPendingMessageRecoveryAndFencedStop (0.01s)\n"}
+{"Time":"2026-10-14T17:44:05.311488166+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestPendingMessageRecoveryAndFencedStop","Elapsed":0.01}
+{"Time":"2026-10-14T17:44:05.311494575+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestStopUnknownSubmissionDoesNotStartIt"}
+{"Time":"2026-10-14T17:44:05.311497019+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestStopUnknownSubmissionDoesNotStartIt","Output":"=== RUN   TestStopUnknownSubmissionDoesNotStartIt\n"}
+{"Time":"2026-10-14T17:44:05.316848054+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestStopUnknownSubmissionDoesNotStartIt","Output":"--- PASS: TestStopUnknownSubmissionDoesNotStartIt (0.01s)\n"}
+{"Time":"2026-10-14T17:44:05.316864929+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestStopUnknownSubmissionDoesNotStartIt","Elapsed":0.01}
+{"Time":"2026-10-14T17:44:05.316869255+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestPendingCancellationResumesAfterReceiptArrives"}
+{"Time":"2026-10-14T17:44:05.316871258+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestPendingCancellationResumesAfterReceiptArrives","Output":"=== RUN   TestPendingCancellationResumesAfterReceiptArrives\n"}
+{"Time":"2026-10-14T17:44:05.3224165+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestPendingCancellationResumesAfterReceiptArrives","Output":"--- PASS: TestPendingCancellationResumesAfterReceiptArrives (0.01s)\n"}
+{"Time":"2026-10-14T17:44:05.322438222+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestPendingCancellationResumesAfterReceiptArrives","Elapsed":0.01}
+{"Time":"2026-10-14T17:44:05.32244369+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestUnreadableReceiptRemainsUncertain"}
+{"Time":"2026-10-14T17:44:05.322446013+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestUnreadableReceiptRemainsUncertain","Output":"=== RUN   TestUnreadableReceiptRemainsUncertain\n"}
+{"Time":"2026-10-14T17:44:05.323887793+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestUnreadableReceiptRemainsUncertain","Output":"--- PASS: TestUnreadableReceiptRemainsUncertain (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.323902615+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestUnreadableReceiptRemainsUncertain","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.323908514+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestRuntimePreflight"}
+{"Time":"2026-10-14T17:44:05.32391275+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRuntimePreflight","Output":"=== RUN   TestRuntimePreflight\n"}
+{"Time":"2026-10-14T17:44:05.323957696+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestRuntimePreflight/ready"}
+{"Time":"2026-10-14T17:44:05.323962293+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRuntimePreflight/ready","Output":"=== RUN   TestRuntimePreflight/ready\n"}
+{"Time":"2026-10-14T17:44:05.325890267+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRuntimePreflight/ready","Output":"--- PASS: TestRuntimePreflight/ready (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.325902875+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestRuntimePreflight/ready","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.325907122+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestRuntimePreflight/local"}
+{"Time":"2026-10-14T17:44:05.325909084+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRuntimePreflight/local","Output":"=== RUN   TestRuntimePreflight/local\n"}
+{"Time":"2026-10-14T17:44:05.32710364+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRuntimePreflight/local","Output":"--- PASS: TestRuntimePreflight/local (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.327111843+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestRuntimePreflight/local","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.327114637+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestRuntimePreflight/missing_tool"}
+{"Time":"2026-10-14T17:44:05.327116489+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRuntimePreflight/missing_tool","Output":"=== RUN   TestRuntimePreflight/missing_tool\n"}
+{"Time":"2026-10-14T17:44:05.329019737+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRuntimePreflight/missing_tool","Output":"--- PASS: TestRuntimePreflight/missing_tool (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.329030904+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestRuntimePreflight/missing_tool","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.329183047+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestRuntimePreflight/unauthenticated"}
+{"Time":"2026-10-14T17:44:05.329185851+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRuntimePreflight/unauthenticated","Output":"=== RUN   TestRuntimePreflight/unauthenticated\n"}
+{"Time":"2026-10-14T17:44:05.331020128+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRuntimePreflight/unauthenticated","Output":"--- PASS: TestRuntimePreflight/unauthenticated (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.331030914+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestRuntimePreflight/unauthenticated","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.33103497+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestRuntimePreflight/wrong_binding"}
+{"Time":"2026-10-14T17:44:05.331037313+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRuntimePreflight/wrong_binding","Output":"=== RUN   TestRuntimePreflight/wrong_binding\n"}
+{"Time":"2026-10-14T17:44:05.332386016+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRuntimePreflight/wrong_binding","Output":"--- PASS: TestRuntimePreflight/wrong_binding (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.332399476+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestRuntimePreflight/wrong_binding","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.332413196+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestRuntimePreflight/pending_update"}
+{"Time":"2026-10-14T17:44:05.332415079+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRuntimePreflight/pending_update","Output":"=== RUN   TestRuntimePreflight/pending_update\n"}
+{"Time":"2026-10-14T17:44:05.334289484+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRuntimePreflight/pending_update","Output":"--- PASS: TestRuntimePreflight/pending_update (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.334302233+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestRuntimePreflight/pending_update","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.334306649+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestRuntimePreflight/stopped"}
+{"Time":"2026-10-14T17:44:05.334309323+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRuntimePreflight/stopped","Output":"=== RUN   TestRuntimePreflight/stopped\n"}
+{"Time":"2026-10-14T17:44:05.336269785+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRuntimePreflight/stopped","Output":"--- PASS: TestRuntimePreflight/stopped (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.336282323+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestRuntimePreflight/stopped","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.33631398+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestRuntimePreflight/errors"}
+{"Time":"2026-10-14T17:44:05.336316504+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRuntimePreflight/errors","Output":"=== RUN   TestRuntimePreflight/errors\n"}
+{"Time":"2026-10-14T17:44:05.338123711+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRuntimePreflight/errors","Output":"--- PASS: TestRuntimePreflight/errors (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.338135788+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestRuntimePreflight/errors","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.338139874+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestRuntimePreflight/unprobed"}
+{"Time":"2026-10-14T17:44:05.338141968+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRuntimePreflight/unprobed","Output":"=== RUN   TestRuntimePreflight/unprobed\n"}
+{"Time":"2026-10-14T17:44:05.340182617+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRuntimePreflight/unprobed","Output":"--- PASS: TestRuntimePreflight/unprobed (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.340195266+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestRuntimePreflight/unprobed","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.340199652+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestRuntimePreflight/wrong_project"}
+{"Time":"2026-10-14T17:44:05.340201765+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRuntimePreflight/wrong_project","Output":"=== RUN   TestRuntimePreflight/wrong_project\n"}
+{"Time":"2026-10-14T17:44:05.341563567+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRuntimePreflight/wrong_project","Output":"--- PASS: TestRuntimePreflight/wrong_project (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.341737824+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestRuntimePreflight/wrong_project","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.341746747+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestRuntimePreflight","Output":"--- PASS: TestRuntimePreflight (0.02s)\n"}
+{"Time":"2026-10-14T17:44:05.341754007+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestRuntimePreflight","Elapsed":0.02}
+{"Time":"2026-10-14T17:44:05.341768839+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestDataLockExcludesSecondProcessHandle"}
+{"Time":"2026-10-14T17:44:05.341772515+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestDataLockExcludesSecondProcessHandle","Output":"=== RUN   TestDataLockExcludesSecondProcessHandle\n"}
+{"Time":"2026-10-14T17:44:05.34328642+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestDataLockExcludesSecondProcessHandle","Output":"--- PASS: TestDataLockExcludesSecondProcessHandle (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.343296925+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestDataLockExcludesSecondProcessHandle","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.3433+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestCapabilityDiscoverySeparatesConfiguredAndProbed"}
+{"Time":"2026-10-14T17:44:05.343302183+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestCapabilityDiscoverySeparatesConfiguredAndProbed","Output":"=== RUN   TestCapabilityDiscoverySeparatesConfiguredAndProbed\n"}
+{"Time":"2026-10-14T17:44:05.356080979+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestCapabilityDiscoverySeparatesConfiguredAndProbed","Output":"--- PASS: TestCapabilityDiscoverySeparatesConfiguredAndProbed (0.01s)\n"}
+{"Time":"2026-10-14T17:44:05.356110442+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestCapabilityDiscoverySeparatesConfiguredAndProbed","Elapsed":0.01}
+{"Time":"2026-10-14T17:44:05.356117773+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestAssetImportConcurrentRetriesAndConflicts"}
+{"Time":"2026-10-14T17:44:05.356123852+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestAssetImportConcurrentRetriesAndConflicts","Output":"=== RUN   TestAssetImportConcurrentRetriesAndConflicts\n"}
+{"Time":"2026-10-14T17:44:05.362406257+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestAssetImportConcurrentRetriesAndConflicts","Output":"--- PASS: TestAssetImportConcurrentRetriesAndConflicts (0.01s)\n"}
+{"Time":"2026-10-14T17:44:05.363512443+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestAssetImportConcurrentRetriesAndConflicts","Elapsed":0.01}
+{"Time":"2026-10-14T17:44:05.363524391+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestUnifiedJobsPersistAndReplayRenderReceipt"}
+{"Time":"2026-10-14T17:44:05.363527285+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestUnifiedJobsPersistAndReplayRenderReceipt","Output":"=== RUN   TestUnifiedJobsPersistAndReplayRenderReceipt\n"}
+{"Time":"2026-10-14T17:44:05.36792523+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestUnifiedJobsPersistAndReplayRenderReceipt","Output":"--- PASS: TestUnifiedJobsPersistAndReplayRenderReceipt (0.01s)\n"}
+{"Time":"2026-10-14T17:44:05.367976155+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestUnifiedJobsPersistAndReplayRenderReceipt","Elapsed":0.01}
+{"Time":"2026-10-14T17:44:05.368001752+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestJobCancellationIsIdempotentAndScoped"}
+{"Time":"2026-10-14T17:44:05.368004957+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestJobCancellationIsIdempotentAndScoped","Output":"=== RUN   TestJobCancellationIsIdempotentAndScoped\n"}
+{"Time":"2026-10-14T17:44:05.372057124+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestJobCancellationIsIdempotentAndScoped","Output":"--- PASS: TestJobCancellationIsIdempotentAndScoped (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.372209398+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestJobCancellationIsIdempotentAndScoped","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.372239842+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestJobRejectsUnavailableAndUnknownOptions"}
+{"Time":"2026-10-14T17:44:05.372242967+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestJobRejectsUnavailableAndUnknownOptions","Output":"=== RUN   TestJobRejectsUnavailableAndUnknownOptions\n"}
+{"Time":"2026-10-14T17:44:05.375170691+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestJobRejectsUnavailableAndUnknownOptions","Output":"--- PASS: TestJobRejectsUnavailableAndUnknownOptions (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.375216008+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestJobRejectsUnavailableAndUnknownOptions","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.375239502+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestProjectCreationReceiptSurvivesRename"}
+{"Time":"2026-10-14T17:44:05.375250028+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestProjectCreationReceiptSurvivesRename","Output":"=== RUN   TestProjectCreationReceiptSurvivesRename\n"}
+{"Time":"2026-10-14T17:44:05.376318268+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestProjectCreationReceiptSurvivesRename","Output":"--- PASS: TestProjectCreationReceiptSurvivesRename (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.376359769+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestProjectCreationReceiptSurvivesRename","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.376384385+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestNewGlobalMCPToolsDoNotRequireProject"}
+{"Time":"2026-10-14T17:44:05.376386999+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewGlobalMCPToolsDoNotRequireProject","Output":"=== RUN   TestNewGlobalMCPToolsDoNotRequireProject\n"}
+{"Time":"2026-10-14T17:44:05.385352949+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestNewGlobalMCPToolsDoNotRequireProject","Output":"--- PASS: TestNewGlobalMCPToolsDoNotRequireProject (0.01s)\n"}
+{"Time":"2026-10-14T17:44:05.385370676+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestNewGlobalMCPToolsDoNotRequireProject","Elapsed":0.01}
+{"Time":"2026-10-14T17:44:05.385375012+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestUnifiedTTSRunsActualMediaProcessing"}
+{"Time":"2026-10-14T17:44:05.385377636+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestUnifiedTTSRunsActualMediaProcessing","Output":"=== RUN   TestUnifiedTTSRunsActualMediaProcessing\n"}
+{"Time":"2026-10-14T17:44:05.69542014+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestUnifiedTTSRunsActualMediaProcessing","Output":"--- PASS: TestUnifiedTTSRunsActualMediaProcessing (0.31s)\n"}
+{"Time":"2026-10-14T17:44:05.695465607+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestUnifiedTTSRunsActualMediaProcessing","Elapsed":0.31}
+{"Time":"2026-10-14T17:44:05.695475482+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestConcurrentRenderSubmissionAllocatesOneTask"}
+{"Time":"2026-10-14T17:44:05.695477895+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestConcurrentRenderSubmissionAllocatesOneTask","Output":"=== RUN   TestConcurrentRenderSubmissionAllocatesOneTask\n"}
+{"Time":"2026-10-14T17:44:05.751605375+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestConcurrentRenderSubmissionAllocatesOneTask","Output":"--- PASS: TestConcurrentRenderSubmissionAllocatesOneTask (0.06s)\n"}
+{"Time":"2026-10-14T17:44:05.751638523+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestConcurrentRenderSubmissionAllocatesOneTask","Elapsed":0.06}
+{"Time":"2026-10-14T17:44:05.751722447+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestFoundationMCPRejectsSilentArgumentLoss"}
+{"Time":"2026-10-14T17:44:05.751725972+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestFoundationMCPRejectsSilentArgumentLoss","Output":"=== RUN   TestFoundationMCPRejectsSilentArgumentLoss\n"}
+{"Time":"2026-10-14T17:44:05.751747464+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestFoundationMCPRejectsSilentArgumentLoss","Output":"--- PASS: TestFoundationMCPRejectsSilentArgumentLoss (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.751774303+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestFoundationMCPRejectsSilentArgumentLoss","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.7517924+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog"}
+{"Time":"2026-10-14T17:44:05.751801112+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog","Output":"=== RUN   TestSpeechVoiceCatalog\n"}
+{"Time":"2026-10-14T17:44:05.756427033+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/native-vllm"}
+{"Time":"2026-10-14T17:44:05.75645207+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/native-vllm","Output":"=== RUN   TestSpeechVoiceCatalog/native-vllm\n"}
+{"Time":"2026-10-14T17:44:05.758980852+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/native-vllm","Output":"--- PASS: TestSpeechVoiceCatalog/native-vllm (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.758996495+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/native-vllm","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.759001452+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/empty"}
+{"Time":"2026-10-14T17:44:05.759004056+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/empty","Output":"=== RUN   TestSpeechVoiceCatalog/empty\n"}
+{"Time":"2026-10-14T17:44:05.75984339+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/empty","Output":"--- PASS: TestSpeechVoiceCatalog/empty (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.759852143+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/empty","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.759855898+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/unsupported"}
+{"Time":"2026-10-14T17:44:05.759858022+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/unsupported","Output":"=== RUN   TestSpeechVoiceCatalog/unsupported\n"}
+{"Time":"2026-10-14T17:44:05.760590799+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/unsupported","Output":"--- PASS: TestSpeechVoiceCatalog/unsupported (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.760595846+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/unsupported","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.760599361+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/method-unsupported"}
+{"Time":"2026-10-14T17:44:05.760601454+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/method-unsupported","Output":"=== RUN   TestSpeechVoiceCatalog/method-unsupported\n"}
+{"Time":"2026-10-14T17:44:05.761332659+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/method-unsupported","Output":"--- PASS: TestSpeechVoiceCatalog/method-unsupported (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.761359959+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/method-unsupported","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.761373239+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/auth"}
+{"Time":"2026-10-14T17:44:05.761376554+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/auth","Output":"=== RUN   TestSpeechVoiceCatalog/auth\n"}
+{"Time":"2026-10-14T17:44:05.762071145+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/auth","Output":"--- PASS: TestSpeechVoiceCatalog/auth (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.762113938+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/auth","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.762131283+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/busy"}
+{"Time":"2026-10-14T17:44:05.762133687+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/busy","Output":"=== RUN   TestSpeechVoiceCatalog/busy\n"}
+{"Time":"2026-10-14T17:44:05.763531236+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/busy","Output":"--- PASS: TestSpeechVoiceCatalog/busy (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.763548592+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/busy","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.763552087+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/html"}
+{"Time":"2026-10-14T17:44:05.76355457+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/html","Output":"=== RUN   TestSpeechVoiceCatalog/html\n"}
+{"Time":"2026-10-14T17:44:05.763913208+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/html","Output":"--- PASS: TestSpeechVoiceCatalog/html (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.763923923+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/html","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.76392813+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/missing"}
+{"Time":"2026-10-14T17:44:05.763931084+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/missing","Output":"=== RUN   TestSpeechVoiceCatalog/missing\n"}
+{"Time":"2026-10-14T17:44:05.764732332+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/missing","Output":"--- PASS: TestSpeechVoiceCatalog/missing (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.764743058+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/missing","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.764762206+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/null"}
+{"Time":"2026-10-14T17:44:05.76476476+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/null","Output":"=== RUN   TestSpeechVoiceCatalog/null\n"}
+{"Time":"2026-10-14T17:44:05.765838058+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/null","Output":"--- PASS: TestSpeechVoiceCatalog/null (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.765933258+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/null","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.765937224+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/object"}
+{"Time":"2026-10-14T17:44:05.765939046+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/object","Output":"=== RUN   TestSpeechVoiceCatalog/object\n"}
+{"Time":"2026-10-14T17:44:05.766549589+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/object","Output":"--- PASS: TestSpeechVoiceCatalog/object (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.766562448+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/object","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.766579453+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/path"}
+{"Time":"2026-10-14T17:44:05.766593714+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/path","Output":"=== RUN   TestSpeechVoiceCatalog/path\n"}
+{"Time":"2026-10-14T17:44:05.767339641+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/path","Output":"--- PASS: TestSpeechVoiceCatalog/path (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.767349064+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/path","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.76735278+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/trailing-json"}
+{"Time":"2026-10-14T17:44:05.767354963+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/trailing-json","Output":"=== RUN   TestSpeechVoiceCatalog/trailing-json\n"}
+{"Time":"2026-10-14T17:44:05.768164333+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/trailing-json","Output":"--- PASS: TestSpeechVoiceCatalog/trailing-json (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.768186095+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/trailing-json","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.768194497+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/huge"}
+{"Time":"2026-10-14T17:44:05.768197041+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/huge","Output":"=== RUN   TestSpeechVoiceCatalog/huge\n"}
+{"Time":"2026-10-14T17:44:05.78547542+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/huge","Output":"--- PASS: TestSpeechVoiceCatalog/huge (0.02s)\n"}
+{"Time":"2026-10-14T17:44:05.785521688+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog/huge","Elapsed":0.02}
+{"Time":"2026-10-14T17:44:05.785534277+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog","Output":"--- PASS: TestSpeechVoiceCatalog (0.03s)\n"}
+{"Time":"2026-10-14T17:44:05.785538273+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestSpeechVoiceCatalog","Elapsed":0.03}
+{"Time":"2026-10-14T17:44:05.785541367+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestSpeechVoiceDiscoveryDraftAndKeyIsolation"}
+{"Time":"2026-10-14T17:44:05.785544602+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceDiscoveryDraftAndKeyIsolation","Output":"=== RUN   TestSpeechVoiceDiscoveryDraftAndKeyIsolation\n"}
+{"Time":"2026-10-14T17:44:05.792054152+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceDiscoveryDraftAndKeyIsolation","Output":"--- PASS: TestSpeechVoiceDiscoveryDraftAndKeyIsolation (0.01s)\n"}
+{"Time":"2026-10-14T17:44:05.792075113+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestSpeechVoiceDiscoveryDraftAndKeyIsolation","Elapsed":0.01}
+{"Time":"2026-10-14T17:44:05.792081011+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestSpeechVoiceDiscoveryRedirectAndCancellation"}
+{"Time":"2026-10-14T17:44:05.792083435+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceDiscoveryRedirectAndCancellation","Output":"=== RUN   TestSpeechVoiceDiscoveryRedirectAndCancellation\n"}
+{"Time":"2026-10-14T17:44:05.79302565+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechVoiceDiscoveryRedirectAndCancellation","Output":"--- PASS: TestSpeechVoiceDiscoveryRedirectAndCancellation (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.793038519+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestSpeechVoiceDiscoveryRedirectAndCancellation","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.793043076+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestSpeechDoctorReadOnlyAndSanitized"}
+{"Time":"2026-10-14T17:44:05.793046721+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechDoctorReadOnlyAndSanitized","Output":"=== RUN   TestSpeechDoctorReadOnlyAndSanitized\n"}
+{"Time":"2026-10-14T17:44:05.797873907+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechDoctorReadOnlyAndSanitized","Output":"--- PASS: TestSpeechDoctorReadOnlyAndSanitized (0.00s)\n"}
+{"Time":"2026-10-14T17:44:05.797891433+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestSpeechDoctorReadOnlyAndSanitized","Elapsed":0}
+{"Time":"2026-10-14T17:44:05.797898683+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestIndexTTSSynthesisAndAdoption"}
+{"Time":"2026-10-14T17:44:05.797902349+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestIndexTTSSynthesisAndAdoption","Output":"=== RUN   TestIndexTTSSynthesisAndAdoption\n"}
+{"Time":"2026-10-14T17:44:06.163533595+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestIndexTTSSynthesisAndAdoption","Output":"--- PASS: TestIndexTTSSynthesisAndAdoption (0.37s)\n"}
+{"Time":"2026-10-14T17:44:06.163567425+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestIndexTTSSynthesisAndAdoption","Elapsed":0.37}
+{"Time":"2026-10-14T17:44:06.163575006+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestSpeechSettingsPersistenceAndSecretHandling"}
+{"Time":"2026-10-14T17:44:06.16357739+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechSettingsPersistenceAndSecretHandling","Output":"=== RUN   TestSpeechSettingsPersistenceAndSecretHandling\n"}
+{"Time":"2026-10-14T17:44:06.170221397+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechSettingsPersistenceAndSecretHandling","Output":"--- PASS: TestSpeechSettingsPersistenceAndSecretHandling (0.01s)\n"}
+{"Time":"2026-10-14T17:44:06.170240945+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestSpeechSettingsPersistenceAndSecretHandling","Elapsed":0.01}
+{"Time":"2026-10-14T17:44:06.170253684+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation"}
+{"Time":"2026-10-14T17:44:06.170256708+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation","Output":"=== RUN   TestIndexTTSErrorsRedirectAndCancellation\n"}
+{"Time":"2026-10-14T17:44:06.171419157+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation/credentials"}
+{"Time":"2026-10-14T17:44:06.171425877+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation/credentials","Output":"=== RUN   TestIndexTTSErrorsRedirectAndCancellation/credentials\n"}
+{"Time":"2026-10-14T17:44:06.172828755+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation/credentials","Output":"--- PASS: TestIndexTTSErrorsRedirectAndCancellation/credentials (0.00s)\n"}
+{"Time":"2026-10-14T17:44:06.172841634+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation/credentials","Elapsed":0}
+{"Time":"2026-10-14T17:44:06.172844508+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation/voice"}
+{"Time":"2026-10-14T17:44:06.172846871+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation/voice","Output":"=== RUN   TestIndexTTSErrorsRedirectAndCancellation/voice\n"}
+{"Time":"2026-10-14T17:44:06.174122927+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation/voice","Output":"--- PASS: TestIndexTTSErrorsRedirectAndCancellation/voice (0.00s)\n"}
+{"Time":"2026-10-14T17:44:06.174132201+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation/voice","Elapsed":0}
+{"Time":"2026-10-14T17:44:06.174163577+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation/busy"}
+{"Time":"2026-10-14T17:44:06.174166131+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation/busy","Output":"=== RUN   TestIndexTTSErrorsRedirectAndCancellation/busy\n"}
+{"Time":"2026-10-14T17:44:06.175051943+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation/busy","Output":"--- PASS: TestIndexTTSErrorsRedirectAndCancellation/busy (0.00s)\n"}
+{"Time":"2026-10-14T17:44:06.175055989+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation/busy","Elapsed":0}
+{"Time":"2026-10-14T17:44:06.175089238+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation/json"}
+{"Time":"2026-10-14T17:44:06.175091371+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation/json","Output":"=== RUN   TestIndexTTSErrorsRedirectAndCancellation/json\n"}
+{"Time":"2026-10-14T17:44:06.17595462+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation/json","Output":"--- PASS: TestIndexTTSErrorsRedirectAndCancellation/json (0.00s)\n"}
+{"Time":"2026-10-14T17:44:06.175992075+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation/json","Elapsed":0}
+{"Time":"2026-10-14T17:44:06.176007077+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation/truncated"}
+{"Time":"2026-10-14T17:44:06.176014849+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation/truncated","Output":"=== RUN   TestIndexTTSErrorsRedirectAndCancellation/truncated\n"}
+{"Time":"2026-10-14T17:44:06.176935783+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation/truncated","Output":"--- PASS: TestIndexTTSErrorsRedirectAndCancellation/truncated (0.00s)\n"}
+{"Time":"2026-10-14T17:44:06.176942152+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation/truncated","Elapsed":0}
+{"Time":"2026-10-14T17:44:06.176978556+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation/oversized"}
+{"Time":"2026-10-14T17:44:06.176980609+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation/oversized","Output":"=== RUN   TestIndexTTSErrorsRedirectAndCancellation/oversized\n"}
+{"Time":"2026-10-14T17:44:06.178082879+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation/oversized","Output":"--- PASS: TestIndexTTSErrorsRedirectAndCancellation/oversized (0.00s)\n"}
+{"Time":"2026-10-14T17:44:06.17809051+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation/oversized","Elapsed":0}
+{"Time":"2026-10-14T17:44:06.198413716+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation","Output":"--- PASS: TestIndexTTSErrorsRedirectAndCancellation (0.03s)\n"}
+{"Time":"2026-10-14T17:44:06.198441416+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestIndexTTSErrorsRedirectAndCancellation","Elapsed":0.03}
+{"Time":"2026-10-14T17:44:06.198447315+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestIndexTTSValidationAndProbe"}
+{"Time":"2026-10-14T17:44:06.198456308+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestIndexTTSValidationAndProbe","Output":"=== RUN   TestIndexTTSValidationAndProbe\n"}
+{"Time":"2026-10-14T17:44:06.32317832+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestIndexTTSValidationAndProbe","Output":"--- PASS: TestIndexTTSValidationAndProbe (0.12s)\n"}
+{"Time":"2026-10-14T17:44:06.3232124+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestIndexTTSValidationAndProbe","Elapsed":0.12}
+{"Time":"2026-10-14T17:44:06.323221343+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestIndexTTSMCPAndLegacyReceipt"}
+{"Time":"2026-10-14T17:44:06.323224407+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestIndexTTSMCPAndLegacyReceipt","Output":"=== RUN   TestIndexTTSMCPAndLegacyReceipt\n"}
+{"Time":"2026-10-14T17:44:06.447203792+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestIndexTTSMCPAndLegacyReceipt","Output":"--- PASS: TestIndexTTSMCPAndLegacyReceipt (0.12s)\n"}
+{"Time":"2026-10-14T17:44:06.447237492+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestIndexTTSMCPAndLegacyReceipt","Elapsed":0.12}
+{"Time":"2026-10-14T17:44:06.447245934+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestSpeechSnapshotGenerationAndAdoption"}
+{"Time":"2026-10-14T17:44:06.447249169+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechSnapshotGenerationAndAdoption","Output":"=== RUN   TestSpeechSnapshotGenerationAndAdoption\n"}
+{"Time":"2026-10-14T17:44:06.447287966+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechSnapshotGenerationAndAdoption","Output":"    speech_test.go:61: set VIDEO_TEST_ESPEAK for real local TTS integration\n"}
+{"Time":"2026-10-14T17:44:06.44737224+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechSnapshotGenerationAndAdoption","Output":"--- SKIP: TestSpeechSnapshotGenerationAndAdoption (0.00s)\n"}
+{"Time":"2026-10-14T17:44:06.447375755+09:00","Action":"skip","Package":"rundesk-video-app","Test":"TestSpeechSnapshotGenerationAndAdoption","Elapsed":0}
+{"Time":"2026-10-14T17:44:06.447416074+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestSpeechCancelRetryFailureAndRestart"}
+{"Time":"2026-10-14T17:44:06.447418318+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechCancelRetryFailureAndRestart","Output":"=== RUN   TestSpeechCancelRetryFailureAndRestart\n"}
+{"Time":"2026-10-14T17:44:06.482836394+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechCancelRetryFailureAndRestart","Output":"--- PASS: TestSpeechCancelRetryFailureAndRestart (0.04s)\n"}
+{"Time":"2026-10-14T17:44:06.482872437+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestSpeechCancelRetryFailureAndRestart","Elapsed":0.04}
+{"Time":"2026-10-14T17:44:06.482877694+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestSpeechChunkBoundariesAndStrictBinding"}
+{"Time":"2026-10-14T17:44:06.482880489+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechChunkBoundariesAndStrictBinding","Output":"=== RUN   TestSpeechChunkBoundariesAndStrictBinding\n"}
+{"Time":"2026-10-14T17:44:06.48307206+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSpeechChunkBoundariesAndStrictBinding","Output":"--- PASS: TestSpeechChunkBoundariesAndStrictBinding (0.00s)\n"}
+{"Time":"2026-10-14T17:44:06.483090988+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestSpeechChunkBoundariesAndStrictBinding","Elapsed":0}
+{"Time":"2026-10-14T17:44:06.483095194+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestSubtitleAdoptionBindingConflictAndRecovery"}
+{"Time":"2026-10-14T17:44:06.483098169+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSubtitleAdoptionBindingConflictAndRecovery","Output":"=== RUN   TestSubtitleAdoptionBindingConflictAndRecovery\n"}
+{"Time":"2026-10-14T17:44:07.05613832+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSubtitleAdoptionBindingConflictAndRecovery","Output":"--- PASS: TestSubtitleAdoptionBindingConflictAndRecovery (0.57s)\n"}
+{"Time":"2026-10-14T17:44:07.056171628+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestSubtitleAdoptionBindingConflictAndRecovery","Elapsed":0.57}
+{"Time":"2026-10-14T17:44:07.056177637+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestSubtitleTimingSnapshotAndTampering"}
+{"Time":"2026-10-14T17:44:07.056180552+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSubtitleTimingSnapshotAndTampering","Output":"=== RUN   TestSubtitleTimingSnapshotAndTampering\n"}
+{"Time":"2026-10-14T17:44:07.76913299+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSubtitleTimingSnapshotAndTampering","Output":"--- PASS: TestSubtitleTimingSnapshotAndTampering (0.71s)\n"}
+{"Time":"2026-10-14T17:44:07.769167992+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestSubtitleTimingSnapshotAndTampering","Elapsed":0.71}
+{"Time":"2026-10-14T17:44:07.769176564+09:00","Action":"run","Package":"rundesk-video-app","Test":"TestSubtitleParserBoundaries"}
+{"Time":"2026-10-14T17:44:07.769183044+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSubtitleParserBoundaries","Output":"=== RUN   TestSubtitleParserBoundaries\n"}
+{"Time":"2026-10-14T17:44:07.769684441+09:00","Action":"output","Package":"rundesk-video-app","Test":"TestSubtitleParserBoundaries","Output":"--- PASS: TestSubtitleParserBoundaries (0.00s)\n"}
+{"Time":"2026-10-14T17:44:07.769696369+09:00","Action":"pass","Package":"rundesk-video-app","Test":"TestSubtitleParserBoundaries","Elapsed":0}
+{"Time":"2026-10-14T17:44:07.769736097+09:00","Action":"run","Package":"rundesk-video-app","Test":"Example_newsPackageWorkflow"}
+{"Time":"2026-10-14T17:44:07.769739422+09:00","Action":"output","Package":"rundesk-video-app","Test":"Example_newsPackageWorkflow","Output":"=== RUN   Example_newsPackageWorkflow\n"}
+{"Time":"2026-10-14T17:44:07.769904334+09:00","Action":"output","Package":"rundesk-video-app","Test":"Example_newsPackageWorkflow","Output":"--- PASS: Example_newsPackageWorkflow (0.00s)\n"}
+{"Time":"2026-10-14T17:44:07.769919787+09:00","Action":"pass","Package":"rundesk-video-app","Test":"Example_newsPackageWorkflow","Elapsed":0}
+{"Time":"2026-10-14T17:44:07.769922932+09:00","Action":"output","Package":"rundesk-video-app","Output":"PASS\n"}
+{"Time":"2026-10-14T17:44:08.77729565+09:00","Action":"output","Package":"rundesk-video-app","Output":"ok  \trundesk-video-app\t7.032s\n"}
+{"Time":"2026-10-14T17:44:08.810692164+09:00","Action":"pass","Package":"rundesk-video-app","Elapsed":7.066}

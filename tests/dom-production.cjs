@@ -1,0 +1,40 @@
+const {JSDOM}=require('jsdom');
+const {spawn}=require('child_process');const fs=require('fs'),vm=require('vm');
+const root=require('path').resolve(__dirname,'..'), testData=fs.mkdtempSync(require('path').join(require('os').tmpdir(),'video-dom-')), base='http://127.0.0.1:3321',token='dom-test-token-not-secret';
+(async()=>{
+ const proc=spawn(root+'/bin/video-app',['--data',testData,'--listen','127.0.0.1:3321'],{env:{...process.env,VIDEO_APP_TOKEN:token}});
+ let dom;try{
+  await new Promise((resolve,reject)=>{proc.stderr.on('data',b=>{if(b.toString().includes(base))resolve()});proc.on('error',reject);proc.on('exit',c=>reject(Error('server exit '+c)));setTimeout(()=>reject(Error('server startup timeout')),10000)});
+  const realFetch=(path,opts={})=>fetch(new URL(path,base),{...opts,headers:{...opts.headers,Authorization:'Bearer '+token}});
+  const p=await (await realFetch('/api/projects',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:'DOM制作测试'})})).json();
+  dom=new JSDOM(fs.readFileSync(root+'/web/index.html','utf8'),{url:base,runScripts:'outside-only'});const w=dom.window;
+  w.fetch=realFetch;w.HTMLMediaElement.prototype.pause=function(){};w.HTMLMediaElement.prototype.load=function(){};w.HTMLDialogElement.prototype.showModal=function(){};w.HTMLDialogElement.prototype.close=function(){};
+  w.confirm=()=>true;w.AbortController=AbortController;w.FormData=FormData;
+  const ctx=dom.getInternalVMContext();vm.runInContext(fs.readFileSync(root+'/web/speech-submit.js','utf8'),ctx);vm.runInContext(fs.readFileSync(root+'/web/app.js','utf8').replace('boot().catch((e) => {','globalThis.initialBoot = boot(); initialBoot.catch((e) => {'),ctx); await vm.runInContext('initialBoot',ctx);
+  await vm.runInContext('openProject('+JSON.stringify(p.id)+')',ctx);
+  const text=w.document.querySelector('#production-text');text.value='第一条事实。第二条说明！';text.dispatchEvent(new w.Event('input'));await vm.runInContext('save()',ctx);
+  if(w.document.querySelectorAll('#alignment-table tr').length!==3)throw Error('table not generated');
+  if(!w.document.querySelector('#shot-text').readOnly)throw Error('text not protected');
+  const fd=new FormData();fd.append('file',new Blob([fs.readFileSync(root+'/docs/preview.png')],{type:'image/png'}),'新闻图.png');
+  const up=await (await realFetch('/api/projects/'+p.id+'/assets',{method:'POST',body:fd})).json();
+  await vm.runInContext('openProject('+JSON.stringify(p.id)+')',ctx);
+  const select=w.document.querySelector('#alignment-table select');select.value=up.assets[0].id;select.dispatchEvent(new w.Event('change'));await vm.runInContext('save()',ctx);
+  text.value='新增导语。第一条事实。第二条说明！';text.dispatchEvent(new w.Event('input'));await vm.runInContext('save()',ctx);
+  const selects=w.document.querySelectorAll('#alignment-table select');if(selects.length!==3 || selects[1].value!==up.assets[0].id)throw Error('media mapping lost');
+  const current=await(await realFetch('/api/projects/'+p.id)).json();if(current.production.text!==text.value)throw Error('text not persisted');
+  const preview=await(await realFetch('/api/mcp',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({jsonrpc:'2.0',id:1,method:'tools/call',params:{name:'video_asset_inspect',arguments:{projectId:p.id,assetId:up.assets[0].id}}})})).json();
+  if(!preview.result?.content?.some(x=>x.type==='image'))throw Error('MCP preview missing');
+  await vm.runInContext('loadCapabilities(false)',ctx);
+  if(w.document.querySelectorAll('#capability-list .capability-row').length!==7)throw Error('capability panel incomplete');
+  if(!w.document.querySelector('#capability-list').textContent.includes('未接入'))throw Error('unimplemented generators hidden');
+  const imported={name:'generated-note.txt',data:Buffer.from('素材导入契约测试').toString('base64'),requestId:'b'.repeat(24)};
+  const imports=[];for(let i=0;i<2;i++)imports.push(await(await realFetch('/api/projects/'+p.id+'/assets/import',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(imported)})).json());
+  if(imports[0].asset.id!==imports[1].asset.id||imports[0].revision!==imports[1].revision)throw Error('import receipt duplicated');
+  const unsupported=await realFetch('/api/projects/'+p.id+'/jobs',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'image_generation',revision:imports[1].revision,requestId:'c'.repeat(24)})});
+  if(unsupported.status!==501)throw Error('unsupported generation created a job');
+  await vm.runInContext('loadProductionJobs(true)',ctx);
+  if(!w.document.querySelector('#production-jobs').textContent.includes('还没有'))throw Error('unexpected placeholder job');
+  fs.writeFileSync(root+'/docs/dom-validation-0.10.json' ,JSON.stringify({passed:true,environment:'JSDOM + real Go HTTP API, not a graphical browser',checks:['load embedded UI','save narration text','build paragraph alignment table','protect canonical text','assign actual uploaded image','preserve mapping after new lead','persist text','return actual MCP image content','capability status panel','actual HTTP import deduplication','unsupported generation rejection','unified task panel']},null,2));
+  console.log('DOM + HTTP workflow passed');
+ }finally{dom?.window.close();proc.kill('SIGTERM')}
+})().catch(e=>{console.error(e);process.exitCode=1});

@@ -25,7 +25,7 @@ COPY scripts/start.sh scripts/smoke-render.mjs ./scripts/
 COPY docker/entrypoint.sh docker/doctor.mjs ./docker/
 RUN chmod 755 bin/video-app scripts/start.sh docker/entrypoint.sh \
     && mkdir -p /data && chown node:node /data \
-    && node -e "require('fs').writeFileSync('/opt/video-app/runtime-versions.json',JSON.stringify({app:'0.8.1',node:process.version,...Object.fromEntries(['hyperframes','gsap'].map(n=>[n,require('./runtime/node_modules/'+n+'/package.json').version]))}))" \
+    && node -e "require('fs').writeFileSync('/opt/video-app/runtime-versions.json',JSON.stringify({app:'0.10.0',node:process.version,...Object.fromEntries(['hyperframes','gsap'].map(n=>[n,require('./runtime/node_modules/'+n+'/package.json').version]))}))" \
     && dpkg-query -W > /opt/video-app/debian-packages.txt
 USER node
 EXPOSE 3220

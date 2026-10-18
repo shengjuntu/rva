@@ -425,12 +425,23 @@ func (a *App) adoptNewsAudio(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, 200, q)
 }
 
-func verifySubtitleSnapshot(p Project, dir string) error {
+func draftSubtitlePreviewAllowed(p Project) bool {
+	if p.Subtitles == nil || !p.Subtitles.Enabled {
+		return true
+	}
+	// Evaluate only structural binding; this does not record human review.
+	t := *p.Subtitles
+	t.Draft = false
+	p.Subtitles = &t
+	refreshSubtitleState(&p)
+	return t.Status == "ready"
+}
+func verifySubtitleSnapshot(p Project, dir string, draft ...bool) error {
 	if p.Subtitles == nil || !p.Subtitles.Enabled {
 		return nil
 	}
 	refreshSubtitleState(&p)
-	if p.Subtitles.Status != "ready" {
+	if p.Subtitles.Status != "ready" && !(len(draft) > 0 && draft[0] && draftSubtitlePreviewAllowed(p)) {
 		return errors.New(p.Subtitles.Reason)
 	}
 	for _, asset := range p.Assets {

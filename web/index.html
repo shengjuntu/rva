@@ -26,7 +26,7 @@
     </div>
     <div id="app" hidden>
       <header>
-        <div class="brand">视频工作台 <span>v0.8.1</span></div>
+        <div class="brand">视频工作台 <span>v0.10.0</span></div>
         <div class="top-actions">
           <button id="environment">环境准备</button
           ><button id="toggle-assets">素材栏</button
@@ -46,7 +46,7 @@
           <p class="muted small">导入 news2douyin 已审核脚本 ZIP，创建独立项目。</p>
           <div class="section-head">
             <h2>素材库</h2>
-            <button id="upload-button">＋ 上传</button
+            <button id="upload-folder">导入素材目录</button><input id="folder-files" type="file" webkitdirectory multiple hidden /><button id="upload-button">＋ 上传</button
             ><input
               id="upload"
               type="file"
@@ -71,8 +71,8 @@
               >
             </div>
             <div class="row">
-              <button id="save">保存分镜</button
-              ><button id="render" class="primary">生成视频</button>
+              <button id="save">保存制作稿</button
+              ><button id="render" class="primary">生成初稿</button>
             </div>
           </div>
           <div id="conflict" hidden>
@@ -83,6 +83,23 @@
               重新载入</button
             >。
           </div>
+          <details id="production-services" class="production-panel">
+            <summary>制作能力与任务</summary>
+            <div class="section-head"><h2>制作能力</h2><button id="refresh-capabilities">检查已配置服务</button></div>
+            <p id="capability-status" class="muted small">加载能力信息…</p>
+            <div id="capability-list"></div>
+            <div class="section-head"><h2>制作任务</h2><button id="refresh-jobs">刷新任务</button></div>
+            <p class="muted small">配音、渲染和Agent对话各自运行。取消制作任务不会停止对话；远端模型是否停止由服务端决定。</p>
+            <div id="production-jobs"></div>
+          </details>
+          <section id="production-panel" class="production-panel">
+            <div class="section-head"><h2>新闻正文</h2><span id="production-stage" class="stage-pill">初稿</span></div>
+            <p class="muted small">以正文安排画面。保存后按句分段，再为每段选择图片、视频或文字卡；时长先估计，采用配音后使用实测时长。</p>
+            <textarea id="production-text" rows="7" placeholder="粘贴新闻口播正文，或导入 TXT / Markdown 文件。"></textarea>
+            <div class="row"><button id="load-text">导入正文</button><input id="text-file" type="file" accept=".txt,.md,text/plain" hidden /><button id="apply-text" class="primary">保存正文与对齐表</button><button id="ask-align">让 RunDesk 安排素材</button><button id="adjust-production">进入调整</button><button id="finalize-production">确认当前成片为终稿</button></div>
+            <p id="production-summary" class="muted small"></p>
+            <div id="alignment-table"></div>
+          </section>
           <section id="news-panel" hidden>
             <div class="section-head"><h2>新闻来源与交接</h2><button id="news-details">查看审核稿与证据</button></div>
             <p id="news-summary" class="muted small"></p>
@@ -120,9 +137,9 @@
               ><span class="muted small">预览草图以成片为准</span>
             </div>
           </div>
-          <section class="storyboard">
+          <details id="visual-details"><summary>高级画面细节与项目说明</summary><section class="storyboard">
             <div class="section-head">
-              <h2>分镜 <span id="shot-count">0</span></h2>
+              <h2>画面细节 <span id="shot-count">0</span></h2>
               <div class="row">
                 <button id="add-shot">＋ 新镜头</button
                 ><button id="shot-up">前移</button
@@ -146,7 +163,7 @@
                   step="0.5" /></label
               ><label>画面素材<select id="shot-asset"></select></label
               ><label class="wide"
-                >画面文字<textarea
+                >段落正文<textarea
                   id="shot-text"
                   maxlength="220"
                   rows="3"
@@ -162,6 +179,7 @@
               ></textarea>
             </label>
           </section>
+          </details>
           <section id="speech-section">
             <div class="section-head"><h2>自动配音</h2><button id="speech-check">检查配音环境</button></div>
             <p class="muted small">连接已部署的 IndexTTS-2.5，或使用 eSpeak 预览。先试听，再采用配音、字幕与实测镜头时长。</p>
@@ -194,7 +212,7 @@
             <p id="speech-state" role="status" class="muted small"></p>
             <div id="speech-jobs"></div>
           </section>
-          <section id="sound-section">
+          <details><summary>背景音乐与音轨细节</summary><section id="sound-section">
             <div class="section-head">
               <h2>声音</h2>
               <button id="upload-audio">＋ 上传音频</button>
@@ -300,6 +318,7 @@
               上方播放器用于素材试听，完整混音请在生成后播放成片检查。视频素材原声仍为静音。
             </p>
           </section>
+</details>
           <section id="subtitle-section">
             <div class="section-head"><h2>字幕时间轴</h2><button id="load-srt">导入 SRT</button><input id="srt-file" type="file" accept=".srt,text/plain,application/x-subrip" hidden /></div>
             <label class="check-label"><input id="subtitles-enabled" type="checkbox" />在成片中显示字幕</label>

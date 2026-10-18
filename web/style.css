@@ -733,3 +733,7 @@ dialog p {
 #tts-settings { margin: 12px 0; }
 #tts-settings summary { cursor: pointer; }
 #tts-url { min-width: 280px; }
+
+.production-panel {padding:20px;margin:16px 0;border:1px solid var(--border,#344155);border-radius:12px} #production-text {width:100%;box-sizing:border-box;margin:12px 0} .stage-pill {padding:6px 14px;border-radius:16px;background:#254751;color:#b5f3ed} #alignment-table {overflow:auto;margin-top:14px} #alignment-table table {width:100%;border-collapse:collapse} #alignment-table td,#alignment-table th {padding:12px;text-align:left;border-bottom:1px solid #344155;vertical-align:top} #alignment-table td:first-child {width:48%;white-space:pre-wrap} #alignment-table img,#alignment-table video {display:block;width:120px;height:80px;object-fit:cover;margin-bottom:8px} #alignment-table input {width:80px} #alignment-table select {max-width:240px} #alignment-table p {margin:6px 0}
+
+.capability-row,.service-job {padding:12px 0;border-bottom:1px solid #344155} .capability-row strong {margin-right:16px} .capability-row small,.service-job small {display:block;margin:4px 0}.service-job a {display:inline-block;margin:8px 12px 0 0}

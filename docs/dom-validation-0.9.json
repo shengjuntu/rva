@@ -1,0 +1,14 @@
+{
+  "passed": true,
+  "environment": "JSDOM + real Go HTTP API, not a graphical browser",
+  "checks": [
+    "load embedded UI",
+    "save narration text",
+    "build paragraph alignment table",
+    "protect canonical text",
+    "assign actual uploaded image",
+    "preserve mapping after new lead",
+    "persist text",
+    "return actual MCP image content"
+  ]
+}

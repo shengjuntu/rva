@@ -1,5 +1,5 @@
 "use strict";
-const TOOL_VERSION = "0.8.1";
+const TOOL_VERSION = "0.10.0";
 const $ = (s) => document.querySelector(s),
   el = (tag, text, cls) => {
     const n = document.createElement(tag);
@@ -9,6 +9,10 @@ const $ = (s) => document.querySelector(s),
   };
 let ttsSettings = null, savingTTS = false, discoveringVoices = false;
 const speechSubmission = SpeechSubmission.create(() => sessionStorage);
+const renderSubmission = SpeechSubmission.create(() => sessionStorage,"video-render-pending-v1","渲染");
+let startingRender=false;
+let productionDirty = false;
+let serviceJobsKey="", serviceJobsLoading=false;
 let captionDraft = null, savePromise = null, speechKey = "", startingSpeech = false;
 let project = null,
   selected = 0,
@@ -126,12 +130,14 @@ async function openProject(pid) {
   for (const k of ["narration", "music"]) $("#" + k + "-preview").pause();
   project = p;
   captionDraft = null;
+  productionDirty = false;
   selected = 0;
   dirty = false;
   after = 0;
   session = null;
   rows = new Map();
   renderKey = "";
+  serviceJobsKey="";
   speechKey = "";
   approvalKey = "";
   $("#conversation").replaceChildren(
@@ -177,6 +183,8 @@ function drawProject() {
   drawNews();
   drawSubtitles();
   drawSpeech();
+  drawProduction();
+  loadProductionJobs().catch(()=>{});
 }
 function assetURL(a) {
   return path("/assets/" + a.id);
@@ -252,7 +260,9 @@ function drawShots(editor = false) {
   const s = project.shots[selected];
   $("#editor").hidden = !s;
   for (const name of ["shot-up", "shot-down", "delete-shot"])
-    $("#" + name).disabled = !s;
+    $("#" + name).disabled = !s || !!project.production;
+  $("#add-shot").disabled = !!project.production;
+  $("#shot-text").readOnly = !!project.production;
   drawAudioTimeline();
   if (s && editor) {
     $("#shot-title").value = s.title;
@@ -293,9 +303,14 @@ async function saveChanges() {
   if (!dirty) return project;
   const pid = project.id, gen = epoch, serial = editSerial;
   const captions = captionDraft ? {...captionDraft} : null;
+  const textDraft = productionDirty ? $("#production-text").value : null;
   try {
     let p = await api('/api/projects/' + pid, project, "PUT");
     if (gen === epoch) project.revision = p.revision;
+    if (textDraft !== null) {
+      p = await api('/api/projects/' + pid + '/production/text', {revision:p.revision,text:textDraft}, 'PUT');
+      if (gen === epoch) project.revision = p.revision;
+    }
     if (captions) {
       p = await api('/api/projects/' + pid + '/subtitles', {...captions, revision:p.revision, reviewed:false}, 'PUT');
     }
@@ -303,10 +318,16 @@ async function saveChanges() {
     if (serial === editSerial) {
       project = p;
       captionDraft = null;
+      productionDirty = false;
       dirty = false;
       drawProject();
     } else {
       project.revision = p.revision;
+      if (textDraft !== null) {
+        const local = new Map(project.shots.map(s=>[s.id,s]));
+        project.production = p.production;
+        project.shots = p.shots.map(s=>{const edit=local.get(s.id);return edit && edit.text===s.text ? {...s,title:edit.title,assetId:edit.assetId,duration:edit.duration,visualReason:edit.visualReason} : s});
+      }
       project.assets = p.assets;
       project.renders = p.renders;
       project.speech = p.speech;
@@ -328,6 +349,7 @@ const states = {
   interrupted: "已中断",
 };
 function drawRenders() {
+  try {renderSubmission.reconcile(project.id,project.renders)}catch(e){toast(e.message)}
   const key = JSON.stringify(project.renders);
   if (key === renderKey) return;
   renderKey = key;
@@ -340,7 +362,7 @@ function drawRenders() {
       info = el("div"),
       links = el("div");
     info.append(
-      el("strong", "修订 " + r.revision + " · " + (states[r.state] || r.state)),
+      el("strong", (project.production?.finalRenderId === r.id ? "终稿 · " : r.kind === "draft" ? "初稿预览 · " : "成片 · ") + "修订 " + r.revision + " · " + (states[r.state] || r.state)),
       el(
         "small",
         new Date(r.created).toLocaleString() +
@@ -574,6 +596,7 @@ async function poll() {
     project.speech = p.speech;
     drawSpeech();
     drawRenders();
+    loadProductionJobs().catch(()=>{});
     if (project.sessionId) {
       const [s, events, approvals] = await Promise.all([
         api(path("/agent")),
@@ -708,7 +731,7 @@ function move(offset) {
 }
 $("#shot-up").onclick = () => move(-1);
 $("#shot-down").onclick = () => move(1);
-$("#show-storyboard").onclick = showPoster;
+$("#show-storyboard").onclick = () => { $("#visual-details").open=true;showPoster(); };
 $("#upload-button").onclick = () => {
   if (project) $("#upload").click();
   else $("#new-dialog").showModal();
@@ -743,11 +766,18 @@ $("#upload").onchange = action(async () => {
   }
 });
 $("#render").onclick = action(async () => {
-  if (!project) return;
-  await save();
-  await api(path("/render"), {});
-  toast("渲染任务已创建，可以继续编辑");
-  await poll();
+  if (!project || startingRender) return;
+  const pid=project.id,gen=epoch;startingRender=true;$('#render').disabled=true;
+  try {
+    const pending=renderSubmission.read(pid);
+    if(!pending) await save();
+    if(gen!==epoch)return;
+    const body=pending||{type:"render",revision:project.revision,requestId:id(),options:{kind:"draft"}};
+    const job=await renderSubmission.submit(pid,body,original=>api('/api/projects/'+pid+'/jobs',original));
+    if(gen!==epoch)return;
+    toast(job.state==='running'?'渲染任务已创建，可以继续编辑':'已确认原渲染任务状态：'+job.state);
+    await poll();
+  }finally{startingRender=false;$('#render').disabled=false}
 });
 $("#connect").onclick = action(async () => {
   if (!project) {
@@ -890,6 +920,7 @@ async function boot() {
   const list = await listProjects();
   showApp();
   await loadTTSSettings();
+  loadCapabilities(false).catch(()=>{});
   api("/api/environment")
     .then((e) => {
       $("#open-rundesk").href = e.rundeskURL + (project?.sessionId ? "/?session="+encodeURIComponent(project.sessionId) : "/#application/rundesk-video-app");
@@ -1401,3 +1432,106 @@ $('#new-session').onclick = action(async () => {
     toast('已新建对话；原对话历史保留在 RunDesk。');
   } finally { $('#new-session').disabled = false; }
 });
+
+function drawProduction() {
+  if (!project) return;
+  if (!productionDirty) $('#production-text').value = project.production?.text ?? project.shots.map(s=>s.text).join('');
+  const stage = project.production?.stage || 'draft';
+  $('#production-stage').textContent = ({draft:'初稿',adjustment:'调整',final:'终稿'})[stage];
+  const media = project.shots.filter(s=>s.assetId).length;
+  $('#production-summary').textContent = `${project.shots.length} 段正文 · ${media} 段已配素材 · ${project.shots.length-media} 段文字卡。初稿不代表已核稿，终稿选用当前内容一致的已完成视频。`;
+  const box = $('#alignment-table'); box.replaceChildren();
+  const table = el('table'); const head=el('tr');
+  for (const label of ['段落正文','图片 / 视频','时长']) head.append(el('th',label));
+  table.append(head);
+  project.shots.forEach((shot,index)=> {
+    const tr=el('tr'), text=el('td'), visual=el('td'), time=el('td');
+    text.append(el('small',String(index+1).padStart(2,'0')),el('p',shot.text));
+    const asset=project.assets.find(a=>a.id===shot.assetId);
+    if (asset?.mime.startsWith('image/')) { const img=el('img');img.src=assetURL(asset);img.alt=asset.name;img.loading='lazy';visual.append(img); }
+    if (asset?.mime.startsWith('video/')) { const v=el('video');v.src=assetURL(asset);v.controls=true;v.preload='metadata';v.muted=true;visual.append(v); }
+    const select=el('select'),empty=el('option','文字卡');empty.value='';select.append(empty);
+    for(const a of project.assets.filter(a=>/^(image|video)\//.test(a.mime))) {const o=el('option',a.name);o.value=a.id;select.append(o)}
+    select.value=shot.assetId;select.onchange=()=>{shot.assetId=select.value;changed();drawShots(true);drawProduction()};visual.append(select);
+    const reason=el('input');reason.placeholder='素材与正文的对应依据（可选）';reason.maxLength=300;reason.value=shot.visualReason||'';
+    reason.oninput=()=>{shot.visualReason=reason.value;changed()};visual.append(reason);
+    const duration=el('input');duration.type='number';duration.min='1';duration.max='60';duration.step='0.1';duration.value=shot.duration;
+    duration.onchange=()=>{shot.duration=Number(duration.value);changed();drawShots(true)};time.append(duration);
+    tr.append(text,visual,time);table.append(tr);
+  });
+  box.append(table);
+}
+$('#production-text').oninput=()=>{productionDirty=true;changed()};
+$('#apply-text').onclick=action(async()=>{productionDirty=true;changed();await save();toast('正文与素材对齐表已保存')});
+$('#load-text').onclick=()=>$('#text-file').click();
+$('#text-file').onchange=action(async()=>{const f=$('#text-file').files[0];if(!f)return;if(f.size>128*1024)throw Error('正文文件不能超过128KiB');$('#production-text').value=await f.text();productionDirty=true;changed();$('#text-file').value=''});
+$('#ask-align').onclick=action(async()=>{
+  if(!project)return;productionDirty=true;changed();await save();
+  $('#prompt').value='请按已保存的新闻正文逐段安排现有图片和视频素材，保持事实、段落顺序和原文。先读取 project.production 和素材；用真实素材ID保存对齐结果，无合适素材用文字卡并说明。完成制作初稿；使用已配置的配音和渲染工具，不补充云端生成服务。';
+  $('#prompt').focus();if(project.sessionId){$('#composer').requestSubmit()}else{toast('请先连接 RunDesk；制作要求已保留在对话栏')}
+});
+$('#adjust-production').onclick=action(async()=>{await save();project=await api(path('/production/stage'),{revision:project.revision,stage:'adjustment'});drawProject()});
+$('#finalize-production').onclick=action(async()=>{
+  await save();
+  const completed=[...project.renders].reverse().filter(r=>r.state==='completed');
+  if(!completed.length)throw Error('请先完成视频渲染并检查成片');
+  // Server verifies exact content; never silently chooses an outdated video.
+  project=await api(path('/production/stage'),{revision:project.revision,stage:'final',renderId:completed[0].id});
+  renderKey='';drawProject();toast('当前成片已确认为终稿');
+});
+$('#upload-folder').onclick=()=>$('#folder-files').click();
+$('#folder-files').onchange=action(async()=>{
+  if(!project)throw Error('请先创建项目');await save();const pid=project.id,gen=epoch;
+  for(const file of $('#folder-files').files) {
+    if(!/\.(png|jpe?g|webp|mp4|webm|wav|mp3|m4a|flac|ogg)$/i.test(file.name))continue;
+    const body=new FormData();body.append('file',file);const p=await api('/api/projects/'+pid+'/assets',body);
+    if(gen===epoch){if(dirty){project.assets=p.assets;$('#conflict').hidden=false}else{project=p;drawProject()}}
+  }
+  $('#folder-files').value='';toast('目录素材已导入');
+});
+
+const capabilityLabels={media:'素材',tts:'配音',image_generation:'图片生成',video_generation:'视频生成',text_media_alignment:'文本与素材对齐',editing:'编辑',rendering:'渲染'};
+async function loadCapabilities(probe=false) {
+  $('#capability-status').textContent=probe?'正在检查服务…':'正在读取能力…';
+  try {
+    const result=await api('/api/capabilities'+(probe?'?probe=1':''));
+    const box=$('#capability-list');box.replaceChildren();
+    for(const c of result.capabilities) {
+      const row=el('div',undefined,'capability-row');
+      row.append(el('strong',capabilityLabels[c.id]||c.id));
+      const configured=c.providers.some(p=>p.state==='configured');
+      row.append(el('span',!c.implemented?'未接入':c.ready?'检查通过':configured?'已配置，待探测':'未就绪'));
+      for(const p of c.providers) {
+        row.append(el('small',p.id+(p.default?' · 默认':'')+' · '+({available:'检查通过',configured:'已配置',blocked:'未就绪'})[p.state],'muted'));
+        for(const reason of p.reasons)row.append(el('small',reason,'muted'));
+      }
+      for(const note of c.notes)row.append(el('small',note,'muted'));
+      box.append(row);
+    }
+    $('#capability-status').textContent='检查通过表示依赖或模型列表可用；真实输出以制作任务结果为准。';
+  }catch(e){$('#capability-status').textContent=e.message;throw e}
+}
+async function loadProductionJobs(force=false) {
+  if(!project||serviceJobsLoading)return;
+  const key=project.id+JSON.stringify([project.speech,project.renders]);if(!force&&key===serviceJobsKey)return;
+  serviceJobsLoading=true;const pid=project.id,gen=epoch;
+  try {
+    const result=await api('/api/projects/'+pid+'/jobs');if(gen!==epoch)return;
+    const box=$('#production-jobs');box.replaceChildren();
+    if(!result.jobs.length)box.append(el('p','还没有配音或渲染任务。','muted small'));
+    for(const j of result.jobs) {
+      const row=el('div',undefined,'service-job');
+      row.append(el('strong',(j.type==='tts'?'配音':'渲染')+' · '+({running:'运行中',cancel_requested:'正在取消',succeeded:'完成',failed:'失败',interrupted:'中断',unknown:'未知状态'})[j.state]));
+      row.append(el('small','修订 '+j.revision+' · '+j.provider+(j.progressKnown?' · '+j.completedUnits+'/'+j.totalUnits:' · 未提供步骤进度'),'muted'));
+      if(j.error)row.append(el('p',j.error,'render-error'));
+      if(j.state==='running'){
+        const stop=el('button','取消此任务');stop.onclick=action(async()=>{stop.disabled=true;try{await api('/api/projects/'+pid+'/jobs/'+j.jobId+'/cancel',{});if(gen===epoch){serviceJobsKey='';await loadProductionJobs(true)}}finally{stop.disabled=false}});row.append(stop);
+      }
+      for(const artifact of j.artifacts){const link=el('a',artifact.name);link.href=artifact.url;link.target='_blank';link.rel='noopener';row.append(link)}
+      box.append(row);
+    }
+    serviceJobsKey=key;
+  }finally{serviceJobsLoading=false}
+}
+$('#refresh-capabilities').onclick=action(()=>loadCapabilities(true));
+$('#refresh-jobs').onclick=action(()=>loadProductionJobs(true));
