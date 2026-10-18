@@ -482,6 +482,7 @@ func (a *App) editSave(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := clone(p)
+	q.EditRedo = nil
 	q.EditDSL = in.DSL
 	q.EditActive = true
 	q.Revision++

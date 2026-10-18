@@ -16,8 +16,12 @@ description: Manage this video app project through video_project MCP tools. Use 
 ---
 # Video project workflow
 
+## Extended edits (v0.17)
+Changes may set target=clip(default)/track/anchor/canvas. Canvas uses id=canvas and update only. Tracks and anchors allow add/update/delete; changing an object ID is forbidden, so add the replacement and fix references in one patch before deleting the old object. Preview returns fieldDiffs (top-level old/new values) and affected compiled clips. Track order and object reordering still use full DSL. Nested fields replace whole objects. video_edit_redo restores the most recent undone patch only when current DSL/mode still match. New patch applications or full DSL saves clear the redo branch.
+
+
 ## Precise clip edits (v0.16)
-Use video_edit_patch_preview then video_edit_patch_apply with the identical changes and base revision for localized edits. changes contains {id,op:add/update/delete,fields}. fields merges top-level fields only; nested layout/source replaces its entire object; null clears an optional placement field. Never change id in fields. Preview returns before/after DSL and affectedClipIds including resolved timing changes. The compiler rejects dangling references; fix all related clips in one patch. Add appends a clip; track/canvas/anchor editing still uses full DSL update. Apply preserves activation mode and saves up to20 undo snapshots. video_edit_undo reverses the latest patch only if current DSL and mode still match it; no redo. Re-read revision after any save.
+Use video_edit_patch_preview then video_edit_patch_apply with the identical changes and base revision for localized edits. changes contains {target:clip/track/anchor/canvas,id,op:add/update/delete,fields}. fields merges top-level fields only; nested layout/source replaces its entire object; null clears an optional placement field. Never change id in fields. Preview returns before/after DSL and affectedClipIds including resolved timing changes. The compiler rejects dangling references; fix all related clips in one patch. Add appends an object; canvas permits update only. Apply preserves activation mode and saves up to20 undo snapshots. video_edit_undo reverses the latest patch only if current DSL and mode still match it; video_edit_redo restores its undone snapshot. Re-read revision after any save.
 
 
 ## Generated assets (v0.15)

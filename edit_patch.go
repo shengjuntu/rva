@@ -6,10 +6,13 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"sort"
+	"strings"
 	"time"
 )
 
 type EditChange struct {
+	Target string          `json:"target,omitempty"`
 	ID     string          `json:"id"`
 	Op     string          `json:"op"`
 	Fields json.RawMessage `json:"fields,omitempty"`
@@ -19,76 +22,103 @@ type EditPatchRequest struct {
 	Changes  []EditChange `json:"changes"`
 }
 type EditHistory struct {
-	ID        string       `json:"id"`
-	Created   string       `json:"created"`
-	Before    EditDocument `json:"before"`
-	AfterHash string       `json:"afterHash"`
-	Active    bool         `json:"active"`
+	After     *EditDocument `json:"after,omitempty"`
+	ID        string        `json:"id"`
+	Created   string        `json:"created"`
+	Before    EditDocument  `json:"before"`
+	AfterHash string        `json:"afterHash"`
+	Active    bool          `json:"active"`
 }
 
 func editHash(d *EditDocument) string { b, _ := json.Marshal(d); return hashBytes(b) }
 func patchEdit(d EditDocument, changes []EditChange) (EditDocument, error) {
 	raw, _ := json.Marshal(d)
-	var q EditDocument
-	json.Unmarshal(raw, &q)
+	var doc map[string]json.RawMessage
+	json.Unmarshal(raw, &doc)
 	if len(changes) == 0 || len(changes) > 100 {
-		return q, fmt.Errorf("需要1–100项修改")
+		return d, fmt.Errorf("需要1–100项修改")
 	}
 	seen := map[string]bool{}
 	for _, c := range changes {
-		if !editID.MatchString(c.ID) || seen[c.ID] {
-			return q, fmt.Errorf("对象ID无效或重复: %s", c.ID)
+		target := c.Target
+		if target == "" {
+			target = "clip"
 		}
-		seen[c.ID] = true
+		key := map[string]string{"clip": "clips", "track": "tracks", "anchor": "anchors", "canvas": "canvas"}[target]
+		if key == "" {
+			return d, fmt.Errorf("target必须为clip/track/anchor/canvas")
+		}
+		id := c.ID
+		if target == "canvas" && id != "canvas" {
+			return d, fmt.Errorf("画布ID必须为canvas")
+		}
+		if !editID.MatchString(id) || seen[target+":"+id] {
+			return d, fmt.Errorf("对象ID无效或重复")
+		}
+		seen[target+":"+id] = true
+		var objects []map[string]json.RawMessage
 		index := -1
-		for i, x := range q.Clips {
-			if x.ID == c.ID {
-				index = i
-				break
+		if target == "canvas" {
+			var v map[string]json.RawMessage
+			json.Unmarshal(doc[key], &v)
+			objects = []map[string]json.RawMessage{v}
+			index = 0
+		} else {
+			json.Unmarshal(doc[key], &objects)
+			for i, v := range objects {
+				var existing string
+				json.Unmarshal(v["id"], &existing)
+				if existing == id {
+					index = i
+					break
+				}
 			}
 		}
 		switch c.Op {
 		case "delete":
-			if index < 0 || len(c.Fields) > 0 {
-				return q, fmt.Errorf("删除需要现存对象且不能提供fields")
+			if target == "canvas" || index < 0 || len(c.Fields) > 0 {
+				return d, fmt.Errorf("删除需要现存非画布对象且不能提供fields")
 			}
-			q.Clips = append(q.Clips[:index], q.Clips[index+1:]...)
-		case "update", "add":
-			if (c.Op == "update" && index < 0) || (c.Op == "add" && index >= 0) {
-				return q, fmt.Errorf("对象不存在或重复: %s", c.ID)
+			objects = append(objects[:index], objects[index+1:]...)
+		case "add", "update":
+			if (target == "canvas" && c.Op != "update") || (c.Op == "update" && index < 0) || (c.Op == "add" && index >= 0) {
+				return d, fmt.Errorf("对象不存在或重复")
 			}
 			var fields map[string]json.RawMessage
 			if e := json.Unmarshal(c.Fields, &fields); e != nil || len(fields) == 0 {
-				return q, fmt.Errorf("fields需要非空对象")
+				return d, fmt.Errorf("fields需要非空对象")
 			}
 			if _, ok := fields["id"]; ok {
-				return q, fmt.Errorf("fields不能修改ID")
+				return d, fmt.Errorf("fields不能修改ID")
 			}
-			base := map[string]json.RawMessage{}
+			v := map[string]json.RawMessage{}
 			if index >= 0 {
-				b, _ := json.Marshal(q.Clips[index])
-				json.Unmarshal(b, &base)
+				v = objects[index]
 			}
-			for k, v := range fields {
-				base[k] = v
+			for k, x := range fields {
+				v[k] = x
 			}
-			id, _ := json.Marshal(c.ID)
-			base["id"] = id
-			b, _ := json.Marshal(base)
-			var clip EditClip
-			dec := json.NewDecoder(bytes.NewReader(b))
-			dec.DisallowUnknownFields()
-			if e := dec.Decode(&clip); e != nil {
-				return q, e
+			if target != "canvas" {
+				v["id"], _ = json.Marshal(id)
 			}
 			if index >= 0 {
-				q.Clips[index] = clip
+				objects[index] = v
 			} else {
-				q.Clips = append(q.Clips, clip)
+				objects = append(objects, v)
 			}
 		default:
-			return q, fmt.Errorf("op必须为add/update/delete")
+			return d, fmt.Errorf("op必须为add/update/delete")
 		}
+		if target == "canvas" {
+			doc[key], _ = json.Marshal(objects[0])
+		} else {
+			doc[key], _ = json.Marshal(objects)
+		}
+	}
+	raw, _ = json.Marshal(doc)
+	var q EditDocument
+	if e := json.Unmarshal(raw, &q); e != nil {
+		return d, e
 	}
 	return q, nil
 }
@@ -160,6 +190,7 @@ func (a *App) editPatch(w http.ResponseWriter, r *http.Request) {
 			q.EditHistory = q.EditHistory[len(q.EditHistory)-20:]
 		}
 		q.EditDSL = &d
+		q.EditRedo = nil
 		q.Revision++
 		if e = a.save(&q); e != nil {
 			fail(w, 500, e)
@@ -168,7 +199,7 @@ func (a *App) editPatch(w http.ResponseWriter, r *http.Request) {
 		a.projects[q.ID] = &q
 		revision = q.Revision
 	}
-	writeJSON(w, 200, map[string]any{"revision": revision, "changes": in.Changes, "before": p.EditDSL, "after": d, "ir": ir, "affectedClipIds": affected, "saved": r.PathValue("action") == "apply"})
+	writeJSON(w, 200, map[string]any{"revision": revision, "fieldDiffs": editFieldDiffs(*p.EditDSL, d), "changes": in.Changes, "before": p.EditDSL, "after": d, "ir": ir, "affectedClipIds": affected, "saved": r.PathValue("action") == "apply"})
 }
 func (a *App) editUndo(w http.ResponseWriter, r *http.Request) {
 	var in struct {
@@ -199,6 +230,8 @@ func (a *App) editUndo(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	q := clone(p)
+	h.After = q.EditDSL
+	q.EditRedo = append(q.EditRedo, h)
 	q.EditDSL = &h.Before
 	q.EditHistory = q.EditHistory[:len(q.EditHistory)-1]
 	q.Revision++
@@ -220,4 +253,109 @@ func (c *EditChange) UnmarshalJSON(raw []byte) error {
 	}
 	*c = EditChange(v)
 	return nil
+}
+
+type EditFieldDiff struct {
+	Target string `json:"target"`
+	ID     string `json:"id"`
+	Field  string `json:"field"`
+	Before any    `json:"before"`
+	After  any    `json:"after"`
+}
+
+func editObjects(d EditDocument) map[string]map[string]any {
+	out := map[string]map[string]any{}
+	raw, _ := json.Marshal(d)
+	var doc map[string]any
+	json.Unmarshal(raw, &doc)
+	out["canvas:canvas"] = doc["canvas"].(map[string]any)
+	for _, pair := range [][2]string{{"clips", "clip"}, {"tracks", "track"}, {"anchors", "anchor"}} {
+		if list, ok := doc[pair[0]].([]any); ok {
+			for _, v := range list {
+				obj := v.(map[string]any)
+				out[pair[1]+":"+obj["id"].(string)] = obj
+			}
+		}
+	}
+	return out
+}
+func editFieldDiffs(before, after EditDocument) []EditFieldDiff {
+	a, b := editObjects(before), editObjects(after)
+	keys := map[string]bool{}
+	for k := range a {
+		keys[k] = true
+	}
+	for k := range b {
+		keys[k] = true
+	}
+	sorted := []string{}
+	for k := range keys {
+		sorted = append(sorted, k)
+	}
+	sort.Strings(sorted)
+	out := []EditFieldDiff{}
+	for _, key := range sorted {
+		parts := strings.SplitN(key, ":", 2)
+		fields := map[string]bool{}
+		for k := range a[key] {
+			fields[k] = true
+		}
+		for k := range b[key] {
+			fields[k] = true
+		}
+		names := []string{}
+		for k := range fields {
+			names = append(names, k)
+		}
+		sort.Strings(names)
+		for _, field := range names {
+			av, aok := a[key][field]
+			bv, bok := b[key][field]
+			if aok != bok || !reflect.DeepEqual(av, bv) {
+				out = append(out, EditFieldDiff{parts[0], parts[1], field, av, bv})
+			}
+		}
+	}
+	return out
+}
+func (a *App) editRedo(w http.ResponseWriter, r *http.Request) {
+	var in struct {
+		Revision int `json:"revision"`
+	}
+	if !decodeStrict(w, r, &in) {
+		return
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	p := a.projects[r.PathValue("id")]
+	if p == nil {
+		fail(w, 404, fmt.Errorf("项目不存在"))
+		return
+	}
+	if p.Revision != in.Revision || len(p.EditRedo) == 0 {
+		fail(w, 409, fmt.Errorf("版本冲突或没有可重做记录"))
+		return
+	}
+	h := p.EditRedo[len(p.EditRedo)-1]
+	if h.After == nil || editHash(p.EditDSL) != editHash(&h.Before) || p.EditActive != h.Active {
+		fail(w, 409, fmt.Errorf("当前剪辑已改变，不能覆盖重做"))
+		return
+	}
+	ir, e := compileEdit(*h.After, p.Assets)
+	if e != nil {
+		editErrorResponse(w, e)
+		return
+	}
+	q := clone(p)
+	q.EditDSL = h.After
+	h.After = nil
+	q.EditHistory = append(q.EditHistory, h)
+	q.EditRedo = q.EditRedo[:len(q.EditRedo)-1]
+	q.Revision++
+	if e = a.save(&q); e != nil {
+		fail(w, 500, e)
+		return
+	}
+	a.projects[q.ID] = &q
+	writeJSON(w, 200, map[string]any{"revision": q.Revision, "dsl": q.EditDSL, "ir": ir, "redone": h.ID})
 }

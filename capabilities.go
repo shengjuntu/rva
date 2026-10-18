@@ -106,7 +106,7 @@ func (a *App) capabilityEnvelope(ctx context.Context, probe bool) CapabilityEnve
 	}
 
 	envelope.Capabilities = append(envelope.Capabilities, ProductionCapability{ID: "text_media_alignment", Implemented: true, Ready: true, Providers: []ProviderCapability{}, Tools: []string{"video_asset_describe", "video_media_align"}, Notes: []string{"描述与标签的词项匹配基线，不是视觉语义模型；无需外部API", "候选提供匹配词与描述来源，Codex自行编排或拒绝候选"}})
-	envelope.Capabilities = append(envelope.Capabilities, ProductionCapability{ID: "editing", Implemented: true, Ready: true, Providers: []ProviderCapability{}, Tools: []string{"video_edit_get", "video_edit_validate", "video_edit_update", "video_edit_activate", "video_project_update"}, Notes: []string{"剪辑DSL v1：多轨、片段裁剪/速度、布局、淡入淡出、时间引用；内容通过素材引用自由组合", "旧镜头与DSL分别保存，渲染采用明确激活的模式"}})
+	envelope.Capabilities = append(envelope.Capabilities, ProductionCapability{ID: "editing", Implemented: true, Ready: true, Providers: []ProviderCapability{}, Tools: []string{"video_edit_get", "video_edit_validate", "video_edit_update", "video_edit_activate", "video_edit_patch_preview", "video_edit_patch_apply", "video_edit_undo", "video_edit_redo", "video_project_update"}, Notes: []string{"剪辑DSL v1：多轨、片段裁剪/速度、布局、淡入淡出、时间引用；内容通过素材引用自由组合", "旧镜头与DSL分别保存，渲染采用明确激活的模式"}})
 	renderer := ProviderCapability{ID: "hyperframes", Runtime: "local", State: "blocked", Verified: "dependency_check", Reasons: missingCommands("node", "ffmpeg", "ffprobe"), Supports: []string{"legacy_storyboard", "html_gsap", "vertical_1080x1920_30fps"}}
 	for name, path := range map[string]string{"HyperFrames CLI": hf, "字体": font, "GSAP": gsap} {
 		if path == "" || !regularFile(path) {

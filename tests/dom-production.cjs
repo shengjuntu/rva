@@ -49,6 +49,11 @@ const root=require('path').resolve(__dirname,'..'), testData=fs.mkdtempSync(requ
   if(!patchPreview.affectedClipIds?.includes('opening_title')||patchPreview.saved)throw Error('patch preview failed');
   const patchApplied=await(await realFetch('/api/projects/'+p.id+'/edit/patch/apply',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(patchBody)})).json();
   const undone=await realFetch('/api/projects/'+p.id+'/edit/undo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:patchApplied.revision})});if(undone.status!==200)throw Error('undo failed');
+  const afterUndo=await(await realFetch('/api/projects/'+p.id)).json();
+  const redone=await realFetch('/api/projects/'+p.id+'/edit/redo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:afterUndo.revision})});if(redone.status!==200)throw Error('redo failed');
+  const redoResult=await redone.json();
+  const revert=await realFetch('/api/projects/'+p.id+'/edit/undo',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:redoResult.revision})});if(revert.status!==200)throw Error('second undo failed');
+  if(!w.document.querySelector('#patch-redo'))throw Error('redo button missing');
   await vm.runInContext('openProject('+JSON.stringify(p.id)+')',ctx);
   const narration=w.document.querySelector('#narration-text');narration.value='独立口播正文。';narration.dispatchEvent(new w.Event('input'));
   await vm.runInContext('drawProject()',ctx);if(narration.value!=='独立口播正文。')throw Error('unsaved narration lost');
@@ -58,7 +63,7 @@ const root=require('path').resolve(__dirname,'..'), testData=fs.mkdtempSync(requ
   const workflowSaved=await(await realFetch('/api/projects/'+p.id)).json();if(workflowSaved.workflow.instructions!=='保持原意')throw Error('workflow not persisted');
   const instruction=await(await realFetch('/api/projects/'+p.id+'/draft/instruction',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({revision:workflowSaved.revision})})).json();if(!instruction.text?.includes('保持原意'))throw Error('draft instruction missing');
   if(!w.document.querySelector('#draft-start').disabled)throw Error('disconnected draft button enabled');
-  fs.writeFileSync(root+'/docs/dom-validation-0.16.json' ,JSON.stringify({passed:true,environment:'JSDOM + real Go HTTP API, not a graphical browser',checks:['load embedded UI','save narration text','build paragraph alignment table','protect canonical text','assign actual uploaded image','preserve mapping after new lead','persist text','return actual MCP image content','capability status panel','actual HTTP import deduplication','unsupported generation rejection','unified task panel','create and save editing DSL','activate DSL render mode','show compiled multi-track timeline','switch back without deleting DSL']},null,2));
+  fs.writeFileSync(root+'/docs/dom-validation-0.17.json' ,JSON.stringify({passed:true,environment:'JSDOM + real Go HTTP API, not a graphical browser',checks:['load embedded UI','save narration text','build paragraph alignment table','protect canonical text','assign actual uploaded image','preserve mapping after new lead','persist text','return actual MCP image content','capability status panel','actual HTTP import deduplication','unsupported generation rejection','unified task panel','create and save editing DSL','activate DSL render mode','show compiled multi-track timeline','switch back without deleting DSL']},null,2));
   console.log('DOM + HTTP workflow passed');
  }finally{dom?.window.close();proc.kill('SIGTERM')}
 })().catch(e=>{console.error(e);process.exitCode=1});

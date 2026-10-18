@@ -12,7 +12,7 @@ func validateFoundationArguments(name string, params json.RawMessage) error {
 	case "video_edit_patch_preview", "video_edit_patch_apply":
 		allowed = []string{"projectId", "revision", "changes"}
 		required = allowed
-	case "video_edit_undo":
+	case "video_edit_undo", "video_edit_redo":
 		allowed = []string{"projectId", "revision"}
 		required = allowed
 	case "video_asset_describe":

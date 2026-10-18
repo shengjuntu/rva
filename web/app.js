@@ -1,5 +1,5 @@
 "use strict";
-const TOOL_VERSION = "0.16.0";
+const TOOL_VERSION = "0.17.0";
 const $ = (s) => document.querySelector(s),
   el = (tag, text, cls) => {
     const n = document.createElement(tag);
@@ -1629,7 +1629,7 @@ $('#patch-preview').onclick=action(async()=>{
  if(editDSLDirty)throw new Error('请先保存完整剪辑草稿');
  const pid=project.id,gen=epoch,body={revision:project.revision,changes:JSON.parse($('#edit-patch').value)};
  const result=await api('/api/projects/'+pid+'/edit/patch/preview',body);if(gen!==epoch||JSON.stringify(JSON.parse($('#edit-patch').value))!==JSON.stringify(body.changes))return;
- patchPreview={pid,body};$('#patch-apply').disabled=false;$('#patch-diff').textContent=JSON.stringify({affectedClipIds:result.affectedClipIds,before:result.before,after:result.after},null,2);
+ patchPreview={pid,body};$('#patch-apply').disabled=false;$('#patch-diff').textContent=JSON.stringify({fieldDiffs:result.fieldDiffs,affectedClipIds:result.affectedClipIds},null,2);
 });
 $('#patch-apply').onclick=action(async()=>{
  if(!patchPreview||patchPreview.pid!==project.id)throw new Error('请先预览本项目的修改');
@@ -1640,5 +1640,11 @@ $('#patch-apply').onclick=action(async()=>{
 $('#patch-undo').onclick=action(async()=>{
  if(editDSLDirty)throw new Error('请先处理完整剪辑草稿');const pid=project.id,gen=epoch;
  await api('/api/projects/'+pid+'/edit/undo',{revision:project.revision});if(gen!==epoch)return;
+ const result=await api('/api/projects/'+pid);if(gen!==epoch)return;project=result;patchPreview=null;$('#patch-apply').disabled=true;drawProject();await loadEditPanel(true);
+});
+
+$('#patch-redo').onclick=action(async()=>{
+ if(editDSLDirty)throw new Error('请先处理完整剪辑草稿');const pid=project.id,gen=epoch;
+ await api('/api/projects/'+pid+'/edit/redo',{revision:project.revision});if(gen!==epoch)return;
  const result=await api('/api/projects/'+pid);if(gen!==epoch)return;project=result;patchPreview=null;$('#patch-apply').disabled=true;drawProject();await loadEditPanel(true);
 });
