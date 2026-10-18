@@ -29,6 +29,22 @@ function fixture() {
   return {w, dom, calls, run: code => vm.runInContext(code, ctx), plain: code => JSON.parse(vm.runInContext('JSON.stringify(' + code + ')', ctx)), close: async () => { await new Promise(resolve => setImmediate(resolve)); dom.window.close(); }};
 }
 
+test('assistant stream starts without a false error and reveals text while genuine errors remain visible', async () => {
+  const f = fixture();
+  try {
+    f.run('consume(' + JSON.stringify([{id: 1, direction: 'in', method: 'item/started', data: {params: {turnId: 'turn', item: {id: 'reply', type: 'agentMessage'}}}}]) + ')');
+    const reply = f.w.document.querySelector('#conversation .assistant');
+    assert.ok(reply);
+    assert.equal(reply.hidden, true);
+    assert.ok(!f.w.document.querySelector('#conversation').textContent.includes('运行出现问题'));
+    f.run('consume(' + JSON.stringify([{id: 2, direction: 'in', method: 'item/agentMessage/delta', data: {params: {turnId: 'turn', itemId: 'reply', delta: '正在调整第二节。'}}}]) + ')');
+    assert.equal(reply.hidden, false);
+    assert.equal(reply.textContent, '正在调整第二节。');
+    f.run('consume(' + JSON.stringify([{id: 3, direction: 'in', method: 'error', data: {params: {message: '实际服务错误'}}}]) + ')');
+    assert.match(f.w.document.querySelector('#conversation').textContent, /实际服务错误/);
+  } finally { await f.close(); }
+});
+
 test('malformed durable receipt blocks fresh dispatch while completed videos remain viewable', async () => {
   const f = fixture();
   try {

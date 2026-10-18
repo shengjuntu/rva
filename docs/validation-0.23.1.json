@@ -17,7 +17,7 @@
     "log": "tests-0.23.1.jsonl"
   },
   "goVet": true,
-  "nodeTestsPassed": 7,
+  "nodeTestsPassed": 8,
   "httpDom": {
     "passed": true,
     "checks": 24,
@@ -64,7 +64,8 @@
     "Server-side pending recovery retains skills and expected turn",
     "Local stop fences new submissions and cancels only captured job IDs",
     "Completed historical output and export use the selected render",
-    "Settings late response preserves newer unsaved model/key input"
+    "Settings late response preserves newer unsaved model/key input",
+    "Empty assistant stream startup does not display a false error; actual errors remain visible"
   ],
   "companion": {
     "rundesk": "0.49.5",
@@ -77,8 +78,8 @@
     "linuxAmd64": "compiled and actual version executed",
     "windowsAmd64": "cross-compiled only",
     "sha256": {
-      "video-app": "ac9f94e25627ceeb67ef779587bebbbfb79151cef47b2c0760ac2083da0a5249",
-      "video-app-windows-amd64.exe": "2398d29f013e50342ba3a08c2d21bebc14d165b6f31a022cd4a2d709d7c52436"
+      "video-app": "420c8fdebce21ec908d820a4513cd6dbc645430606769dd4249d0bec51618517",
+      "video-app-windows-amd64.exe": "defb240f805f098f6b8a3e4695811a085fd1a961127ec7123a116c74144f353a"
     }
   },
   "notRepeated": [

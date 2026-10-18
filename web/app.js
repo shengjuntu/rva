@@ -166,7 +166,7 @@ async function stopProduction(){
 }
 
 function eventRow(key,type){let row=rows.get(key);if(row)return row;const box=$("#conversation");if(!rows.size)box.replaceChildren();const node=el("div",undefined,"message "+(type==="user"?"user":type==="agentMessage"?"assistant":"notice"));row={node,item:{type}};rows.set(key,row);box.append(node);return row;}
-function drawEvent(row){const item=row.item;row.node.textContent=item.text||item.message||item.error?.message||(item.type==="warning"?"运行提示，请在 RunDesk 查看详情。":"运行出现问题，请在 RunDesk 查看详情。");}
+function drawEvent(row){const item=row.item;if(item.type==="agentMessage"){row.node.textContent=item.text||"";row.node.hidden=!item.text;return;}row.node.textContent=item.text||item.message||item.error?.message||(item.type==="warning"?"运行提示，请在 RunDesk 查看详情。":"运行出现问题，请在 RunDesk 查看详情。");}
 function friendlyInput(text){const plain=String(text||"").replace(/^\[Video App[^]*?\n用户要求：\n/,"").trim();return plain.startsWith("为视频项目 "+project.id)?"生成初稿":plain;}
 function consume(events){
  const box=$("#conversation"),bottom=box.scrollHeight-box.scrollTop-box.clientHeight<90;
