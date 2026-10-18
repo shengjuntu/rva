@@ -278,6 +278,31 @@
             "type": "number",
             "minimum": 0,
             "maximum": 600
+          },
+          "textRefs": {
+            "type": "array",
+            "maxItems": 32,
+            "items": {
+              "type": "object",
+              "properties": {
+                "quote": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 16384,
+                  "description": "Exact nonblank original narration; server additionally enforces 16384 UTF-8 bytes and supported control characters."
+                },
+                "occurrence": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "One-based occurrence, counting overlapping matches; required when quote repeats."
+                }
+              },
+              "required": [
+                "quote"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Optional editorial references. Does not imply one sentence per clip or measured speech timestamps."
           }
         },
         "required": [
@@ -345,6 +370,11 @@
           }
         ]
       }
+    },
+    "textSourceHash": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "SHA256 of exact saved UTF-8 narration, required when clips contain textRefs. Checked against current project by the compiler."
     }
   },
   "required": [

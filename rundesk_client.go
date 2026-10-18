@@ -61,6 +61,8 @@ func (a *App) rdRequest(ctx context.Context, method, path string, body any, key 
 	client := *a.client
 	if strings.HasSuffix(path, "/runtime/prepare") {
 		client.Timeout = 3 * time.Minute
+	} else if strings.HasSuffix(path, "/runtime/diagnostics") {
+		client.Timeout = 35 * time.Second
 	}
 	resp, e := client.Do(req)
 	if e != nil {

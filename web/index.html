@@ -94,6 +94,11 @@
               ><button id="render" class="primary">生成初稿</button>
             </div></div>
             <section class="production-panel"><h2>正文与工作流设置</h2><div class="row"><button id="narration-save">保存正文</button><button id="workflow-save">保存制作要求</button></div><div class="workflow-skills"><label><input type="checkbox" id="skill-narration" checked>口播与时序</label><label><input type="checkbox" id="skill-editing" checked>素材与剪辑</label><label><input type="checkbox" id="skill-review" checked>精修检查</label></div><label class="workflow-backend">剪辑引擎<select id="workflow-backend"><option value="native">内置剪辑</option><option value="video_use">video-use</option></select></label><p class="muted small">video-use 需要配置共享工作目录和对应的 RunDesk 制作环境。</p></section>
+          <section id="runtime-diagnostics" class="production-panel">
+            <div class="section-head"><h2>制作环境诊断</h2><button id="diagnose-production">检查制作环境</button></div>
+            <p id="diagnostics-status" class="muted small" role="status">按当前项目的剪辑引擎检查依赖和连接。</p>
+            <div id="diagnostics-results"></div>
+          </section>
           <details id="production-services" class="production-panel">
             <summary>制作能力与任务</summary>
             <div class="section-head"><h2>制作能力</h2><button id="refresh-capabilities">检查已配置服务</button></div>
@@ -108,6 +113,12 @@
             <p id="edit-engine-intro" class="muted small">图片、视频、声音和文字可以自由组成多轨剪辑。启用后，成片只使用这份剪辑结构；旧镜头、音轨和字幕仍保留。</p>
             <div class="row"><button id="edit-example">创建剪辑示例</button><button id="edit-reload">载入保存的剪辑</button><button id="edit-activate">启用已保存剪辑</button><button id="edit-legacy">使用旧镜头</button></div>
             <div id="edit-timeline"></div>
+            <details id="quote-locator"><summary>按原文定位镜头</summary>
+              <p class="muted small">查找已保存原文与镜头的明确关联。旧工程没有关联时会显示未关联，不会按素材猜测。</p>
+              <label>原文片段<textarea id="locate-quote" rows="2" placeholder="粘贴需要调整的原文，保持文字完全一致。"></textarea></label>
+              <div class="locator-options"><label>第几次出现（重复时填写）<input id="locate-occurrence" type="number" min="1" step="1" placeholder="自动"></label><label>查询工程<select id="locate-render"><option value="">当前剪辑工程</option></select></label></div>
+              <button id="locate-clips">定位镜头</button><p id="locate-status" class="muted small" role="status">定位后可将镜头引用加入右侧对话草稿。</p><div id="locate-results"></div>
+            </details>
             <details><summary>查看与编辑剪辑 DSL</summary><textarea id="edit-json" rows="16" spellcheck="false" placeholder="由 RunDesk/Codex 编写，或创建示例后调整。"></textarea><div class="row"><button id="edit-validate">校验并查看时间线</button><button id="edit-save" class="primary">保存并启用剪辑</button></div></details>
             <details><summary>局部修改与撤销</summary><p id="edit-selection" class="muted small">点击时间线片段取得对象 ID。</p><textarea id="edit-patch" rows="5" placeholder='[ {"id":"title","op":"update","fields":{"text":"新标题"}} ]'></textarea><button id="patch-preview">预览差异</button><button id="patch-apply" disabled>应用预览修改</button><button id="patch-undo">撤销最近局部修改</button><button id="patch-redo">重做局部修改</button><pre id="patch-diff"></pre></details><details id="final-tools"><summary>局部预览与终稿</summary><label>起点（秒）<input id="preview-start" type="number" min="0" step="0.1" value="0"></label><label>终点（秒）<input id="preview-end" type="number" min="0" step="0.1" value="3"></label><button id="range-render">渲染指定片段</button><label>已完成的完整成片<select id="final-render-id"><option value="">请选择完整成片</option></select></label><label><input id="final-reviewed" type="checkbox">我已检查完整成片的画面、配音与字幕</label><button id="final-designate">保存终稿快照</button><button id="final-verify">复核终稿完整性</button><p id="final-status" class="muted small"></p></details><p id="edit-status" class="muted small"></p>
           </section>

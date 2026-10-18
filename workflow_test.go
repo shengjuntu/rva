@@ -135,13 +135,55 @@ func TestWorkflowBackendCompatibilityAndInstruction(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, want := range []string{"剪辑后端：video_use", "素材准备和对齐", "（2）剪辑", "（3）精修", "DSL/EDL 只约束剪辑", "video_media_alignment_update", "video_production_run_prepare", "video_production_run_ingest"} {
+	for _, want := range []string{"剪辑后端：video_use", "素材准备和对齐", "（2）剪辑", "（3）精修", "DSL/EDL 只约束剪辑", "video_media_alignment_update", "video_production_run_prepare", "video_production_run_ingest", "video_runtime_diagnose", "video_edit_locate", "modelVisionVerified=false", "textRefs"} {
 		if !strings.Contains(instruction, want) {
 			t.Fatal("missing actionable workflow instruction", want)
 		}
 	}
 	if strings.Contains(instruction, "video_production_run_export") {
 		t.Fatal("instruction refers to nonexistent export tool")
+	}
+}
+
+func TestInstalledSkillsKeepDiagnosticAndReferenceBoundaries(t *testing.T) {
+	// The installed bundles are the Agent's executable workflow contract. Ensure
+	// upgrades carry the real tools without teaching semantic or vision proof.
+	bundles := installedProductionSkills()
+	checks := map[string][]string{
+		"video-project": {
+			"video_runtime_diagnose(projectId)", "passed/failed/blocked/not_checked",
+			"modelVisionVerified", "not prove the model saw an image",
+			"textSourceHash", "frozen manifest textPath", "unmappedClipIds",
+			"video_edit_locate(projectId,quote,occurrence?,renderId?)",
+			"An EDL needs no top-level textSourceHash", "do not prove semantic correctness or word-level timing",
+		},
+		"video-narration": {
+			"video_runtime_diagnose(projectId)", "before paid generation",
+			"Do not rebuild environments", "not that all production is blocked",
+		},
+		"video-editing": {
+			"document textSourceHash", "textRefs=[{quote,occurrence?}]",
+			"unreferenced background and legacy clips", "exact frozen-original textRefs",
+		},
+		"video-review": {
+			"video_edit_locate(projectId,quote,occurrence?,renderId?)",
+			"unmappedClipIds and empty matches", "not word timing or verified semantics",
+			"Preserve unrelated IDs, references, assets and edits",
+		},
+	}
+	for logical, required := range checks {
+		t.Run(logical, func(t *testing.T) {
+			files := bundles[runtimeSkillName(logical)].(map[string]string)
+			body := files["SKILL.md"]
+			for _, want := range required {
+				if !strings.Contains(body, want) {
+					t.Errorf("installed Skill missing workflow contract %q", want)
+				}
+			}
+			if strings.Contains(body, "rundesk_diagnostic_image(") {
+				t.Error("internal transport probe must not be presented as an Agent-facing tool")
+			}
+		})
 	}
 }
 

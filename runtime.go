@@ -7,7 +7,7 @@ import (
 	"net/http"
 )
 
-var videoTools = []string{"video_media_alignment_get", "video_media_alignment_update", "video_asset_video_inspect", "video_production_run_prepare", "video_production_run_get", "video_production_run_ingest", "video_production_board_get", "video_production_checkpoint", "video_render_inspect", "video_final_verify", "video_final_get", "video_final_save", "video_edit_redo", "video_edit_patch_preview", "video_edit_patch_apply", "video_edit_undo", "video_asset_describe", "video_media_align", "video_narration_update", "video_speech_materialize", "video_edit_get", "video_edit_validate", "video_edit_update", "video_edit_activate", "video_project_create", "video_production_text", "video_production_stage", "video_capabilities_get", "video_asset_list", "video_asset_import", "video_asset_inspect", "video_job_start", "video_job_get", "video_job_list", "video_job_cancel", "video_project_get", "video_news_get", "video_project_update", "video_news_audio_adopt", "video_subtitles_update", "video_speech_start", "video_speech_stop", "video_speech_adopt", "video_render_start", "video_render_stop"}
+var videoTools = []string{"rundesk_diagnostic_image", "video_runtime_diagnose", "video_edit_locate", "video_media_alignment_get", "video_media_alignment_update", "video_asset_video_inspect", "video_production_run_prepare", "video_production_run_get", "video_production_run_ingest", "video_production_board_get", "video_production_checkpoint", "video_render_inspect", "video_final_verify", "video_final_get", "video_final_save", "video_edit_redo", "video_edit_patch_preview", "video_edit_patch_apply", "video_edit_undo", "video_asset_describe", "video_media_align", "video_narration_update", "video_speech_materialize", "video_edit_get", "video_edit_validate", "video_edit_update", "video_edit_activate", "video_project_create", "video_production_text", "video_production_stage", "video_capabilities_get", "video_asset_list", "video_asset_import", "video_asset_inspect", "video_job_start", "video_job_get", "video_job_list", "video_job_cancel", "video_project_get", "video_news_get", "video_project_update", "video_news_audio_adopt", "video_subtitles_update", "video_speech_start", "video_speech_stop", "video_speech_adopt", "video_render_start", "video_render_stop"}
 
 type runtimeView struct {
 	AppID         string `json:"appId"`
@@ -101,6 +101,20 @@ func (a *App) prepareRuntime(ctx context.Context, p *Project) (runtimeView, erro
 	for _, name := range videoTools {
 		if !available[name] {
 			return v, fmt.Errorf("容器缺少 video_project/%s，请检查 MCP 回调地址与 Token", name)
+		}
+	}
+	if p != nil && workflowFor(*p).EditingBackend == "video_use" {
+		diagnostic, err := a.diagnoseRuntime(ctx, p.ID)
+		if err != nil {
+			return v, err
+		}
+		if !diagnostic.Ready {
+			for _, row := range diagnostic.Rows {
+				if row.State == "failed" || row.State == "blocked" {
+					return v, fmt.Errorf("制作环境预检未通过：%s。%s", row.Summary, row.Remedy)
+				}
+			}
+			return v, errors.New("制作环境仍有必要项目未验证，请打开制作环境诊断查看")
 		}
 	}
 	return v, nil

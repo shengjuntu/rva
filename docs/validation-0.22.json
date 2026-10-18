@@ -1,0 +1,54 @@
+{
+  "version": "0.22.0",
+  "checkedAt": "2026-10-17T23:19:18.568492+00:00",
+  "goRace": {
+    "passed": 302,
+    "skipped": [
+      {
+        "test": "TestSpeechSnapshotGenerationAndAdoption",
+        "reason": "=== RUN   TestSpeechSnapshotGenerationAndAdoption\n    speech_test.go:61: set VIDEO_TEST_ESPEAK for real local TTS integration\n--- SKIP: TestSpeechSnapshotGenerationAndAdoption (0.00s)\n"
+      }
+    ],
+    "failures": []
+  },
+  "goVet": true,
+  "nodeTestsPassed": 6,
+  "domHttp": {
+    "passed": true,
+    "checks": 43,
+    "environment": "JSDOM + actual Go HTTP API, not graphical browser"
+  },
+  "schemaJSONValid": true,
+  "schemaReviewedAgainstGoContract": true,
+  "mcpTools": 48,
+  "actualMediaAndProtocolTests": [
+    "Actual embedded RunDesk Python probe to actual App HTTP MCP with nonce-bound PNG payload; Docker/account RPC are fixtures",
+    "Native and real pinned video-use textRefs render/ingest/locate",
+    "Multiple clips for same text and multiple references per clip",
+    "Historical archived source remains locatable after shared workspace removal",
+    "Stale text hash, ambiguous occurrences, Unicode, private archive proof and boundary rejection"
+  ],
+  "companion": {
+    "rundeskVersion": "0.49.3",
+    "videoBuildProfile": "1.3.0",
+    "adapterContractVersion": 2,
+    "videoUseCommit": "43cfc566833548093455c9d4a46bd69913b7e552"
+  },
+  "builds": {
+    "linuxAmd64": "tested runtime",
+    "windowsAmd64": "cross-compiled only"
+  },
+  "notTested": [
+    "Docker image build and deployment",
+    "real Codex autonomous production and model vision",
+    "actual image/video generation models",
+    "actual IndexTTS voice quality",
+    "graphical browser",
+    "Windows runtime"
+  ],
+  "limits": [
+    "modelVisionVerified remains false; image transport does not prove model perception",
+    "video_use remains single sequential visual track with continuous narration and subtitles",
+    "textRefs are editorial associations, not semantic proof or forced word alignment"
+  ]
+}

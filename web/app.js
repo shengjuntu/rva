@@ -1,5 +1,5 @@
 "use strict";
-const TOOL_VERSION = "0.21.0";
+const TOOL_VERSION = "0.22.0";
 const $ = (s) => document.querySelector(s),
   el = (tag, text, cls) => {
     const n = document.createElement(tag);
@@ -12,6 +12,7 @@ const speechSubmission = SpeechSubmission.create(() => sessionStorage);
 const renderSubmission = SpeechSubmission.create(() => sessionStorage,"video-render-pending-v1","渲染");
 let startingRender=false;
 let startingDraft=false, boardLoading=false, boardKey="";
+let diagnosticsRequest=0, locatorRequest=0, locatorResult=null;
 let productionDirty = false;
 let editDSLDirty=false,editDSLBase=0,editPanelLoading=false;
 let serviceJobsKey="", serviceJobsLoading=false;
@@ -142,6 +143,7 @@ async function openProject(pid) {
   renderKey = "";
   serviceJobsKey="";
   boardKey="";
+  resetProductionDiagnostics();
   speechKey = "";
   approvalKey = "";
   $("#conversation").replaceChildren(
@@ -366,6 +368,8 @@ const states = {
 function drawRenders() {
   try {renderSubmission.reconcile(project.id,project.renders)}catch(e){toast(e.message)}
   drawFinalRenderOptions();
+  drawLocatorRenderOptions();
+  refreshLocatorNotice();
   const key = JSON.stringify([project.renders,project.final?.renderId,project.production?.finalRenderId]);
   if (key === renderKey) return;
   renderKey = key;
@@ -1581,6 +1585,113 @@ async function loadProductionJobs(force=false) {
 }
 $('#refresh-capabilities').onclick=action(()=>loadCapabilities(true));
 $('#refresh-jobs').onclick=action(()=>loadProductionJobs(true));
+
+function resetProductionDiagnostics(){
+ diagnosticsRequest++;locatorRequest++;locatorResult=null;
+ $('#diagnose-production').disabled=false;$('#locate-clips').disabled=false;
+ $('#diagnostics-status').textContent='按当前项目的剪辑引擎检查依赖和连接。';$('#diagnostics-results').replaceChildren();
+ $('#locate-quote').value='';$('#locate-occurrence').value='';$('#locate-render').value='';$('#locate-results').replaceChildren();
+ $('#locate-status').textContent='定位后可将镜头引用加入右侧对话草稿。';
+}
+function drawRuntimeDiagnostics(report){
+ const box=$('#diagnostics-results');box.replaceChildren();
+ const backend=report.editingBackend==='video_use'?'video-use':'内置剪辑';
+ $('#diagnostics-status').textContent=backend+' · '+(report.ready===true?'当前制作依赖检查通过。':'制作环境有待处理项。')+' 模型实际看图尚未验证。'+(workflowDirty?' 工作流有未保存修改，本次检查使用已保存设置。':'');
+ const labels={passed:'通过',failed:'失败',blocked:'待处理',not_checked:'未检查'};
+ for(const check of report.rows||[]){
+  const row=el('div',undefined,'diagnostic-row'),head=el('div',undefined,'diagnostic-heading');
+  const state=Object.hasOwn(labels,check.state)?check.state:'not_checked',badge=el('span',labels[state],'diagnostic-state');badge.dataset.state=state;
+  head.append(el('strong',check.title||check.id||'检查项'),badge);row.append(head);
+  if(check.summary)row.append(el('p',check.summary,'muted small'));
+  if(check.remedy)row.append(el('p','处理方式：'+check.remedy,'small'));
+  box.append(row);
+ }
+ const detail=el('details');detail.append(el('summary','查看诊断详情'),el('pre',JSON.stringify(report,null,2)));box.append(detail);
+}
+async function diagnoseProduction(){
+ if(!project)throw Error('请先创建项目');
+ const pid=project.id,gen=epoch,request=++diagnosticsRequest;$('#diagnose-production').disabled=true;
+ $('#diagnostics-results').replaceChildren();$('#diagnostics-status').textContent='正在检查制作环境…';
+ try{
+  const report=await api('/api/projects/'+pid+'/diagnostics',{});
+  if(gen!==epoch||request!==diagnosticsRequest||project?.id!==pid)return;
+  if(report.projectId!==pid)throw Error('诊断结果不属于当前项目，请重新检查');
+  drawRuntimeDiagnostics(report);
+ }catch(err){if(gen===epoch&&request===diagnosticsRequest)$('#diagnostics-status').textContent='检查未完成：'+err.message;throw err;}
+ finally{if(gen===epoch&&request===diagnosticsRequest)$('#diagnose-production').disabled=false;}
+}
+$('#diagnose-production').onclick=action(diagnoseProduction);
+
+function drawLocatorRenderOptions(){
+ const select=$('#locate-render'),selected=select.value;select.replaceChildren();
+ const current=el('option','当前剪辑工程');current.value='';select.append(current);
+ for(const render of [...(project?.renders||[])].reverse()){
+  if(render.state!=='completed'||render.range)continue;
+  const option=el('option',`成片修订 ${render.revision} · ${render.engine==='video_use'?'video-use':'内置剪辑'} · ${render.id}`);option.value=render.id;select.append(option);
+ }
+ if([...select.options].some(option=>option.value===selected))select.value=selected;
+}
+function locatorNotice(result){
+ const parts=[result.backend==='video_use'?'video-use EDL':'内置剪辑'];
+ if(result.renderId)parts.push('成片 '+result.renderId+' 的已保存工程与原文');
+ else parts.push('已保存的当前工程');
+ if(result.current!==true)parts.push('与当前输入不同或属于历史记录');
+ if(result.revision!==project?.revision)parts.push('项目已更新，请重新定位后调整');
+ if(narrationDirty||editDSLDirty||workflowDirty)parts.push('有未保存修改，本次定位仅使用已保存内容');
+ parts.push(`${(result.matches||[]).length} 个关联镜头`);
+ if(result.warning)parts.push(result.warning);
+ return parts.join(' · ');
+}
+function refreshLocatorNotice(){
+ if(locatorResult&&locatorResult.projectId===project?.id)$('#locate-status').textContent=locatorNotice(locatorResult);
+}
+function locatorTime(value){return typeof value==='number'&&Number.isFinite(value)?value.toFixed(3):'未知';}
+function addLocatedClipToDraft(result,match){
+ if(project?.id!==result.projectId)throw Error('项目已经切换，请重新定位');
+ if(result.revision!==project.revision)throw Error('项目已经更新，请重新定位；对话草稿已保留');
+ if(pendingMessage(project.id))throw Error('上一条指令仍待确认，请先确认原提交；定位结果已保留');
+ const quote=result.query?.quote||'',scope=result.renderId?'成片 '+result.renderId+' 的已保存工程':'当前已保存工程';
+ const occurrence=result.query?.occurrence?'第 '+result.query.occurrence+' 次出现的':'';
+ const instruction=`针对${scope}中的镜头 ${match.clipId}（${locatorTime(match.start)}–${locatorTime(match.end)} 秒${match.assetId?'，素材 '+match.assetId:''}），对应原文${occurrence}：${JSON.stringify(quote)}。${result.current!==true?'这是历史或已变化的输入，请先核对当前工程。':''}\n调整要求：`;
+ const composer=$('#prompt'),previous=composer.value;composer.value=previous+(previous&& !previous.endsWith('\n\n')?'\n\n':'')+instruction;
+ $('#chat').hidden=false;$('.layout').classList.remove('no-chat');composer.focus();composer.setSelectionRange(composer.value.length,composer.value.length);
+ $('#send-state').textContent='镜头引用已加入草稿，填写调整要求后发送。';
+}
+function drawLocatedClips(result){
+ const box=$('#locate-results');box.replaceChildren();locatorResult=result;refreshLocatorNotice();
+ if(!(result.matches||[]).length)box.append(el('p','该原文没有已记录的镜头关联。可让 RunDesk 为工程补充原文引用。','muted small'));
+ for(const match of result.matches||[]){
+  const card=el('article',undefined,'located-clip');card.append(el('strong','镜头 '+match.clipId));
+  card.append(el('p',`${locatorTime(match.start)}–${locatorTime(match.end)} 秒`+(match.trackId?' · 轨道 '+match.trackId:'')+(match.assetId?' · 素材 '+match.assetId:''),'muted small'));
+  card.append(el('p','查询原文：'+(result.query?.quote||''),'small'));
+  for(const ref of match.matchedRefs||[])if(ref.quote)card.append(el('p','关联原文'+(ref.occurrence?'（第 '+ref.occurrence+' 次）':'')+'：'+ref.quote,'small'));
+  const refs=el('details');refs.append(el('summary','查看已保存的原文引用'),el('pre',JSON.stringify({textRefs:match.textRefs||[],matchedRefs:match.matchedRefs||[]},null,2)));card.append(refs);
+  const button=el('button','将此镜头加入对话草稿');button.onclick=action(()=>addLocatedClipToDraft(result,match));const actions=el('div',undefined,'row');actions.append(button);card.append(actions);box.append(card);
+ }
+ if(result.unmappedClipIds?.length)box.append(el('p','未记录原文关联的镜头：'+result.unmappedClipIds.join('、')+'。这些镜头未被自动分配给查询文字。','muted small'));
+ const detail=el('details');detail.append(el('summary','查看定位详情'),el('pre',JSON.stringify(result,null,2)));box.append(detail);
+}
+async function locateClips(){
+ if(!project)throw Error('请先创建项目');
+ const quote=$('#locate-quote').value;if(!quote.trim())throw Error('请填写需要定位的原文');
+ const raw=$('#locate-occurrence').value,body={quote};
+ if(raw!==''){const occurrence=Number(raw);if(!Number.isSafeInteger(occurrence)||occurrence<1)throw Error('出现次数必须是大于零的整数');body.occurrence=occurrence;}
+ const renderId=$('#locate-render').value;if(renderId)body.renderId=renderId;
+ const pid=project.id,gen=epoch,request=++locatorRequest;locatorResult=null;$('#locate-clips').disabled=true;
+ $('#locate-results').replaceChildren();$('#locate-status').textContent='正在查找已保存的原文引用…';
+ try{
+  const result=await api('/api/projects/'+pid+'/edit/locate',body);
+  if(gen!==epoch||request!==locatorRequest||project?.id!==pid)return;
+  if(result.projectId!==pid)throw Error('定位结果不属于当前项目，请重新查询');
+  drawLocatedClips(result);
+ }catch(err){if(gen===epoch&&request===locatorRequest)$('#locate-status').textContent='定位未完成：'+err.message;throw err;}
+ finally{if(gen===epoch&&request===locatorRequest)$('#locate-clips').disabled=false;}
+}
+function invalidateLocator(){
+ locatorRequest++;locatorResult=null;$('#locate-clips').disabled=false;$('#locate-results').replaceChildren();$('#locate-status').textContent='查询内容已变化，请重新定位。';
+}
+$('#locate-clips').onclick=action(locateClips);
+$('#locate-quote').oninput=invalidateLocator;$('#locate-occurrence').oninput=invalidateLocator;$('#locate-render').onchange=invalidateLocator;
 
 function drawEditingMode(){
  const external=project?.workflow?.editingBackend==='video_use',active=!!project?.editActive&&!external;

@@ -46,29 +46,31 @@ type EditLayout struct {
 	Opacity *float64 `json:"opacity,omitempty"`
 }
 type EditClip struct {
-	ID       string     `json:"id"`
-	Track    string     `json:"track"`
-	Asset    string     `json:"asset,omitempty"`
-	Start    *float64   `json:"start,omitempty"`
-	After    string     `json:"after,omitempty"`
-	Anchor   string     `json:"anchor,omitempty"`
-	Offset   float64    `json:"offset,omitempty"`
-	Duration float64    `json:"duration,omitempty"`
-	Source   EditSource `json:"source,omitempty"`
-	Layout   EditLayout `json:"layout,omitempty"`
-	Text     string     `json:"text,omitempty"`
-	FontSize int        `json:"fontSize,omitempty"`
-	Color    string     `json:"color,omitempty"`
-	Volume   *float64   `json:"volume,omitempty"`
-	FadeIn   float64    `json:"fadeIn,omitempty"`
-	FadeOut  float64    `json:"fadeOut,omitempty"`
+	ID       string          `json:"id"`
+	Track    string          `json:"track"`
+	Asset    string          `json:"asset,omitempty"`
+	Start    *float64        `json:"start,omitempty"`
+	After    string          `json:"after,omitempty"`
+	Anchor   string          `json:"anchor,omitempty"`
+	Offset   float64         `json:"offset,omitempty"`
+	Duration float64         `json:"duration,omitempty"`
+	Source   EditSource      `json:"source,omitempty"`
+	Layout   EditLayout      `json:"layout,omitempty"`
+	Text     string          `json:"text,omitempty"`
+	FontSize int             `json:"fontSize,omitempty"`
+	Color    string          `json:"color,omitempty"`
+	Volume   *float64        `json:"volume,omitempty"`
+	FadeIn   float64         `json:"fadeIn,omitempty"`
+	FadeOut  float64         `json:"fadeOut,omitempty"`
+	TextRefs []TextReference `json:"textRefs,omitempty"`
 }
 type EditDocument struct {
-	Version int          `json:"version"`
-	Canvas  EditCanvas   `json:"canvas"`
-	Tracks  []EditTrack  `json:"tracks"`
-	Anchors []EditAnchor `json:"anchors,omitempty"`
-	Clips   []EditClip   `json:"clips"`
+	TextSourceHash string       `json:"textSourceHash,omitempty"`
+	Version        int          `json:"version"`
+	Canvas         EditCanvas   `json:"canvas"`
+	Tracks         []EditTrack  `json:"tracks"`
+	Anchors        []EditAnchor `json:"anchors,omitempty"`
+	Clips          []EditClip   `json:"clips"`
 }
 
 func (d *EditDocument) UnmarshalJSON(raw []byte) error {
@@ -127,6 +129,9 @@ type EditIR struct {
 func compileEdit(d EditDocument, assets []Asset) (EditIR, error) {
 	ir := EditIR{Schema: "video.edit-ir.v1", Canvas: d.Canvas, Clips: []EditIRClip{}, Anchors: map[string]float64{}}
 	fail := func(code, target, msg string) (EditIR, error) { return ir, editFailure(code, target, msg) }
+	if err := validateEditTextReferenceShape(d); err != nil {
+		return ir, err
+	}
 	if d.Version != 1 {
 		return fail("VERSION", "version", "仅支持version=1")
 	}
@@ -426,12 +431,20 @@ func (a *App) editGet(w http.ResponseWriter, r *http.Request) {
 	}
 	result := map[string]any{"revision": p.Revision, "dsl": p.EditDSL, "active": p.EditActive}
 	if p.EditDSL != nil {
+		// A stale quote pin must remain readable so an Agent can inspect and
+		// repair it. All write/render operations use compileProjectEdit instead.
 		ir, e := compileEdit(*p.EditDSL, p.Assets)
 		if e != nil {
 			editErrorResponse(w, e)
 			return
 		}
 		result["ir"] = ir
+		textErr := validateEditTextReferences(p, *p.EditDSL)
+		result["textReferencesCurrent"] = textErr == nil
+		result["staleTextRefs"] = textErr != nil
+		if textErr != nil {
+			result["textReferencesError"] = textErr.Error()
+		}
 	}
 	writeJSON(w, 200, result)
 }
@@ -449,7 +462,7 @@ func (a *App) editValidate(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, fmt.Errorf("需要dsl对象"))
 		return
 	}
-	ir, e := compileEdit(*in.DSL, p.Assets)
+	ir, e := compileProjectEdit(p, *in.DSL)
 	if e != nil {
 		editErrorResponse(w, e)
 		return
@@ -476,7 +489,7 @@ func (a *App) editSave(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, fmt.Errorf("需要dsl对象"))
 		return
 	}
-	ir, e := compileEdit(*in.DSL, p.Assets)
+	ir, e := compileProjectEdit(*p, *in.DSL)
 	if e != nil {
 		editErrorResponse(w, e)
 		return

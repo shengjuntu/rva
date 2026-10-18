@@ -9,6 +9,15 @@ import (
 func validateFoundationArguments(name string, params json.RawMessage) error {
 	var allowed, required []string
 	switch name {
+	case "rundesk_diagnostic_image":
+		allowed = []string{"nonce"}
+		required = allowed
+	case "video_runtime_diagnose":
+		allowed = []string{"projectId"}
+		required = allowed
+	case "video_edit_locate":
+		allowed = []string{"projectId", "quote", "occurrence", "renderId"}
+		required = []string{"projectId", "quote"}
 	case "video_media_alignment_get":
 		allowed = []string{"projectId"}
 		required = allowed
@@ -43,8 +52,8 @@ func validateFoundationArguments(name string, params json.RawMessage) error {
 		allowed = []string{"projectId", "revision", "renderId", "reviewed"}
 		required = allowed
 	case "video_edit_patch_preview", "video_edit_patch_apply":
-		allowed = []string{"projectId", "revision", "changes"}
-		required = allowed
+		allowed = []string{"projectId", "revision", "changes", "textSourceHash"}
+		required = []string{"projectId", "revision", "changes"}
 	case "video_edit_undo", "video_edit_redo":
 		allowed = []string{"projectId", "revision"}
 		required = allowed
@@ -108,6 +117,14 @@ func validateFoundationArguments(name string, params json.RawMessage) error {
 		}
 		if !found {
 			return fmt.Errorf("unknown argument %q for %s", key, name)
+		}
+	}
+	if name == "video_edit_locate" {
+		if raw, exists := envelope.Arguments["occurrence"]; exists {
+			var occurrence int
+			if err := json.Unmarshal(raw, &occurrence); err != nil || occurrence < 1 {
+				return fmt.Errorf("occurrence must be a positive integer when supplied")
+			}
 		}
 	}
 	for _, key := range required {

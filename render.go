@@ -95,7 +95,7 @@ func (a *App) startRender(w http.ResponseWriter, r *http.Request) {
 	ir := EditIR{}
 	if usesEditDSL(*p) {
 		var e error
-		ir, e = compileEdit(*p.EditDSL, p.Assets)
+		ir, e = compileProjectEdit(*p, *p.EditDSL)
 		if e != nil {
 			a.mu.Unlock()
 			editErrorResponse(w, e)

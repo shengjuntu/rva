@@ -120,7 +120,7 @@ func (a *App) finalSave(w http.ResponseWriter, r *http.Request) {
 			fail(w, 409, errors.New("当前原生剪辑未启用"))
 			return
 		}
-		ir, err := compileEdit(*p.EditDSL, p.Assets)
+		ir, err := compileProjectEdit(p, *p.EditDSL)
 		if err != nil {
 			fail(w, 409, err)
 			return

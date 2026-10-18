@@ -18,8 +18,9 @@ type EditChange struct {
 	Fields json.RawMessage `json:"fields,omitempty"`
 }
 type EditPatchRequest struct {
-	Revision int          `json:"revision"`
-	Changes  []EditChange `json:"changes"`
+	Revision       int          `json:"revision"`
+	Changes        []EditChange `json:"changes"`
+	TextSourceHash *string      `json:"textSourceHash,omitempty"`
 }
 type EditHistory struct {
 	After     *EditDocument `json:"after,omitempty"`
@@ -147,12 +148,15 @@ func (a *App) editPatch(w http.ResponseWriter, r *http.Request) {
 		fail(w, 422, e)
 		return
 	}
-	ir, e := compileEdit(d, p.Assets)
+	if in.TextSourceHash != nil {
+		d.TextSourceHash = *in.TextSourceHash
+	}
+	ir, e := compileProjectEdit(*p, d)
 	if e != nil {
 		editErrorResponse(w, e)
 		return
 	}
-	before, _ := compileEdit(*p.EditDSL, p.Assets)
+	before, _ := compileProjectEdit(*p, *p.EditDSL)
 	affected := []string{}
 	for _, x := range ir.Clips {
 		found := false
@@ -181,6 +185,24 @@ func (a *App) editPatch(w http.ResponseWriter, r *http.Request) {
 			affected = append(affected, old.ID)
 		}
 	}
+	// Editorial references do not change rendered pixels, so they are absent
+	// from IR equality. Still report their stable clip IDs in a patch preview.
+	fieldDiffs := editFieldDiffs(*p.EditDSL, d)
+	for _, diff := range fieldDiffs {
+		if diff.Target != "clip" {
+			continue
+		}
+		found := false
+		for _, id := range affected {
+			if id == diff.ID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			affected = append(affected, diff.ID)
+		}
+	}
 	revision := p.Revision
 	if r.PathValue("action") == "apply" {
 		q := clone(p)
@@ -199,7 +221,7 @@ func (a *App) editPatch(w http.ResponseWriter, r *http.Request) {
 		a.projects[q.ID] = &q
 		revision = q.Revision
 	}
-	writeJSON(w, 200, map[string]any{"revision": revision, "fieldDiffs": editFieldDiffs(*p.EditDSL, d), "changes": in.Changes, "before": p.EditDSL, "after": d, "ir": ir, "affectedClipIds": affected, "saved": r.PathValue("action") == "apply"})
+	writeJSON(w, 200, map[string]any{"revision": revision, "fieldDiffs": fieldDiffs, "changes": in.Changes, "before": p.EditDSL, "after": d, "ir": ir, "affectedClipIds": affected, "saved": r.PathValue("action") == "apply"})
 }
 func (a *App) editUndo(w http.ResponseWriter, r *http.Request) {
 	var in struct {
@@ -224,7 +246,7 @@ func (a *App) editUndo(w http.ResponseWriter, r *http.Request) {
 		fail(w, 409, fmt.Errorf("剪辑已通过其他操作改变，不能覆盖撤销"))
 		return
 	}
-	ir, e := compileEdit(h.Before, p.Assets)
+	ir, e := compileProjectEdit(*p, h.Before)
 	if e != nil {
 		editErrorResponse(w, e)
 		return
@@ -268,6 +290,7 @@ func editObjects(d EditDocument) map[string]map[string]any {
 	raw, _ := json.Marshal(d)
 	var doc map[string]any
 	json.Unmarshal(raw, &doc)
+	out["document:document"] = map[string]any{"textSourceHash": d.TextSourceHash}
 	out["canvas:canvas"] = doc["canvas"].(map[string]any)
 	for _, pair := range [][2]string{{"clips", "clip"}, {"tracks", "track"}, {"anchors", "anchor"}} {
 		if list, ok := doc[pair[0]].([]any); ok {
@@ -341,7 +364,7 @@ func (a *App) editRedo(w http.ResponseWriter, r *http.Request) {
 		fail(w, 409, fmt.Errorf("当前剪辑已改变，不能覆盖重做"))
 		return
 	}
-	ir, e := compileEdit(*h.After, p.Assets)
+	ir, e := compileProjectEdit(*p, *h.After)
 	if e != nil {
 		editErrorResponse(w, e)
 		return

@@ -1,3 +1,12 @@
+# v0.22.0
+
+- 新增运行诊断：当前项目绑定、认证配置、MCP工具、容器内真实PNG传输；video_use额外验证共享目录双向挑战、profile1.3.0、adapter2与固定上游版本。
+- 显式区分passed/failed/blocked/not_checked；不调用模型或生成、不自动启动/重建环境，PNG传输不冒充模型视觉验证。
+- 原生DSL增加可选textSourceHash，native/video_use镜头增加可选精确textRefs；保留自由内容、多对多引用、背景与旧无引用工程。
+- 新增video_edit_locate，按原文定位稳定镜头ID和剪辑时间；支持指纹校验的历史私有归档，返回current及未映射镜头，不猜造关联。
+- 三阶段Skills使用诊断与文字定位，保留无关镜头与素材；高级工具展示诊断和定位结果，日常入口继续一键RunDesk。
+- 新增3项MCP，共48项；配套RunDesk0.49.3、video-build1.3.0与适配器协议2。
+
 # v0.21.0
 
 - 三阶段卡片、独立版本状态和对应Skills；保留一键RunDesk制作及高级工具。

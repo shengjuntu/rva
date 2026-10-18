@@ -1,4 +1,4 @@
-# 剪辑DSL v1 · v0.11.0
+# 剪辑 DSL v1 · v0.22.0
 
 ## 内容与剪辑分开
 
@@ -41,6 +41,20 @@ fadeIn/fadeOut为秒，非负且合计不超过片段时长。音频volume为线
 
 也可使用time指定绝对时间。锚点由调用者明确提供，不假称自动语音对齐；第三阶段可将TTS时序转成锚点。
 
+## 原文与镜头关联
+
+可在文档上保存 `textSourceHash`（完整主播稿原始 UTF-8 字节的 SHA256），在片段上保存 `textRefs`：
+
+```json
+{"id":"first","track":"pictures","asset":"真实素材ID","start":0,"duration":3,"textRefs":[{"quote":"主播稿中的完全一致原文","occurrence":1}]}
+```
+
+每片段最多 32 项引用，每项 1–16384 UTF-8 字节。原文重复时须指定从 1 开始的 `occurrence`，重叠匹配也计数；只有唯一匹配时可省略。引用不决定片段时长、语音时间或内容结构。一句话可以关联多个片段，一个片段也可以引用多处原文。无引用的旧 DSL 继续可用。
+
+保存、校验、补丁与渲染会核对原文指纹与引用。主播稿改变后，读取仍返回旧 DSL 和过期说明；需按当前原文重新核对引用、更新 `textSourceHash` 后再制作。补丁可在请求顶层传入 `textSourceHash`，与剪辑变更一起预览和应用。
+
+`POST /api/projects/{id}/edit/locate` 或 `video_edit_locate` 接收 `{quote,occurrence?,renderId?}`。它按已保存引用返回相交镜头的稳定 ID、时间与匹配引用，并列出没有原文关联的片段；不会猜测关联。重复查询未指定 occurrence 返回 422。可用属于当前项目的完整历史 renderId 查询归档 DSL/EDL 与冻结原文；`current=false` 表示原文已变化，不能直接套用旧时间。video-use EDL 使用同样的 `textRefs`，无需转换成原生 DSL。归档后不依赖共享目录继续存在。
+
 ## HTTP与MCP
 
 - GET /api/projects/{id}/edit：revision、active、dsl、编译ir。
@@ -59,4 +73,4 @@ fadeIn/fadeOut为秒，非负且合计不超过片段时长。音频volume为线
 
 本版支持声明式剪辑，不支持任意关键帧、循环音频、转场名字、动态组件代码、自动换行、逐字对齐或局部渲染。不可用字段会拒绝，不会悄悄忽略。
 
-TTS暂时仍使用旧镜头正文快照；音频通过素材ID加入DSL音轨。原终稿确认只用于旧正文模式，新剪辑终稿绑定后续阶段完成。图形浏览器视觉/播放尚未实测；本版通过实际FFmpeg像素、时序与音频检查。
+TTS 使用项目保存的自由主播稿与实际合成时序，音频通过素材 ID 加入 DSL 音轨；终稿确认绑定通过验证的具体渲染。textRefs 是剪辑关联元数据，不是自动语义判断或逐字对齐。实际浏览器播放、Docker 部署与模型制作仍需在运行环境验收。

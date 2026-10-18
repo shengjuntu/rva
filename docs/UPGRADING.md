@@ -1,3 +1,22 @@
+# 升级到 v0.22.0
+
+备份并保留完整data、RunDesk/TTS配置、访问令牌、账户与原会话，等待活动任务结束后停止旧App，替换程序或重建App镜像。旧docker/.env中的VIDEO_IMAGE需显式改为rundesk-video-app:0.22.0。新版补装并显式选用v0.22.0版本化Skills，共48项MCP；保留旧版本及自定义文件。
+
+默认仍是native后端，内容无需迁移。原生DSL和video_use EDL的textRefs是可选关联，无引用的旧工程、背景片段继续有效；不会根据镜头或素材描述猜造引用。对新引用使用精确正文及重复出现次序；原生DSL同时绑定textSourceHash，EDL绑定生产快照manifest的原文与sourceHash。改稿后要重新验证，不能仅替换哈希冒充已核对。
+
+使用video_use新功能时，升级RunDesk至0.49.3，重建video-build1.3.0（adapter协议2），在RunDesk明确选择新工具镜像，再按既有流程更新/重建应用执行容器；保留HOME、Codex认证与工作区。App渲染镜像与RunDesk工具镜像分别更新。仅替换ZIP、修改标签或更新App不会自动替换运行中的Docker容器。
+
+沿用原共享应用工作目录和VIDEO_EXCHANGE_ROOT；两个容器访问同一物理目录，并保留匹配的运行用户权限。连接项目并更新工具后，在高级工具运行“制作环境诊断”。检查实际profile、适配器、MCP PNG传输与共享目录双向读写，按具体行的remedy处理；诊断自身不启动/重建环境或切换镜像。同次制作且环境配置未变可复用成功结果，新一轮制作或变化后再诊断。
+
+诊断不会调用模型或生成服务，modelVisionVerified始终为false；通过图片传输只能说明容器收到正确PNG，真实Codex看图理解与自主制作仍须实际联调。native无需video_use与共享目录；本机模式未执行的Docker探测显示未检查，不用宿主机替代验证。
+
+按文字修改时使用video_edit_locate；无匹配和unmappedClipIds表示尚无关联。指定renderId可查具有完整校验记录的历史成片，服务读取私有归档并返回current状态；current=false的旧时间不直接应用到当前工程。旧无引用成片仍可查看，但不会凭空获得镜头关联。
+
+[本版实现与边界](DIAGNOSTICS-TEXTREFS-0.22.md) · [共享目录部署](EXCHANGE-0.21.md)
+
+---
+以下为历史说明。
+
 # 升级到 v0.21.0
 
 保留完整data、RunDesk/TTS配置、访问令牌与原会话，停止旧App后替换程序或重建镜像。Docker旧.env显式更新VIDEO_IMAGE=rundesk-video-app:0.21.0。项目会补装并选用v0.21.0版本化Skills，共45项MCP；保留已有定制文件。

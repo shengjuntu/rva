@@ -193,7 +193,7 @@ func (a *App) verifyFinal(w http.ResponseWriter, r *http.Request) {
 	ir := EditIR{}
 	ce := fmt.Errorf("没有DSL")
 	if p.EditDSL != nil {
-		ir, ce = compileEdit(*p.EditDSL, p.Assets)
+		ir, ce = compileProjectEdit(p, *p.EditDSL)
 	}
 	key := ""
 	if ce == nil {

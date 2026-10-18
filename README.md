@@ -1,4 +1,4 @@
-# RunDesk Video App · v0.21.0
+# RunDesk Video App · v0.22.0
 
 文字驱动视频制作。你提供正文与已有素材，点击“交给 RunDesk 制作”，由 RunDesk 驱动 Codex 调用 App 的 MCP 服务完成配音、选材、剪辑、渲染和检查。页面通过阶段卡片显示工作产物，修改要求继续在右侧对话提出。
 
@@ -26,6 +26,8 @@ news2douyin新导入包的审核正文直接作为独立口播输入；旧项目
 | 图片/视频生成 | 自定义http_binary_v1服务适配，支持目标时长/画幅/真实参考图；需适配器支持，非任意厂商原生API |
 | 剪辑与渲染 | 原生多轨DSL/FFmpeg；可选video_use共享目录EDL制作与私有成片归档；两种工程分别管理 |
 | 结果检查 | 实际成片指定时间单帧PNG、独立检查记录、终稿字节复核 |
+| 运行诊断 | 当前环境、认证配置、MCP工具与真实PNG传输；video_use额外检查适配器版本和共享目录双向读写 |
+| 按文字修改 | 可选剪辑textRefs绑定精确原文；查询当前或已归档成片的稳定镜头ID与剪辑时间 |
 
 App主程序为Go标准库与嵌入HTML/JS，无需Python或GPU。DSL渲染只需要FFmpeg/FFprobe，文字需要支持目标语言的字体。旧HyperFrames镜头模式仍需Node.js、Chromium及其原依赖。已有IndexTTS模型在独立服务中运行。
 
@@ -58,22 +60,25 @@ bash scripts/docker.sh token
 bash scripts/docker.sh doctor
 ```
 
-镜像默认rundesk-video-app:0.21.0。RunDesk的Codex工具运行环境和App渲染服务是各自的部署组件；首次环境与账户仍需配置。未在本次环境进行Docker或真实模型验收。
+镜像默认rundesk-video-app:0.22.0。RunDesk的Codex工具运行环境和App渲染服务是各自的部署组件；首次环境与账户仍需配置。未在本次环境进行Docker或真实模型验收。
 
 ## 本版变化与验证
 
-- 三阶段工作流：素材准备和对齐 → 剪辑 → 精修。一键发起，阶段产物可展开，初稿/调整/终稿另外记录。
-- 关联表持久化完整原文引用和素材选择；支持重复文字序号、真实视频选段、部分覆盖与具体未覆盖原文。所选素材字节、来源或正文改变后标记过期。
-- 视频生成支持目标时长、画幅、真实参考图和生成来源；成功后查看实际结果并关联文字。适配器须实现扩展可选字段，目标参数不是输出保证。
-- `video_asset_video_inspect`返回多张带时间点的真实PNG；图像抽查不代表完整运动或听音验收。
-- 可选`video_use`后端使用RunDesk video-build 1.2.0，将连续配音、图片、无声视频和字幕交给共享目录适配器；输入冻结、校验归档，终稿复核适配两种后端。原生DSL保留现有多轨、特效和音乐能力；video_use首版只实现单视觉轨连续配音，暂不支持原生DSL的所有特效。
-- 新增6项工具，共45项MCP。验证结果见[三阶段实现与验收](docs/THREE-STAGE-0.21.md)。真实Codex自主编排、真实生成模型、IndexTTS音质、图形浏览器、Windows运行和Docker部署仍需在实际环境验收。
+- 三阶段与一键制作保持不变。运行诊断和按原文定位放在“高级工具与诊断”，日常调整继续通过对话发起。
+- `video_runtime_diagnose`检查当前绑定、运行环境、认证配置及MCP工具；在已运行的Codex Docker容器内，通过当前MCP配置接收真实PNG并核对随机挑战。使用video_use时还验证共享目录双向读写、video-build1.3.0、适配器协议2和固定video-use源码版本。
+- 诊断不启动模型、不发起生成、不重建环境或切换镜像。`modelVisionVerified:false`明确表示没有验证模型理解图像；PNG传输通过不等于Codex实际看图正确。native不要求video_use和共享目录，本机模式未执行的容器检查明确列为未检查。
+- 原生DSL可选`textSourceHash`，两种后端的镜头均可选`textRefs:[{quote,occurrence?}]`，支持自由的多对多文字关联。`video_edit_locate`返回稳定镜头ID、剪辑时间、原文版本及未映射镜头；历史成片查询读取私有归档并校验指纹，过时结果不冒充当前工程。
+- 未引用背景和旧DSL/EDL继续有效，不自动猜造文字关联；正文变化后重新核对已有引用。DSL/EDL继续只约束剪辑，不限制内容表达。
+- 新增3项工具，共48项MCP。使用video_use新引用功能需升级RunDesk0.49.3，重建并选择video-build1.3.0镜像。仅替换源码包或镜像标签不会更新已经运行的容器。
+
+实现与验证边界见[诊断与文字引用](docs/DIAGNOSTICS-TEXTREFS-0.22.md)。三阶段历史设计见[v0.21记录](docs/THREE-STAGE-0.21.md)。真实Codex自主制作、视觉理解、生成模型、IndexTTS音质、图形浏览器、Windows运行和Docker部署仍需在实际环境验收。
 
 可选video-use部署见[共享目录与归档](docs/EXCHANGE-0.21.md)。App与RunDesk容器共享同一个应用工作目录；App私人项目数据单独保存。使用`docker/compose.video-use.yaml`叠加挂载，`VIDEO_EXCHANGE_HOST_WORKSPACE`设为已经存在的RunDesk视频应用工作区绝对路径，冻结文件使用私有权限，两边须映射为同一个宿主UID；常规Docker令App的VIDEO_UID/VIDEO_GID与RunDesk服务一致。
 
 ## 文档
 
-- [v0.21设计与验收](docs/THREE-STAGE-0.21.md)、[升级](docs/UPGRADING.md)
+- [v0.22诊断与文字引用](docs/DIAGNOSTICS-TEXTREFS-0.22.md)、[升级](docs/UPGRADING.md)
+- [v0.21三阶段设计与验收](docs/THREE-STAGE-0.21.md)
 - [制作Skill](integrations/video-project/SKILL.md)、[指令设计](integrations/video-project/WORKFLOW-DESIGN.md)
 - [IndexTTS](docs/INDEXTTS.md)、[新闻交接](docs/NEWS-HANDOFF.md)
 - [剪辑DSL](docs/EDIT-DSL.md)、[Schema](schemas/edit-dsl-v1.json)、[生成适配协议](docs/GENERATION-0.15.md)

@@ -28,7 +28,7 @@ import (
 	"time"
 )
 
-const version = "0.21.0"
+const version = "0.22.0"
 
 //go:embed web/*
 var ui embed.FS
@@ -420,6 +420,9 @@ func (a *App) routes() http.Handler {
 		writeJSON(w, 200, map[string]any{"ready": true, "version": version})
 	})
 	m.HandleFunc("POST /api/mcp", a.mcpHTTP)
+	m.HandleFunc("POST /api/diagnostics/image", a.runtimeDiagnosticImage)
+	m.HandleFunc("POST /api/projects/{id}/diagnostics", a.runtimeDiagnose)
+	m.HandleFunc("POST /api/projects/{id}/edit/locate", a.editLocate)
 	m.HandleFunc("GET /api/runtime", a.runtimeStatus)
 	m.HandleFunc("POST /api/runtime/prepare", a.runtimePrepare)
 	m.HandleFunc("GET /api/speech/capabilities", a.speechCapabilities)

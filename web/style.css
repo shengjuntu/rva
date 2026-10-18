@@ -797,5 +797,21 @@ dialog p {
 .workflow-backend select { width:auto; max-width:220px; }
 #connection-settings { margin:12px 0; }
 #connection-settings #connect { width:100%; }
+.diagnostic-row,.located-clip { border-top:1px solid var(--line); padding:12px 0; overflow-wrap:anywhere; }
+.diagnostic-row:first-child { border-top:0; }
+.diagnostic-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.diagnostic-heading strong,.located-clip strong { font-size:13px; }
+.diagnostic-row p,.located-clip p { margin:6px 0; }
+.diagnostic-state { font-size:11px; border-radius:12px; padding:2px 8px; background:#f0f3f2; color:#677a72; white-space:nowrap; }
+.diagnostic-state[data-state="passed"] { background:#e8f3ed; color:#286a4c; }
+.diagnostic-state[data-state="failed"],.diagnostic-state[data-state="blocked"] { background:#fff0e9; color:#9d583f; }
+#runtime-diagnostics pre,#quote-locator pre { white-space:pre-wrap; overflow-wrap:anywhere; max-height:260px; overflow:auto; font-size:12px; background:#f5f7f6; padding:10px; border-radius:6px; }
+#runtime-diagnostics summary,#quote-locator summary { cursor:pointer; font-size:13px; color:var(--green); }
+#quote-locator { margin:16px 0; padding-top:12px; border-top:1px solid var(--line); }
+#quote-locator textarea { margin:8px 0; }
+.locator-options { display:flex; align-items:flex-end; gap:14px; flex-wrap:wrap; margin:10px 0; }
+.locator-options label { flex:1; min-width:170px; }
+.locator-options input,.locator-options select { margin-top:5px; width:100%; }
+.located-clip .row { margin-top:10px; }
 @media (max-width:1150px) { .production-materials { align-items:flex-start; flex-direction:column; } .production-materials .row { justify-content:flex-start; } }
 @media (max-width:850px) { .production-input { padding:17px; } .production-board { grid-template-columns:1fr; } }

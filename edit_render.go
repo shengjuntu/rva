@@ -28,7 +28,7 @@ func (a *App) renderEditDSL(ctx context.Context, p Project, job Render) {
 	}
 	ir := EditIR{}
 	if e == nil {
-		ir, e = compileEdit(*p.EditDSL, p.Assets)
+		ir, e = compileProjectEdit(p, *p.EditDSL)
 	}
 	if e == nil {
 		e = atomicJSON(filepath.Join(dir, "snapshot.json"), p)

@@ -1,9 +1,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"math"
 	"os"
 	"os/exec"
@@ -11,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 const exchangeVideoUseCommit = "43cfc566833548093455c9d4a46bd69913b7e552"
@@ -22,25 +25,49 @@ type exchangeCanvas struct {
 }
 
 type exchangeEDL struct {
-	SchemaVersion int            `json:"schemaVersion"`
-	Canvas        exchangeCanvas `json:"canvas"`
-	Clips         []struct {
-		ID       string   `json:"id"`
-		AssetID  string   `json:"assetId,omitempty"`
-		Path     string   `json:"path"`
-		Type     string   `json:"type"`
-		Start    *float64 `json:"start"`
-		Duration float64  `json:"duration"`
-		SourceIn float64  `json:"sourceIn,omitempty"`
-		Fit      string   `json:"fit,omitempty"`
-		Note     string   `json:"note,omitempty"`
-	} `json:"clips"`
-	Subtitles struct {
+	SchemaVersion int               `json:"schemaVersion"`
+	Canvas        exchangeCanvas    `json:"canvas"`
+	Clips         []exchangeEDLClip `json:"clips"`
+	Subtitles     struct {
 		FontName string   `json:"fontName,omitempty"`
 		FontSize *float64 `json:"fontSize,omitempty"`
 		MarginV  *float64 `json:"marginV,omitempty"`
 	} `json:"subtitles,omitempty"`
 	Notes string `json:"notes,omitempty"`
+}
+type exchangeEDLClip struct {
+	ID       string          `json:"id"`
+	AssetID  string          `json:"assetId,omitempty"`
+	Path     string          `json:"path"`
+	Type     string          `json:"type"`
+	Start    *float64        `json:"start"`
+	Duration float64         `json:"duration"`
+	SourceIn float64         `json:"sourceIn,omitempty"`
+	Fit      string          `json:"fit,omitempty"`
+	Note     string          `json:"note,omitempty"`
+	TextRefs []TextReference `json:"textRefs,omitempty"`
+}
+
+func (v *exchangeEDLClip) UnmarshalJSON(raw []byte) error {
+	type plain exchangeEDLClip
+	var p plain
+	d := json.NewDecoder(bytes.NewReader(raw))
+	d.DisallowUnknownFields()
+	if !utf8.Valid(raw) {
+		return errors.New("EDL镜头必须使用有效UTF-8")
+	}
+	if err := d.Decode(&p); err != nil {
+		return err
+	}
+	var fields map[string]json.RawMessage
+	if err := json.Unmarshal(raw, &fields); err != nil {
+		return err
+	}
+	if value, ok := fields["textRefs"]; ok && bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+		return errors.New("textRefs必须是引用数组，不能为null")
+	}
+	*v = exchangeEDLClip(p)
+	return nil
 }
 
 // Validate independently of adapter status: successful JSON alone is not evidence
@@ -59,6 +86,19 @@ func validateProductionExchange(ctx context.Context, archive, inputs *os.Root, r
 	var edl exchangeEDL
 	if err := exchangeJSON(archive, "edit-ir.json", 4<<20, &edl); err != nil {
 		return errors.New("EDL字段或结构无效")
+	}
+	source, err := readFrozenExchangeText(inputs, manifest, run.SourceHash)
+	if err != nil {
+		return err
+	}
+	anyTextRefs := false
+	for _, clip := range edl.Clips {
+		if err := validateTextReferences(source, clip.TextRefs); err != nil {
+			return errors.New("EDL原文引用无效: " + err.Error())
+		}
+		if len(clip.TextRefs) > 0 {
+			anyTextRefs = true
+		}
 	}
 	c := edl.Canvas
 	if edl.SchemaVersion != 1 || c.Width < 64 || c.Width > 3840 || c.Width%2 != 0 || c.Height < 64 || c.Height > 3840 || c.Height%2 != 0 || !finite(c.FPS) || c.FPS < 1 || c.FPS > 60 || len(edl.Clips) < 1 || len(edl.Clips) > 300 {
@@ -119,6 +159,13 @@ func validateProductionExchange(ctx context.Context, archive, inputs *os.Root, r
 	for key, want := range map[string]any{"schemaVersion": float64(1), "engine": "video_use", "upstreamCommit": exchangeVideoUseCommit, "projectId": completion.ProjectID, "productionRunId": run.ID, "sourceHash": run.SourceHash, "inputHash": run.InputHash, "edlHash": editHash, "narrationSHA256": manifest.Narration.SHA256, "passed": true} {
 		if !exchangeScalarEqual(report[key], want) {
 			return errors.New("适配器验证报告未通过或未绑定当前输入与EDL")
+		}
+	}
+	if anyTextRefs {
+		version, ok := report["adapterVersion"].(float64)
+		refs, refsOK := report["textReferences"].(map[string]any)
+		if !ok || version < 2 || !refsOK || refs["sourceVerified"] != true {
+			return errors.New("带原文引用的EDL需要第2版适配器及原文校验报告")
 		}
 	}
 	checks, ok := report["checks"].([]any)
@@ -244,4 +291,22 @@ func exchangeFrameRate(raw string) (float64, error) {
 		}
 	}
 	return numerator / denominator, nil
+}
+
+// manifest.TextPath is already bound by the frozen manifest hash. Verify the
+// exact narration bytes as well, before accepting any editorial quote metadata.
+func readFrozenExchangeText(root *os.Root, manifest ExchangeManifest, sourceHash string) (string, error) {
+	if !exchangeDigest.MatchString(sourceHash) || manifest.SourceHash != sourceHash || !exchangeRelative(manifest.TextPath) {
+		return "", errors.New("冻结原文路径或指纹无效")
+	}
+	f, err := exchangeOpen(root, manifest.TextPath, 4<<20)
+	if err != nil {
+		return "", errors.New("冻结原文不可读")
+	}
+	defer f.Close()
+	b, err := io.ReadAll(io.LimitReader(f, (4<<20)+1))
+	if err != nil || len(b) > 4<<20 || !utf8.Valid(b) || hashBytes(b) != sourceHash {
+		return "", errors.New("冻结原文与主播稿指纹不一致")
+	}
+	return string(b), nil
 }

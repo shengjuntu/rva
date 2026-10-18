@@ -24,6 +24,16 @@ TTS 使用实际合成块时序，可能带静音补齐，不冒充逐字对齐�
 
 `video_production_run_prepare` 冻结并导出当前第一阶段输入；Agent 按返回路径写 EDL 并调用适配器；`video_production_run_ingest` 验证、归档真实成片。适配器第一版提供连续外部配音、图片/视频单视觉轨道和字幕，不声称具有原生叠层/音乐的全部能力。精修新建生产快照，沿用剪辑决策并刷新导出路径，不修改已归档工程和输出。
 
+## 运行诊断与按文字定位剪辑
+
+video_use 在付费生成和准备生产快照前调用 `video_runtime_diagnose(projectId)`；同次制作且环境和配置未变化时复用成功结果，新一轮制作或环境变化再检查，不在每条消息重复执行检查。逐项读取 passed/failed/blocked/not_checked，针对本次需要的路径、权限、版本和服务处理真实阻塞；不因诊断自动重建环境、切换镜像或安装工具。文字引用功能要求 video-build profile 1.3.0、adapter contract 2。PNG 传输成功只能证明工具图像在链路上传递；返回的 `modelVisionVerified:false` 不代表已经通过实际模型视觉验证，也不单独阻塞全部制作。
+
+原生 DSL 可选 `textSourceHash` 绑定保存正文的精确哈希；剪辑片段可选 `textRefs:[{quote,occurrence?}]`，一个片段可引用多处文字，多片段也可引用同一处文字。video-use EDL 片段使用同样的可选引用，但绑定生产快照 manifest 的 `textPath` 和 `sourceHash`，不增加顶层 `textSourceHash`。重复或重叠出现的引用要给出从 1 开始的次序；无文字关联的背景镜头和旧工程继续有效。
+
+“这一句换图”这类修改先用 `video_edit_locate(projectId,quote,occurrence?,renderId?)` 查询精确原文，取得稳定 clip ID、剪辑时间及已匹配引用。读取 current、正文哈希和输出/生产快照身份，避免把历史成片的时间直接用于已经改变的当前工程。无匹配和 unmappedClipIds 明确暴露缺口，不根据相似语义猜造关联；多个匹配可按指令和上下文处理，无须一律暂停确认。局部调整保留无关 ID、文字引用和素材；正文变化后重新验证引用与配音时序。
+
+剪辑引用是可编辑的关联记录，不是逐字对齐或事实真实性证明。语义选材仍需真实看图和来源核查，实际切点仍依据配音与剪辑判断。
+
 ## 参考与验证边界
 
 借鉴 [browser-use/video-use](https://github.com/browser-use/video-use) 的文本驱动编辑、项目记录和输出检查。输入以用户撰写的主播稿为主，因此没有照搬从原始视频转写开始的流程，也没有在每次视觉切点对连续配音做淡化。

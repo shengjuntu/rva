@@ -246,7 +246,7 @@ func (a *App) productionBoard(w http.ResponseWriter, r *http.Request) {
 	}
 	edit := ProductionCard{ID: "edit", Title: "剪辑方案", State: "empty", Summary: "尚未保存剪辑方案", Items: []ProductionItem{}}
 	if p.EditDSL != nil {
-		ir, err := compileEdit(*p.EditDSL, p.Assets)
+		ir, err := compileProjectEdit(p, *p.EditDSL)
 		if err != nil {
 			edit.State = "failed"
 			edit.Summary = "当前剪辑无法编译"
