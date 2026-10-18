@@ -1,288 +1,261 @@
-================================================================================
-rundesk-video-app (RVA)  —  Video Production Workbench for RunDesk/Codex
-视频制作工作台（RunDesk/Codex 自动化视频生产）
-================================================================================
+rundesk-video-app (RVA) · v0.24.0
+视频制作工作台 / Video Production Workbench for RunDesk/Codex
 
-【中文版】  [English below]
+【中文版】 English follows below.
 
-一、这是什么
-----------------------------------------------------------------------
-rundesk-video-app（简称 RVA / video-app）是一个用 Go 编写的视频制作工作台。
-它负责：视频项目的创建与管理、文字稿（narration）的配音（TTS）、
-图片/视频素材的生成与组织、编辑指令（Edit DSL）的执行、以及最终成片的
-渲染、校验与归档。它把"制作"这件事交给 RunDesk / Codex（AI Agent），
-自己则负责请求、任务、产物校验和保存——分工清晰、可审计。
+一、日常使用
 
-典型用法：你在 Web 工作台（http://<host>:3220）里写一段口播稿，
-App 调用 TTS 生成配音 → 生成/挑选配图 → Agent 按编辑 DSL 排布 →
-渲染成片并校验存档。整个过程可以由 RunDesk 里的 Agent 自动驱动。
+提供正文和已有素材，点击“开始制作”，查看成片，再通过对话修改。
+RunDesk/Codex 决定分镜、选材、生成、配音、动画和重做；Video App 提供
+制作 MCP、版本检查、素材与成片保存。正文是内容依据，画面服务文字。
+不要求一句话一张图，也不把正文段落固定投影为镜头模板。
 
-二、核心能力
-----------------------------------------------------------------------
-1) 项目与素材管理：项目快照、素材（图片/视频）入库、校验与私有归档。
-2) 配音（TTS）：IndexTTS 等后端；支持字幕（SRT）、语速/时长测量。
-3) 图片/视频生成适配器：通过 http_binary_v1 协议对接任意外部生成服务
-   （图片/视频生成 URL、模型、密钥均可配置），App 负责幂等与产物校验。
-4) 编辑 DSL：声明式编辑指令（文本/图片排版、时间线、替换），
-   支持文本引用（textrefs）与增量补丁（edit patches）。
-5) 三阶段生产交换（v0.21+）：prepare → Agent 渲染 → ingest，
-   输入快照冻结、产物哈希校验、私有归档，适合生产流水线。
-6) 运行态诊断与文本引用（v0.22+）：诊断图片输出、文本引用解析等。
-7) MCP 接口：通过 MCP 暴露给 RunDesk/Codex，Agent 可调用
-   video_job_start / video_job_get / video_production_run_* 等工具。
+1. 首次打开可自动建立空项目；也可从项目列表新建、打开或重命名项目。
+2. 粘贴或导入 TXT/Markdown 正文，导入本地素材目录或文件，补充制作要求。
+   目录恰好有一份 TXT/MD 且正文为空时，会将其载入正文草稿；已有正文
+   不会被自动覆盖。多份文本全部保留，由用户显式选择“作为正文”。
+3. 点击“开始制作”。程序先保存最新正文与要求，再交给 RunDesk。
+   未发送的对话草稿仍保留，不会自动变成这次初稿的制作指令。
+4. 在“视频与版本”查看已完成成片或历史版本，下载选定的 MP4；
+   不满意时通过对话提出修改。完整输出须在实际观看后再确认为终稿。
 
-三、架构速览
-----------------------------------------------------------------------
-                        +---------------------------+
-                        |   RunDesk / Codex (Agent)  |
-                        |   - 制作视频（渲染/编排）   |
-                        +-------------+--------------+
-                                      | MCP / HTTP
-                                      v
-   +-----------------------------+  http_binary_v1   +----------------------+
-   |      video-app (Go)          |<---------------->|  外部生成适配器       |
-   |  请求/任务/校验/保存/归档    |  POST /image|/video |  (可插拔：图片/视频)  |
-   |  TTS、EDL、生产交换、MCP     |   200 = 原始二进制  |  如 ComfyUI H3 适配器  |
-   +-----------------------------+                    +----------------------+
-              |
-              | ffmpeg / chromium / node(渲染器)
-              v
-         成片（H.264/AAC MP4）+ 字幕 + 校验报告
+未发送的对话、正文和要求草稿按项目保存在本机浏览器；正式对话历史由
+RunDesk 事件重放。接收情况不确定时确认原提交，沿用原 requestId 和内容，
+不要换编号重复启动。停止操作不保证远端模型已经停止或释放显存。
 
-- video-app 是"裁判与仓库"：它不直接跑模型，只负责编排、校验与存档。
-- 生成能力通过 VIDEO_IMAGE_GEN_URL / VIDEO_VIDEO_GEN_URL 指向外部适配器。
-- 适配器协议：POST JSON {"schema":"video.generation-request.v1","requestId":...,
-  "type":"image_generation|video_generation","model":...,"prompt":...}
-  成功响应 = HTTP 200 + 原始 PNG/JPEG/MP4 字节（非 URL、非 Base64、非异步）。
-- 限制：图片 ≤32MiB/3200万像素，视频 ≤128MiB 且 ≤100s（ffprobe 校验）。
+主页面只有项目、输入、简要状态、成片和对话。手动 TTS、渲染、DSL、对齐、
+多轨时间线、源码和详细工具日志不在本版 UI 中；详细执行与调试在 RunDesk。
+旧后台接口保留供 Agent 和既有集成使用，不需要恢复旧手动控制台。
 
-四、快速开始（Docker）
-----------------------------------------------------------------------
-1) 准备源码与配置文件（docker/.env 由 docker/.env.example 复制而来）：
-     cd rundesk-video-app
-     cp docker/.env.example docker/.env
-     编辑 docker/.env：设置 RUNDESK_URL / RUNDESK_TOKEN 等。
+二、后台能力与边界
 
-2) 构建并启动：
-     cd docker
-     docker compose up -d --build
-   （network_mode: host；App 监听 0.0.0.0:3220；数据目录 VIDEO_HOST_DATA）
+- 新项目默认 HyperFrames：Agent 编写 HTML/CSS/JavaScript/GSAP，绑定真实
+  素材，App 冻结工程、检查并保存实际视频。声明的时间线不是逐帧验证证据。
+- IndexTTS：连接已部署的 HTTP 语音服务；eSpeak 用于机械预览。实际合成
+  片段的测量时序不等于逐字强制对齐，也不代表完成听审。
+- 图片/视频生成：支持 http_binary_v1 服务；另内置 ComfyUI MiniMax-H3
+  文生视频客户端，无需为 H3 再启动一层生成适配器。
+- 素材观察与文字关联：真实图片/抽帧、精确原文引用、素材来源和选择理由。
+  检索与记录不等于模型已经理解全部画面或核实新闻事实。
+- 旧项目的 native DSL/FFmpeg、video_use EDL 和旧镜头工程继续保留原后端。
+  video_use 的 prepare/Agent-render/ingest 是可选兼容流程，使用专用共享
+  工作目录；HyperFrames 主流程不需要它，也不读取 RunDesk 私人数据目录。
 
-3) 打开工作台：
-     http://<服务器IP>:3220/
-   API/MCP： http://<服务器IP>:3220/api/mcp  （Authorization: Bearer <token>）
+素材准备与对齐、剪辑、精修是后台产物分类，可以往返处理，不是用户必须
+逐项点击的流程。工具成功、检查通过和 Agent 自检都不代替具体输出的人审。
 
-4) 验证健康：
-     docker ps --filter name=rundesk-video-video-app-1
-     curl -s -o /dev/null -w '%{http_code}' http://127.0.0.1:3220/
+三、启动与 Docker 部署
 
-五、主要环境变量
-----------------------------------------------------------------------
-  VIDEO_LISTEN            监听地址（默认 0.0.0.0:3220）
-  VIDEO_APP_PUBLIC_URL    对外访问地址（如 http://192.168.0.234:3220）
-  VIDEO_APP_MCP_URL       MCP 端点（供 RunDesk 桥接容器使用）
-  RUNDESK_URL / RUNDESK_TOKEN   RunDesk 服务地址与令牌
-  VIDEO_TTS_BACKEND/URL/MODEL/VOICE/LANGUAGE/TIMEOUT/API_KEY   配音后端
-  VIDEO_IMAGE_GEN_URL/MODEL/KEY   图片生成适配器（http_binary_v1）
-  VIDEO_VIDEO_GEN_URL/MODEL/KEY   视频生成适配器（http_binary_v1）
-  VIDEO_UID/VIDEO_GID     容器运行 UID/GID
-  VIDEO_HOST_DATA         持久数据目录（默认 ../.state/video）
+已有渲染依赖时，本机启动示例：
+  VIDEO_DATA=./data VIDEO_FONT=/absolute/path/to/NotoSansCJK-Regular.ttc bash scripts/start.sh
 
-六、代码结构与模块
-----------------------------------------------------------------------
-  main.go / bridge.go        服务入口、HTTP 与 MCP 桥接
-  generation.go              生成任务与 http_binary_v1 适配器客户端
-  exchange_validation.go     三阶段生产交换（prepare/ingest）校验
-  edit_dsl.go / edit_patch.go / edit_text_refs.go  编辑 DSL、补丁、文本引用
-  alignment.go / audio.go / speech / subtitles   对齐、TTS、字幕
-  asset_preview.go / diagnostic_image.go          素材预览、诊断输出
-  jobs.go / capabilities.go  任务队列、能力目录
-  web/                       前端工作台（Node/hyperframes 渲染器）
-  docker/                    Dockerfile / compose / 健康检查
-  docs/                      协议与设计文档（GENERATION-0.15、EXCHANGE-0.21 等）
+默认地址 http://127.0.0.1:3220。令牌保存在 data/access-token，或设置至少
+24 字符的 VIDEO_APP_TOKEN。源码构建使用 bash scripts/build.sh。
+HyperFrames 需要 Node.js 22+、Chromium、HyperFrames 0.8.87、GSAP 3.15.0、
+FFmpeg/FFprobe 和字体；scripts/start.sh 显式传入已安装的 HyperFrames/GSAP
+路径。新本机环境可使用 scripts/setup-renderer.sh 准备渲染依赖，已有环境
+不必重装；随包 App Dockerfile 在构建时准备这些依赖。
+IndexTTS 和 ComfyUI 模型在独立服务运行，App 镜像不加载 GPU 模型权重。
 
-七、版本历史（本仓库按版本打 tag：v0.2.0 → v0.22.0）
-----------------------------------------------------------------------
-  v0.2.0   初始版本
-  v0.3.0   基础服务
-  v0.5.0 / v0.5.1   功能扩展
-  v0.6.0   （大版本，含 bin 二进制）
-  v0.7.0   Docker 化部署
-  v0.8.0 / v0.8.1   IndexTTS 配音接入
-  v0.10.0  服务基础（service foundation）
-  v0.11.0  编辑 DSL
-  v0.12.0  口播工作流（narration workflow）
-  v0.13.0  Agent 技能工作流（workflow skills）
-  v0.15.0  图片/视频生成适配器（generation adapter，http_binary_v1）
-  v0.16.0  编辑补丁（edit patches）
-  v0.17.0  编辑重做（edit redo）
-  v0.18.0  预览与终稿（preview/final）
-  v0.19.0  渲染缓存（render cache）
-  v0.20.0  文本驱动工作台（text-driven workbench）
-  v0.21.0  三阶段生产交换（three-stage video-use）
-  v0.22.0  运行态诊断与文本引用（runtime diagnostics & textrefs）
+Linux Docker Engine + Compose v2：
+  bash scripts/docker.sh init
+  # 编辑 docker/.env：保留已有数据路径、地址、令牌和服务设置。
+  # 旧安装显式更新 VIDEO_IMAGE=rundesk-video-app:0.24.0。
+  bash scripts/docker.sh build
+  bash scripts/docker.sh up
+  bash scripts/docker.sh token
+  bash scripts/docker.sh doctor
 
-八、与 RunDesk / Codex 的关系
-----------------------------------------------------------------------
-RunDesk 是承载 AI Agent（如 Codex）的编排平台。video-app 通过 MCP 暴露
-能力，Agent 可以在 RunDesk 会话里：创建项目、提交配音任务、调用
-video_job_start 发起图片/视频生成、用编辑 DSL 组装、触发生产交换渲染，
-最后 ingest 回成片。简单说：Agent 负责"怎么剪"，video-app 负责
-"剪得好不好、存得对不对"。
+init 不覆盖已有配置，up 不自动构建。沿用原 VIDEO_HOST_DATA，升级前等待
+活动任务结束并备份完整数据。App 渲染容器与 RunDesk 的 Agent 工具容器分别
+更新；已配置的 RunDesk 0.49.5 / video-build 1.4.0 可继续使用。认证、模型、
+Skills/MCP 和执行环境在 RunDesk 管理，不向 App 挂载 Docker socket。
 
-九、二次开发 / 集成新生成后端
-----------------------------------------------------------------------
-新视频/图片模型（如本地 ComfyUI MiniMax-H3）接入方式：
-  1) 实现一个 http_binary_v1 适配器（HTTP 服务，POST /video|/image 返回原始
-     MP4/PNG 字节；内部可调用 ComfyUI API：提交 /prompt → 轮询 /history →
-     下载 /view 产物）。
-  2) 在 docker/.env 设置 VIDEO_VIDEO_GEN_URL=http://<adapter>:<port>/video
-     与 VIDEO_VIDEO_GEN_MODEL=...，重启容器。
-  3) Agent/工作台即可通过现有 video_job_start(type=video_generation) 使用。
-  参考 docs/GENERATION-0.15.md 与 docs/EXCHANGE-0.21.md。
+详见 docs/DOCKER.md、docs/UPGRADING.md。更换 RunDesk 服务或机器不意味着
+旧会话、认证和秘密会自动迁移；先核对原有绑定和各自持久目录。
 
-十、验证与测试
-----------------------------------------------------------------------
-  go vet ./... && go test ./...      单元测试（含 generation、exchange 契约）
-  docker compose up -d --build       容器级部署验证
-  bin/video-app --version            版本自检
-  浏览器打开工作台 → 新建项目 → 写口播稿 → 配音 → 出片
+四、IndexTTS 与 ComfyUI 配置
 
---------------------------------------------------------------------------------
+打开主页面“设置”进入 /settings.html，保存 IndexTTS 地址、模型、音色、
+语言、超时和可选 API Key，再点“检查连接”。可读取服务提供的音色列表。
+已有 data/speech-config.json 继续沿用；非空 VIDEO_TTS_* 环境变量会使配音
+配置表单只读。完整变量名包括 VIDEO_TTS_TIMEOUT_SECONDS。
 
-================================================================================
-ENGLISH VERSION
-================================================================================
+  VIDEO_TTS_BACKEND=indextts
+  VIDEO_TTS_URL=http://127.0.0.1:8092/v1/audio/speech
+  VIDEO_TTS_MODEL=IndexTeam/IndexTTS-2.5
+  VIDEO_TTS_VOICE=news_zh
+  VIDEO_TTS_LANGUAGE=zh
+  VIDEO_TTS_TIMEOUT_SECONDS=180
+  VIDEO_TTS_API_KEY=
 
-WHAT IT IS
-----------------------------------------------------------------------
-rundesk-video-app (RVA / video-app) is a video production workbench written in
-Go. It manages video projects, narration (TTS voiceover), image/video asset
-generation, declarative edit instructions (Edit DSL), and final render,
-validation and archiving. It deliberately leaves "making the video" to
-RunDesk/Codex AI agents, while the App itself owns requests, jobs, artifact
-validation and storage — clean separation, fully auditable.
+服务须直接返回 WAV。Gradio 网页或返回 JSON 文件路径的接口不能直接使用；
+可在已有 IndexTTS 环境运行 integrations/indextts/server.py，复用现有模型。
+配置、适配器与命令行 speech-doctor 见 docs/INDEXTTS.md。
 
-Typical flow: author a script in the web workbench (http://<host>:3220),
-the App generates TTS narration, generates/selects images, an agent lays out
-the video with Edit DSL, renders and archives the final cut. The whole flow
-can be driven automatically by an agent inside RunDesk.
+内置 H3 在 App 启动环境或 docker/.env 配置，修改后重启 App：
+  VIDEO_VIDEO_GEN_URL=comfy://127.0.0.1:19897
+  VIDEO_VIDEO_GEN_MODEL=minimax_h3_fl2va
+  VIDEO_VIDEO_GEN_KEY=
+  VIDEO_COMFY_H3_AUDIO_GAIN_DB=18
 
-CORE FEATURES
-----------------------------------------------------------------------
-- Project & asset management: snapshots, media (image/video) ingestion,
-  validation, private archiving.
-- TTS voiceover: IndexTTS and other backends; subtitles (SRT), duration/timing.
-- Image/video generation via http_binary_v1 adapters: pluggable external
-  generation endpoints (URL/model/key configurable); App handles idempotency
-  and artifact validation.
-- Edit DSL: declarative editing (text/image layout, timeline, replacements),
-  text references (textrefs) and incremental edit patches.
-- Three-stage production exchange (v0.21+): prepare -> agent render -> ingest,
-  frozen input snapshot, hash validation, private archive.
-- Runtime diagnostics & textrefs (v0.22+).
-- MCP interface exposed to RunDesk/Codex: video_job_start, video_job_get,
-  video_production_run_* etc.
+ComfyUI 需预装原工作流的节点和模型。comfy:// 连接指定主机/端口的 HTTP
+服务，可选 KEY 用作 Bearer。默认保留安静音轨的 +18dB 增益修复并限幅；
+设为 0 可保留原始媒体，不声称已经完成响度或音质验收。
+当前仅文生视频，参考图请求明确拒绝。默认 124 帧、24fps，目标时长换算后
+限制在 124..362 帧；目标 60 秒不能生成 60 秒。任务记录目标、生效参数和
+调整说明，产物实际时长以媒体探测为准。H3 素材原声不等于 IndexTTS 主播
+配音，最终混音由 Agent 明确安排。详见 docs/COMFYUI-H3.md。
 
-ARCHITECTURE
-----------------------------------------------------------------------
-   RunDesk / Codex (Agent: renders/orchestrates)
-        |  MCP / HTTP
-        v
-   video-app (Go): requests / jobs / validation / storage / TTS / EDL / MCP
-        |  http_binary_v1  POST /image|/video  -> 200 = raw bytes
-        v
-   External generation adapters (pluggable; e.g. ComfyUI MiniMax-H3 adapter)
-        |
-        v
-   Final video (H.264/AAC MP4) + subtitles + validation report
+通用 VIDEO_IMAGE_GEN_URL/MODEL/KEY 与 VIDEO_VIDEO_GEN_URL/MODEL/KEY
+仍支持 http_binary_v1：POST JSON，成功直接返回原始 PNG/JPEG/MP4 字节，
+不接受下载 URL、Base64 JSON 或异步任务对象。同一进程的视频生成配置
+当前选择内置 H3 或一个通用适配器。协议见 docs/GENERATION-0.15.md。
 
-- video-app is the "judge & warehouse": it never runs models itself.
-- Generation is delegated to adapters configured via
-  VIDEO_IMAGE_GEN_URL / VIDEO_VIDEO_GEN_URL.
-- Adapter contract: POST JSON {"schema":"video.generation-request.v1",
-  "requestId":..., "type":"image_generation|video_generation",
-  "model":..., "prompt":...}  -> HTTP 200 + raw PNG/JPEG/MP4 bytes
-  (no download URLs, no base64 JSON, no async polling).
-- Limits: image <=32MiB / 32MP; video <=128MiB and <=100s (ffprobe checked).
+五、探测、测试与升级边界
 
-QUICK START (Docker)
-----------------------------------------------------------------------
-  1) Prepare config:
-       cd rundesk-video-app
-       cp docker/.env.example docker/.env
-       edit docker/.env (set RUNDESK_URL / RUNDESK_TOKEN ...)
-  2) Build & run:
-       cd docker && docker compose up -d --build
-     (network_mode: host; listens on 0.0.0.0:3220; data in VIDEO_HOST_DATA)
-  3) Open http://<server-ip>:3220/  (API/MCP: /api/mcp, Bearer token)
-  4) Health: docker ps --filter name=rundesk-video-video-app-1
+设置页展示部署配置并可请求服务发现；GET /api/capabilities?probe=1 或 MCP
+video_capabilities_get(probe=true) 用于受支持的只读探测。IndexTTS 模型列表、
+ComfyUI 系统/节点信息可达，都不等于已实际合成、生成或验收模型质量。
+Docker doctor 检查 App、渲染依赖、RunDesk 和现有配音连接；不执行 GPU
+推理，也不是一次 ComfyUI 视频生成测试。详细运行诊断在 RunDesk 查看。
 
-KEY ENVIRONMENT VARIABLES
-----------------------------------------------------------------------
-  VIDEO_LISTEN / VIDEO_APP_PUBLIC_URL / VIDEO_APP_MCP_URL
-  RUNDESK_URL / RUNDESK_TOKEN
-  VIDEO_TTS_BACKEND|URL|MODEL|VOICE|LANGUAGE|TIMEOUT_SECONDS|API_KEY
-  VIDEO_IMAGE_GEN_URL|MODEL|KEY        (image adapter, http_binary_v1)
-  VIDEO_VIDEO_GEN_URL|MODEL|KEY        (video adapter, http_binary_v1)
-  VIDEO_UID / VIDEO_GID / VIDEO_HOST_DATA
+测试入口：
+  go vet ./...
+  go test ./...
+  node --test tests/*.test.cjs          # 需独立安装 jsdom 开发依赖
+  bin/video-app speech-doctor --data ./data
+  bin/video-app --version
 
-CODE MAP
-----------------------------------------------------------------------
-  bridge.go / main.go      HTTP & MCP bridge, entrypoint
-  generation.go            generation jobs + http_binary_v1 adapter client
-  exchange_validation.go   three-stage production exchange validation
-  edit_dsl.go / edit_patch.go / edit_text_refs.go   editing
-  alignment.go / audio.go / speech / subtitles      TTS & timing
-  asset_preview.go / diagnostic_image.go            preview & diagnostics
-  jobs.go / capabilities.go                         job queue & capabilities
-  web/                     frontend (Node/hyperframes renderer)
-  docker/                  Dockerfile / compose / healthcheck
-  docs/                    protocol docs (GENERATION-0.15, EXCHANGE-0.21, ...)
+本轮合并保留 shengjuntu/rva 的 065e4c7 及之前的内置 H3、音轨修复和双语
+说明，加入 HyperFrames 与极简工作台。历史：v0.8 IndexTTS，v0.11 native
+DSL，v0.21 video_use 交换，v0.23 HyperFrames，v0.23.1 极简界面，v0.24.0
+合并与生成服务完善。旧版本页面操作说明仅用于理解历史，不是当前入口。
 
-VERSION HISTORY (tags v0.2.0 -> v0.22.0)
-----------------------------------------------------------------------
-  v0.2.0   initial
-  v0.3.0   base service
-  v0.5.0 / v0.5.1   feature extensions
-  v0.6.0   major release (with binaries)
-  v0.7.0   dockerized deployment
-  v0.8.0 / v0.8.1   IndexTTS voiceover
-  v0.10.0  service foundation
-  v0.11.0  edit DSL
-  v0.12.0  narration workflow
-  v0.13.0  workflow skills
-  v0.15.0  generation adapter (http_binary_v1)
-  v0.16.0  edit patches
-  v0.17.0  edit redo
-  v0.18.0  preview & final
-  v0.19.0  render cache
-  v0.20.0  text-driven workbench
-  v0.21.0  three-stage video-use production exchange
-  v0.22.0  runtime diagnostics & textrefs
+核对实际验证范围见 docs/validation-0.24.0.json。HTTP 模拟与本地媒体检查
+不代表用户 GPU、真实 IndexTTS 音质、H3 生成质量、Codex 创作或 Docker
+部署已经实机验收；Windows 二进制仅交叉编译。升级继续保留原项目、素材、
+会话和服务配置，降级恢复完整升级前备份。
 
-RELATION TO RUNDESK / CODEX
-----------------------------------------------------------------------
-RunDesk is an orchestration platform hosting AI agents (e.g. Codex).
-video-app exposes its capabilities over MCP; an agent inside RunDesk can
-create projects, submit TTS jobs, call video_job_start to generate images/
-videos, assemble with Edit DSL, trigger the production exchange render, and
-finally ingest the cut. In short: the agent decides "how to edit"; video-app
-decides "whether it is valid and correctly stored".
+English
 
-ADDING A NEW GENERATION BACKEND (e.g. local ComfyUI MiniMax-H3)
-----------------------------------------------------------------------
-  1) Implement an http_binary_v1 adapter: an HTTP service with
-     POST /video|/image returning raw MP4/PNG bytes; internally talk to
-     ComfyUI API (submit /prompt -> poll /history -> download /view).
-  2) Set VIDEO_VIDEO_GEN_URL=http://<adapter>:<port>/video and
-     VIDEO_VIDEO_GEN_MODEL=... in docker/.env; restart the container.
-  3) Agents/workbench can then use video_job_start(type=video_generation).
-  See docs/GENERATION-0.15.md and docs/EXCHANGE-0.21.md.
+1. Daily workflow
 
-VALIDATION / TESTING
-----------------------------------------------------------------------
-  go vet ./... && go test ./...     unit + contract tests
-  docker compose up -d --build       deployment verification
-  bin/video-app --version            version self-check
-  Workbench: new project -> script -> TTS -> render -> finalize
+Provide narration and local material, click Start production, review completed
+videos, then request changes in conversation. RunDesk/Codex decides the scenes,
+material, generation, voiceover, animation and revisions. Video App provides
+production MCP tools, revision checks, media storage and output history.
+Pictures follow the words; there is no mandatory sentence-to-shot template.
+
+The first launch can create an empty project. Import text and files, add optional
+requirements, and start. A folder containing exactly one TXT/MD file adopts it
+as a narration draft only when narration is empty. Existing text is preserved;
+multiple scripts require an explicit choice. Start saves current narration and
+requirements without automatically sending an unsent conversation draft.
+
+Watch completed versions, download the selected MP4, and describe changes in
+chat. Confirm a final only after reviewing that exact complete output. Local
+unsent drafts are stored per project; formal conversation is replayed from
+RunDesk events. An uncertain submission reuses its original request ID and
+content. Cancellation does not guarantee remote GPU work has stopped.
+
+This release has no manual TTS/render/DSL/alignment controls, multitrack editor,
+source viewer or detailed tool log in the main UI. Execution details belong in
+RunDesk. Existing backend interfaces remain available to agents and integrations.
+
+2. Production backends
+
+New projects default to HyperFrames. The agent authors HTML/CSS/JavaScript/GSAP
+with real asset bindings; App freezes, checks and renders each version. Declared
+timeline annotations do not prove that every rendered frame was verified.
+
+IndexTTS remains an independent HTTP voice service; eSpeak is a mechanical
+preview. Measured synthesis chunks are not forced word alignment or listening
+verification. Generated H3 audio is asset sound, not the narration voiceover.
+
+Generation supports generic http_binary_v1 services and a built-in ComfyUI
+MiniMax-H3 text-to-video client. Native DSL/FFmpeg, video_use EDL and legacy shot
+projects retain their original backend. The optional video_use exchange uses a
+dedicated shared workspace; the normal HyperFrames path does not require it.
+Preparation/alignment, editing and refinement are artifact categories, not a
+sequence of manual approvals. Successful tools do not establish factual accuracy
+or replace human review of the actual result.
+
+3. Startup and deployment
+
+With renderer dependencies installed:
+  VIDEO_DATA=./data VIDEO_FONT=/absolute/path/to/NotoSansCJK-Regular.ttc bash scripts/start.sh
+
+Default URL: http://127.0.0.1:3220. The access token is in data/access-token,
+or set VIDEO_APP_TOKEN to at least 24 characters. Build with bash scripts/build.sh.
+HyperFrames requires Node.js 22+, Chromium, HyperFrames 0.8.87, GSAP 3.15.0,
+FFmpeg/FFprobe and a font. scripts/start.sh passes the installed HyperFrames/GSAP
+paths. A new native setup can use scripts/setup-renderer.sh; an existing setup
+does not need reinstallation. The App Dockerfile installs renderer dependencies;
+IndexTTS and ComfyUI model weights run in separate services.
+
+For Linux Docker Engine and Compose v2:
+  bash scripts/docker.sh init
+  # Edit docker/.env; retain existing data paths, endpoints and credentials.
+  # Set VIDEO_IMAGE=rundesk-video-app:0.24.0 for an existing installation.
+  bash scripts/docker.sh build
+  bash scripts/docker.sh up
+  bash scripts/docker.sh token
+  bash scripts/docker.sh doctor
+
+init preserves existing configuration; up does not build. Back up the entire
+data directory after active tasks finish. Update the App renderer and RunDesk
+agent-tool containers separately. Existing RunDesk 0.49.5 / video-build 1.4.0
+can continue to be used. RunDesk owns model authentication, Skills/MCP and agent
+environments. Moving hosts or RunDesk services does not automatically transfer
+old sessions or secrets. See docs/DOCKER.md and docs/UPGRADING.md.
+
+4. IndexTTS and ComfyUI
+
+Open Settings (/settings.html) to save IndexTTS defaults and check connectivity.
+Existing speech-config.json remains in use. Nonempty VIDEO_TTS_* overrides make
+the speech configuration form readonly. Use VIDEO_TTS_TIMEOUT_SECONDS, not
+VIDEO_TTS_TIMEOUT. The full example is in the Chinese section and docs/INDEXTTS.md.
+The endpoint must return WAV directly; Gradio pages and JSON file paths are not
+supported. The bundled Python adapter can reuse an existing IndexTTS installation.
+
+Built-in ComfyUI H3 configuration, followed by an App restart:
+  VIDEO_VIDEO_GEN_URL=comfy://127.0.0.1:19897
+  VIDEO_VIDEO_GEN_MODEL=minimax_h3_fl2va
+  VIDEO_VIDEO_GEN_KEY=
+  VIDEO_COMFY_H3_AUDIO_GAIN_DB=18
+
+Install the workflow's models and nodes in ComfyUI first. The optional key is
+sent as Bearer authentication. Default +18dB audio gain with limiting preserves
+the quiet-audio fix; 0 retains the original media. This is not a loudness or
+listening-quality certification. The built-in path is text-to-video only and
+rejects reference images. It defaults to 124 frames at 24fps and clamps requested
+length to 124..362 frames; requesting 60 seconds does not produce 60 seconds.
+Requested and effective parameters are recorded; measured media duration is
+authoritative. See docs/COMFYUI-H3.md for exact models, options and limitations.
+
+Generic image/video services still use VIDEO_IMAGE_GEN_* / VIDEO_VIDEO_GEN_* and
+http_binary_v1: POST JSON, return raw PNG/JPEG/MP4 bytes. Download URLs, Base64 JSON
+and async job objects are not accepted. One App process selects either H3 or one
+generic video provider. See docs/GENERATION-0.15.md.
+
+5. Discovery and validation
+
+GET /api/capabilities?probe=1 or video_capabilities_get(probe=true) requests
+supported readonly service discovery. IndexTTS model lists and ComfyUI system/node
+information do not prove successful synthesis, video inference or model quality.
+Docker doctor checks App, renderer dependencies, RunDesk and existing speech
+connectivity; it never runs GPU inference or a ComfyUI generation test.
+
+Run go vet ./..., go test ./..., node --test tests/*.test.cjs (jsdom required),
+and bin/video-app speech-doctor --data ./data as appropriate. Check the actual
+release evidence in docs/validation-0.24.0.json. HTTP fixtures and local media
+tests do not certify the user's GPU, IndexTTS audio, H3 quality, Codex creativity
+or Docker deployment. Windows binaries are cross-compiled, not device-tested.
+
+This release preserves the shengjuntu/rva changes through 065e4c7, including H3,
+the audio fix and bilingual documentation, alongside HyperFrames and the minimal
+workbench. Historical milestones: v0.8 IndexTTS; v0.11 DSL; v0.21 video_use exchange;
+v0.23 HyperFrames; v0.23.1 minimal UI; v0.24.0 merged generation support. Historical
+UI instructions are not current navigation. Retain projects, assets, sessions
+and configuration on upgrade; restore a complete pre-upgrade backup to downgrade.

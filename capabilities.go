@@ -94,15 +94,45 @@ func (a *App) capabilityEnvelope(ctx context.Context, probe bool) CapabilityEnve
 	envelope.Capabilities = append(envelope.Capabilities, ProductionCapability{ID: "media", Implemented: true, Ready: true, Providers: []ProviderCapability{}, Tools: []string{"video_asset_list", "video_asset_import", "video_asset_inspect", "video_asset_video_inspect"}, Notes: []string{"图片/视频预览需要FFmpeg；inspect-video支持最多8个带时间点的真实视频帧，不包含听音或完整运动检查", "大文件通过已有multipart上传或页面目录导入，MCP导入限小文件"}, Limits: map[string]any{"uploadBytes": 256 << 20, "mcpImportBytes": 1 << 20}})
 	envelope.Capabilities = append(envelope.Capabilities, ProductionCapability{ID: "tts", Implemented: true, Ready: espeak.Ready || index.Ready, Providers: []ProviderCapability{espeak, index}, Tools: []string{"video_job_start", "video_speech_start", "video_speech_adopt"}, Notes: []string{"模型列表探测不代表真实合成、音色和音质已验收", "TTS支持独立口播 source=narration 与兼容旧镜头 source=shots"}})
 	for _, id := range []string{"image_generation", "video_generation"} {
-		_, err := generationTarget(id)
-		provider := ProviderCapability{ID: "http_binary_v1", Runtime: "http_service", State: "blocked", Verified: "configuration_only", Reasons: []string{}, Supports: []string{id}}
+		target, err := generationTarget(id)
+		provider := ProviderCapability{ID: generationProvider(target), Runtime: "http_service", State: "blocked", Verified: "configuration_only", Reasons: []string{}, Supports: []string{id}, Model: target.Model}
+		notes := []string{"自定义HTTP二进制适配协议，非厂商原生API；probe不向该适配器发起生成", "配置检查不是实际模型验收；取消不保证远端停止"}
+		limits := map[string]any{"referenceImages": 4, "referenceImageBytes": 8 << 20, "referenceTotalBytes": 16 << 20, "outputBytes": 32 << 20}
+		if id == "video_generation" {
+			limits["durationTargetMaximum"] = 60
+			limits["outputBytes"] = 128 << 20
+		}
+		if provider.ID == "comfyui_h3" {
+			provider.Supports = []string{"video_generation", "text_to_video", "native_generated_audio"}
+			notes = []string{"内置ComfyUI MiniMax-H3固定文生视频工作流：提交prompt、轮询history、下载MP4；不支持参考图", "时长目标映射并限制到124–362帧@24fps；回执保存有效参数与调整说明，产物实际时长以媒体探测为准", "probe只检查API、节点和模型清单，不执行推理或验收生成质量；取消后远端可能继续", "保留原生生成音轨；默认增益18dB并限幅，VIDEO_COMFY_H3_AUDIO_GAIN_DB=0可保留原始MP4"}
+			limits["referenceImages"] = 0
+			limits["effectiveFrameRange"] = []int{124, 362}
+			limits["frameRate"] = 24
+			limits["effectiveDurationRange"] = []float64{124.0 / 24, 362.0 / 24}
+			limits["audioGainDb"] = target.AudioGainDB
+			provider.Reasons = append(provider.Reasons, missingCommands("ffmpeg", "ffprobe")...)
+		}
 		if err == nil {
 			provider.Configured = true
-			provider.State = "configured"
+			if len(provider.Reasons) == 0 {
+				provider.State = "configured"
+			}
+			if probe && provider.ID == "comfyui_h3" {
+				step, cancel := context.WithTimeout(ctx, 8*time.Second)
+				probeErr := probeComfyGeneration(step, target)
+				cancel()
+				if probeErr != nil {
+					provider.State = "blocked"
+					provider.Verified = "probe_failed"
+					provider.Reasons = append(provider.Reasons, probeErr.Error())
+				} else {
+					provider.Verified = "comfyui_nodes_models"
+				}
+			}
 		} else {
 			provider.Reasons = append(provider.Reasons, err.Error())
 		}
-		envelope.Capabilities = append(envelope.Capabilities, ProductionCapability{ID: id, Implemented: true, Ready: false, Providers: []ProviderCapability{provider}, Tools: []string{"video_job_start", "video_job_get", "video_job_cancel"}, Notes: []string{"自定义HTTP二进制适配协议，非厂商原生API", "配置检查不是实际模型验收；取消不保证远端停止"}})
+		envelope.Capabilities = append(envelope.Capabilities, ProductionCapability{ID: id, Implemented: true, Ready: false, Providers: []ProviderCapability{provider}, Tools: []string{"video_job_start", "video_job_get", "video_job_cancel"}, Notes: notes, Limits: limits})
 	}
 
 	envelope.Capabilities = append(envelope.Capabilities, ProductionCapability{ID: "text_media_alignment", Implemented: true, Ready: true, Providers: []ProviderCapability{}, Tools: []string{"video_asset_describe", "video_media_align", "video_media_alignment_get", "video_media_alignment_update"}, Notes: []string{"描述与标签可作词项检索；实际画面语义由具备视觉能力的Agent查看后判断", "关联表保存精确原文引用、真实素材、理由、用途和缺口；不要求一段一镜，未覆盖内容仍显示未完成"}})

@@ -1,0 +1,118 @@
+{
+  "version": "0.24.0",
+  "checkedAt": "2026-10-18T14:27:15.150095+00:00",
+  "repository": "https://github.com/shengjuntu/rva",
+  "upstreamCommit": "065e4c797ac249901bb138db2368ad31a7202d13",
+  "upstreamBaseIdenticalToLocal022": true,
+  "mergedLocalCommits": [
+    "c941c55",
+    "749bb5f",
+    "d464f51"
+  ],
+  "preservedUnchanged": [
+    "speech.go",
+    "speech_provider.go",
+    "speech_doctor.go",
+    "integrations/indextts/",
+    "comfyh3/workflow.go"
+  ],
+  "goRace": {
+    "command": "go test -race ./... -count=1 -json",
+    "passed": 426,
+    "failed": 0,
+    "skipped": 6,
+    "topLevelPassed": 190,
+    "packageTerminals": [
+      {
+        "package": "rundesk-video-app/comfyh3",
+        "action": "pass",
+        "elapsed": 1.199
+      },
+      {
+        "package": "rundesk-video-app",
+        "action": "pass",
+        "elapsed": 29.535
+      }
+    ],
+    "skippedTests": [
+      "TestRootRuntimeProbeProgramWithActualAppMCP",
+      "TestTextRefsRealAdapterArchiveAndLocator",
+      "TestHyperFramesRealAnimationAudioRender",
+      "TestProductionExchangeRealAdapterArchiveLateResultAndFinalProof",
+      "TestProductionExchangeNewerEditAuthoritySurvivesOlderLateIngest",
+      "TestSpeechSnapshotGenerationAndAdoption"
+    ],
+    "evidence": "tests-0.24.0.jsonl"
+  },
+  "goVet": "passed",
+  "frontendNodeTests": {
+    "passed": 10,
+    "failed": 0
+  },
+  "httpDomChecks": {
+    "passed": 24,
+    "failed": 0,
+    "evidence": "dom-validation-0.24.0.json"
+  },
+  "indexTTSAdapterContracts": {
+    "passed": 4,
+    "engine": "fake engine, real local HTTP server",
+    "gpuTested": false
+  },
+  "comfyUIContracts": {
+    "service": "httptest fixtures with actual short FFmpeg media",
+    "covered": [
+      "workflow preservation",
+      "metadata-only probe",
+      "Bearer authentication",
+      "strict URLs and redirects",
+      "failure before completed",
+      "HTTP and body deadlines",
+      "bounded JSON and MP4",
+      "own queued prompt deletion",
+      "unsupported references rejected before dispatch",
+      "effective duration and provenance",
+      "asset import and identical retry across restart",
+      "gain=18/0, explicit failures, preserved encoded video packets"
+    ],
+    "gpuTested": false
+  },
+  "hyperframesSmoke": {
+    "passed": true,
+    "engine": "hyperframes_authored",
+    "runtime": "HyperFrames 0.8.87, host Node 24, headless Chrome 155, FFmpeg",
+    "width": 320,
+    "height": 180,
+    "fps": 30,
+    "durationSeconds": 2,
+    "videoCodec": "h264",
+    "audioCodec": "aac",
+    "differentSampleFrames": true,
+    "nonSilentDecodedAudio": true,
+    "evidence": "validation-0.24.0/smoke-render.json",
+    "testMedia": "validation-0.24.0/smoke-render.mp4",
+    "firstAttempt": "New smoke source omitted the required audio ID; corrected the source and reran successfully."
+  },
+  "binaries": [
+    {
+      "path": "bin/video-app",
+      "bytes": 9130168,
+      "sha256": "510e9ec74c2cba3518b3218b6c34200332e336fe83bcadaa1ebe214a57f6d92d",
+      "executed": true
+    },
+    {
+      "path": "bin/video-app-windows-amd64.exe",
+      "bytes": 9389056,
+      "sha256": "c355de2a0f243612f2cedeb4cd55e9b8fc71013cffa3f312ab0d8c6bd644cced",
+      "executed": false
+    }
+  ],
+  "limitations": [
+    "No live IndexTTS or ComfyUI H3 model invocation or quality acceptance.",
+    "No Docker CLI/image build or user server deployment in this environment.",
+    "Windows binary cross-compiled only.",
+    "ComfyUI object_info uses traditional enum schema in fixtures; actual server snapshot not captured.",
+    "No real Codex/Kun autonomous production acceptance in this run.",
+    "GitHub source read succeeded; write credentials unavailable, no remote push performed."
+  ]
+}

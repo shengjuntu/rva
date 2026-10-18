@@ -1,0 +1,19 @@
+{
+  "status": "passed",
+  "projectId": "c17911f49706ec8c1a97ed95",
+  "renderId": "7f8f8fd0c5a81a7de3ea6fec",
+  "engine": "hyperframes_authored",
+  "output": "smoke-render.mp4",
+  "width": 320,
+  "height": 180,
+  "duration": "2.000000",
+  "hasAudio": true,
+  "frameHashes": [
+    "e3c3b089bef76baa1d57e5d7a3aaf943f7c254943645dc5f355e4071543a0195",
+    "4a18f8572b19e1ce63988c21f9dbff50bb7c3906c7ced7ef418bbafa05938785"
+  ],
+  "audioPeakDB": -36.2,
+  "modelTested": false,
+  "visualReviewRequired": true,
+  "outputSha256": "c51b510cbc6c34f61eb501ef816ba423210fc794845d68462ba8e448a88c9228"
+}

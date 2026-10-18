@@ -1,5 +1,7 @@
 # v0.15 图片与视频生成 HTTP 适配器
 
+此页保留 v0.15 HTTP 协议说明。当前版本已支持可选 duration、aspectRatio、referenceAssetIds（由适配器实际能力决定）；另有内置 [ComfyUI MiniMax-H3 文生视频](COMFYUI-H3.md)，无需外部 http_binary_v1 适配器。后文的旧工具数量与仅 prompt 限制不是当前版本的完整能力。
+
 App 负责请求、任务、产物校验和保存，RunDesk/Codex 负责制作。这里是自定义 http_binary_v1 协议，不是直接支持任何厂商原生 API，也不是 ComfyUI 原生接口。现有模型服务需加适配端点。
 
 启动 App 前设置管理员环境变量：

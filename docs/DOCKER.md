@@ -1,60 +1,98 @@
-# Video App 与 RunDesk：视频 Docker 与联调
+# Video App v0.24.0：Docker 部署与服务接入
 
-配套版本：RunDesk 0.48.1、Video App 0.11.0、news2douyin 0.15.0。RunDesk 0.48.0 已具备所需 API，可继续使用；0.48.1 增加入口、说明和通用错误措辞。
+当前配套为 Video App 0.24.0、RunDesk 0.49.5 / video-build 1.4.0。已有适配环境继续沿用；本次合并不要求清空项目、重建 RunDesk 安装身份或重新部署已有 IndexTTS/ComfyUI 模型。
 
-## 两个镜像，各准备一次
+## 各部件分别部署
 
-| 部件 | 运行位置 | 职责 | 持久数据 |
-|---|---|---|---|
-| RunDesk | Linux 宿主机 | 应用注册、Codex 生命周期、会话、审批、轨迹 | 原 RunDesk data |
-| `rundesk-video-build` | RunDesk 托管 Docker | Codex、FFmpeg/Pillow 工具、视频制作 Skill；通过 `video_project` MCP 操作业务 | RunDesk 工作区、Codex home |
-| `rundesk-video-app:0.11.0` | 独立 Compose 容器 | WebUI、项目、HTTP MCP、HyperFrames 0.8.87、GSAP 3.15.0、Chromium、FFmpeg、Noto CJK、eSpeak NG | 宿主目录挂到 `/data` |
+| 部件 | 职责 | 持久数据 |
+| --- | --- | --- |
+| RunDesk | Agent 生命周期、模型认证、Skills/MCP、会话、审批和轨迹 | 原 RunDesk data、账户与工作区 |
+| RunDesk 托管的 `video-build` 工具容器 | Codex 与其制作工具环境 | RunDesk 管理的工作区和 Codex home |
+| `rundesk-video-app:0.24.0` | 极简 WebUI、制作 HTTP/MCP、HyperFrames/FFmpeg 渲染、素材和成片归档 | 原宿主目录挂载到 `/data` |
+| 已部署的 IndexTTS / ComfyUI | 各自的 GPU 推理服务 | 各服务自己的模型、音色、节点和输出目录 |
 
-Codex 发起 `video_render_start`，实际渲染由 App 容器执行。不是在 Codex 容器里启动第二个 App；不要向 App 挂载 Docker socket。App 数据与 Codex 工作目录不共用，素材由 App 按 assetId 读取。视频不要求 Exa/Agent-Reach；新闻搜索继续在 news2douyin 研究环境完成，已审核制作包携带素材交接。
+App 镜像包含 HyperFrames 0.8.87、GSAP 3.15.0、Node.js、Chromium、FFmpeg/FFprobe、Noto CJK 和 eSpeak NG。App 与 Codex 工具容器分别更新；模型服务不放进 App 镜像，不向 App 挂载 Docker socket。
 
-## 升级、构建、启动
+新项目默认 HyperFrames。Codex 通过 App MCP 保存源文件与真实素材引用，App 冻结后渲染。无需向 Codex 暴露 App 私人 data，也不需要共享生产目录。旧 native DSL/FFmpeg、video_use 和镜头项目保留原后端；video_use 的专用共享目录要求见后文。
 
-1. 停止旧 RunDesk，备份 data；解压源码、`make build`，沿用原 `--data` 启动。不要清空 data 或创建第二份同名应用安装。
-2. 在 RunDesk 初始化/运行环境页选择 `video-build`，填写已安装 Codex 的精确版本，准备镜像一次。可以从已有本地镜像或受信仓库拉取；应用注册和任务开始不触发构建。
-3. 解压 Video App 0.11.0。若从 0.6.0 升级，先停旧 App、备份整个 data，在 Docker 配置中令 `VIDEO_HOST_DATA` 指向该目录。保留 access-token、config.json、rundesk-requests、projects，避免安装身份、会话和回执丢失。
-4. 执行 App 包的 `bash scripts/docker.sh init`。编辑生成的 `docker/.env`：填 RunDesk Token，核对 UID/GID、数据目录、浏览器入口与 MCP 回调地址。
-5. `bash scripts/docker.sh build` 显式构建渲染镜像；`bash scripts/docker.sh up` 只启动已有镜像。镜像内已安装所有渲染依赖，启动不再执行 npm/apt 或浏览器下载。
-6. `bash scripts/docker.sh token` 获取 App 登录 Token，打开 `http://127.0.0.1:3220`。远程访问需把 `VIDEO_APP_PUBLIC_URL` 改为浏览器可访问地址。
-7. 在 App 创建/导入项目，点“连接 RunDesk”。转到 RunDesk 对应应用，选择已准备的 `video-build` Docker 镜像，完成该容器 Codex 认证；首次切换 Docker 时在当前容器安装 `integrations/video-project/SKILL.md`，添加 HTTP MCP `video_project`，URL 为 `VIDEO_APP_MCP_URL`，HTTP Header 为 `Authorization: Bearer <App Token>`。此配置位于容器独立 Codex home，原本机配置不会自动迁移。模型、权限和审批由 RunDesk 管理。
-8. 回 App 点击“重新配置工具”以重连（空会话自动更换到 Docker）；若已有本机对话，点击“新建当前环境对话”，旧历史保留。再打开“环境准备 → 启动并检查 Codex 容器”，确认运行、认证、10 个视频 MCP 工具可发现；发送新任务也自动做该检查。检查通过不代表真实模型调用已验收。
+## 构建、启动和升级
 
-也可在 RunDesk 目录统一操作：设置 `VIDEO_APP_DIR` 后执行 `bash examples/video-build/run-app.sh <init|build|up|doctor|smoke|logs|stop>`。
+以下脚本面向 Linux Docker Engine 与 Compose v2。在源码根目录执行：
 
-## Linux 网络约定
+```bash
+bash scripts/docker.sh init
+# 编辑 docker/.env 后继续：
+bash scripts/docker.sh build
+bash scripts/docker.sh up
+bash scripts/docker.sh token
+bash scripts/docker.sh doctor
+```
 
-App Compose 默认 `network_mode: host`，可访问宿主 `127.0.0.1:3210` 的 RunDesk。App 监听 `0.0.0.0:3220`，让 RunDesk 默认 bridge 容器通过内置 `host.docker.internal:host-gateway` 访问回调。
+1. 新安装的 `init` 生成配置并写入当前 UID/GID 与绝对数据路径；已有 `docker/.env` 不会被覆盖。填入实际 `RUNDESK_URL`、`RUNDESK_TOKEN`，核对浏览器入口、MCP 回调与数据目录。
+2. 升级先等待活动任务结束、停止旧 App 并备份完整数据，继续将原目录挂到 `/data`。保留 access-token、config.json、speech-config.json、RunDesk 请求回执、projects、素材和历史输出。旧配置显式更新 `VIDEO_IMAGE=rundesk-video-app:0.24.0`，不要用示例文件覆盖已有配置。
+3. `build` 显式构建 App 镜像；`up` 使用现有镜像启动，不自动安装 npm/apt 或下载浏览器。仅替换源码或镜像标签不会更新已经运行的容器，需执行相应重建与启动流程。
+4. 用 `token` 输出登录令牌，打开浏览器入口。主页面首次可创建空项目；日常操作是导入正文/素材、开始制作、查看视频版本、对话修改和下载。
+5. 首次配置模型认证、Agent 环境与 Skills/MCP 时，在 RunDesk 的视频应用和运行环境页核对已选镜像、账户与工作区。App 开始制作会按现有流程建立连接、配置制作工具并检查运行环境；遇到认证或环境错误，按页面提示转到 RunDesk 处理，再确认原提交。不要为排错删除旧会话或清空配置。
 
-- `VIDEO_APP_PUBLIC_URL=http://127.0.0.1:3220`：浏览器入口；远程使用改成服务域名或宿主 IP。
-- `VIDEO_APP_MCP_URL=http://host.docker.internal:3220/api/mcp`：Codex 容器回调，含完整 `/api/mcp` 路径。
-- `RUNDESK_URL=http://127.0.0.1:3210`：App 到 RunDesk。
+主页面没有“连接 RunDesk”“重新配置工具”“新建当前环境对话”“环境准备”等旧手动按钮。App 的独立“设置”页展示环境状态并提供 RunDesk 链接；详细运行过程、权限和工具配置在 RunDesk。重连与升级保留管理员配置，不能据此假定更换服务后旧会话或认证会自动迁移。
 
-此 Compose 面向 Linux Docker Engine；Windows/macOS Docker Desktop 需另行启用受支持的 host networking 或调整网络与地址。宿主防火墙应允许 Docker 网桥到 3220；App 使用 Token，公网部署应置于 HTTPS 反向代理后。
+也可在已有 RunDesk 部署目录使用其 `examples/video-build/run-app.sh` 包装脚本；先核对该脚本对应的 App 路径和版本。
 
-已有安装只在首次注册写入默认 MCP/Skill。升级时，在 RunDesk 确认 MCP URL、Authorization Header 和 `video-project` Skill：**重连不会覆盖管理员配置**。App 新的业务任务会说明素材与渲染边界，旧 Skill 中“本地 assets 路径”的描述应更新。不要清空配置来强制重新注册。
+## 网络与持久目录
 
-## 验收
+App Compose 默认 `network_mode: host`，适用于 Linux 宿主上的服务：
 
-- `doctor`：检查 App、依赖、RunDesk 与已绑定运行环境，只读，不调用模型。
-- `smoke`：创建标记为验收的两秒中文标题项目，合成测试音，真实调用 App → HyperFrames/Chromium → FFmpeg，检查 1080×1920 H.264/AAC 和时长；不调用模型。
-- 导入 news2douyin 0.15.0 已审核脚本 ZIP：检查语言、原稿、证据和图片候选；图片进入素材库，由用户选入分镜，不自动判定使用权。
-- 发送“读取项目并保存分镜，按当前素材制作视频”，检查 RunDesk 轨迹中真实 MCP 调用、App 项目 revision、渲染进度与成片。播放检查中文、图像、字幕和音频。
-- `stop` → `up` 后核对项目、成片、Token 与连接仍在；重试未知结果沿用原请求，不重复建会话。
+| 变量 | 示例与方向 |
+| --- | --- |
+| `VIDEO_APP_PUBLIC_URL` | `http://127.0.0.1:3220`，浏览器到 App；远程使用改成可达域名或宿主 IP |
+| `VIDEO_APP_MCP_URL` | `http://host.docker.internal:3220/api/mcp`，RunDesk 的 bridge 工具容器回调 App |
+| `RUNDESK_URL` | `http://127.0.0.1:3210`，App 到 RunDesk |
+| `VIDEO_HOST_DATA` | 原 App 持久目录，挂到 `/data`；不是 RunDesk home 或模型目录 |
 
-短脚本的文字语言由 news2douyin 指定并随制作包保留；eSpeak NG 是机械预览配音，不代表专业 TTS。当前渲染固定竖屏 1080×1920/30fps，未引入生成视频模型。
+同机 IndexTTS/ComfyUI 可使用宿主 `127.0.0.1`。若改为 bridge 网络，127.0.0.1 指 App 容器自身，需改成服务 DNS 或实际宿主网关。Windows/macOS Docker Desktop 需使用其支持的 host networking 或另行调整网络；本环境未做 Docker Desktop 实机验收。
 
-## 升级与镜像分发
+RunDesk 工具容器需能访问 MCP 地址，且配置 `Authorization: Bearer <App Token>`。App 和模型服务分别使用各自凭据。公开部署按实际网络配置 HTTPS 和认证；令牌、`.env` 与数据不写入镜像。
 
-镜像可由 CI/维护者提前构建并推送到自己的 GHCR/Docker Hub，部署配置引用版本标签或 digest 后拉取即可。当前包没有已发布镜像地址；不要把示例标签当成远程可下载镜像。App 镜像构建上下文采用白名单，不包含 `.env`、data、Token、日志或旧二进制。发布前运行 smoke、记录 digest；同时保留镜像的第三方许可。
+## IndexTTS 配音
 
-Node/Debian 基础标签和 apt 仓库随时间更新；需要字节级复现时传入带 digest 的 `GO_IMAGE`/`NODE_IMAGE` 并使用自己的 apt 快照。npm 依赖使用 package-lock.json + npm ci；镜像记录 runtime-versions.json 和 debian-packages.txt。
+打开 App“设置”→“配音服务”，保存已有服务的完整 `/v1/audio/speech` 地址、模型名、已注册音色、语言和可选 Key。配置保存在 `/data/speech-config.json`，容器重建后沿用。模型继续运行在原 GPU 服务，不需要安装到 App 或 Codex 容器。
 
-## IndexTTS-2.5 配音
+也可启用 `docker/.env.example` 中的 `VIDEO_TTS_*` 环境变量，Compose 已透传。任一非空变量会使配音配置表单显示由环境管理；其余字段沿用保存值或默认值。超时变量为 `VIDEO_TTS_TIMEOUT_SECONDS`。完整协议、原生 Python 适配器和只读自检见 [INDEXTTS](INDEXTTS.md)。
 
-Video App 通过 HTTP 连接已有 TTS 服务，镜像不需要 GPU/PyTorch。Linux 默认 `network_mode: host`，同机服务可填 `http://127.0.0.1:8092/v1/audio/speech`；不同服务器使用可达的局域网地址。若自行改成 bridge 网络，127.0.0.1 是 App 容器自身，需配置宿主机网关或服务 DNS。
+“检查连接”与模型/音色列表发现不进行合成，不能证明音质已验收。实际制作由 Codex 发起配音、检查产物并安排到视频中，主页面不提供旧手动配音/采用按钮。
 
-推荐在 WebUI 保存配音配置到 `/data/speech-config.json`。也可启用 `.env.example` 的 VIDEO_TTS_* 配置，新版 compose 已透传这些变量；任一非空变量会使设置页改为环境管理。API Key 只设置在运行环境，不写入 Dockerfile。`doctor` 检查当前配音后端；`--health` 仍仅用于 App 存活，不因外部 TTS 暂时不可用而重启 App。详细步骤见 [INDEXTTS](INDEXTTS.md)。
+## ComfyUI 与通用生成服务
+
+内置 MiniMax-H3 直接访问现有 ComfyUI，不需要再部署 http_binary_v1 中转服务。在现有 `docker/.env` 增加并重启 App：
+
+```dotenv
+VIDEO_VIDEO_GEN_URL=comfy://127.0.0.1:19897
+VIDEO_VIDEO_GEN_MODEL=minimax_h3_fl2va
+VIDEO_VIDEO_GEN_KEY=
+VIDEO_COMFY_H3_AUDIO_GAIN_DB=18
+```
+
+ComfyUI 的节点与模型需预先安装，不向 App 挂载模型或输出目录。当前仅支持文生视频，拒绝参考图；默认音轨增益、124..362 帧限制、实际生效参数和取消边界见 [COMFYUI-H3](COMFYUI-H3.md)。H3 素材原声不自动替代主播口播。
+
+通用图像与视频生成仍可通过 `VIDEO_IMAGE_GEN_*` / `VIDEO_VIDEO_GEN_*` 连接 [http_binary_v1](GENERATION-0.15.md) 服务。同一组视频变量当前选择一个提供方。设置页的生成配置只读，部署修改后重启；发现可达或节点存在不等于完成 GPU 推理或产物验收。
+
+## 检查范围与验收
+
+- `docker.sh doctor`：检查 App、渲染依赖、RunDesk、已绑定运行环境及现有配音连接；不执行模型推理，不是一次 H3 视频生成测试。`--health` 仅检查 App 存活，不因外部模型服务暂不可用而重启 App。
+- 设置页服务发现，或 `GET /api/capabilities?probe=1` / MCP `video_capabilities_get(probe=true)`：请求受支持的只读服务探测；IndexTTS 模型列表、ComfyUI 系统/节点信息不证明实际生成成功。
+- `bin/video-app speech-doctor --data /data`：在 App 容器内读取实际配音配置，检查基础依赖、模型和音色列表，不合成音频。
+- `docker.sh smoke`：创建标记为验收的短测试项目，检查本地渲染和媒体结果，不运行 Codex、IndexTTS 或 H3 模型。它不是自主制作、口播音质或 GPU 生成验收。
+- 在实际项目输入短稿、导入素材，点“开始制作”；到 RunDesk 核对真实工具调用和任务回执，回 App 查看已完成版本、下载并观看/试听。再发一条修改要求，检查新版本和原有结果均保留。
+- `stop` → `up` 后核对项目、历史输出、访问令牌和服务设置仍在。未知提交确认原回执，不换 requestId 重复生成；停止本地等待不保证远端 GPU 已停止。
+
+HyperFrames 的尺寸、帧率和时长来自工程，并非固定 1080×1920/30fps。旧版本固定竖屏、手动分镜和配音操作属于历史行为；当前用户界面以 [README](../README.md) 为准。实际发布检查范围见 `validation-0.24.0.json`，没有用模拟服务或本地媒体测试替代真实 GPU、Docker 与用户环境验收。
+
+## 可选 video_use 共享目录
+
+仅旧 video_use 流程需要把同一个 RunDesk 视频应用工作目录挂给 App，并设置 `VIDEO_EXCHANGE_ROOT`。可叠加 `docker/compose.video-use.yaml`，其 `VIDEO_EXCHANGE_HOST_WORKSPACE` 必须指向已有应用工作目录，不是 RunDesk home 或整个 data。工具镜像需显式包含 video-use。详见 [共享交换契约](EXCHANGE-0.21.md)。HyperFrames 主路径无需此挂载。
+
+## 镜像分发与复现
+
+示例镜像标签不代表已发布到远程仓库；需要自行构建，或使用维护者明确提供的镜像与 digest。构建上下文白名单包含 Go、comfyh3、嵌入网页与制作 Skill、渲染依赖清单和启动脚本，不包含 `.env`、项目数据、令牌或旧二进制。
+
+Node/Debian 标签和 apt 仓库会变化；严格复现可传入带 digest 的 `GO_IMAGE` / `NODE_IMAGE` 并使用受控 apt 快照。npm 使用 package-lock.json 与 npm ci，镜像记录 runtime-versions.json 和 debian-packages.txt。App 与工具镜像的第三方许可分别保留；本版不声称用户 Docker 镜像已在本环境运行验收。

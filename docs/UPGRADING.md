@@ -1,3 +1,18 @@
+# 升级到 v0.24.0
+
+本版以 shengjuntu/rva 的 `065e4c7` 为基线，合入 v0.23.1 的 HyperFrames 与简化工作台，并加固新增 ComfyUI MiniMax-H3 文生视频后端。IndexTTS 源码和已有配置保留，不要求重装模型或重新登记音色。
+
+保留并备份完整 data、访问令牌、RunDesk 身份/会话与服务设置。等待活动任务结束后替换程序，或在旧 docker/.env 中显式设置 VIDEO_IMAGE=rundesk-video-app:0.24.0，再 build/up。脚本不覆盖已有 .env；不要把示例文件覆盖到现有配置。
+
+需要使用内置 H3 时，保持 VIDEO_VIDEO_GEN_URL=comfy://主机:端口、VIDEO_VIDEO_GEN_MODEL=minimax_h3_fl2va。已安装的 ComfyUI 节点和模型文件名保持原实现。VIDEO_COMFY_H3_AUDIO_GAIN_DB 默认18，设0可保留原始声音；此项只影响新的生成任务，不重新处理旧素材。详见 [ComfyUI H3](COMFYUI-H3.md)。通用 http_binary_v1 和 IndexTTS 服务继续可用。
+
+已有 H3 参考图请求会明确拒绝，不假装实现图生视频；任务中的目标时长和生效帧数分别记录，实际时长以媒体探测为准。取消或 App 重启不能保证远端生成停止，不要用新 requestId 自动重试不确定结果。
+
+UI 继续只保留项目、导入、一键初稿、成片、对话和导出，详细调试在 RunDesk。无需更新 RunDesk 或重新创建项目；已配置的 RunDesk 0.49.5/video-build 1.4.0 继续沿用。真实 IndexTTS/H3 模型和用户 Docker 运行环境仍需部署侧验收。
+
+---
+以下为历史说明。
+
 # 升级到 v0.23.1
 
 保留并备份完整 data、原稿、素材、工程与历史输出、RunDesk 身份/会话/工作区、访问令牌及已有服务设置。等待活动任务结束后替换 App 或重建 App 镜像；旧 docker/.env 显式更新 VIDEO_IMAGE=rundesk-video-app:0.23.1。不清空数据、不重建同名工作区，也不通过默认值覆盖已配置的 IndexTTS 或生成服务。

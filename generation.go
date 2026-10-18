@@ -15,6 +15,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -36,6 +37,23 @@ type GenerationJob struct {
 	Duration    *float64              `json:"duration,omitempty"`
 	AspectRatio string                `json:"aspectRatio,omitempty"`
 	References  []GenerationReference `json:"references,omitempty"`
+	Provider    string                `json:"provider,omitempty"`
+	Parameters  *GenerationParameters `json:"parameters,omitempty"`
+	Warnings    []string              `json:"warnings,omitempty"`
+}
+
+// GenerationParameters describes the effective provider request, never measured
+// properties of the returned media. Duration and aspectRatio remain the user's
+// requested targets on GenerationJob/GeneratedAssetInfo.
+type GenerationParameters struct {
+	Width           int     `json:"width"`
+	Height          int     `json:"height"`
+	FrameCount      int     `json:"frameCount"`
+	FrameRate       int     `json:"frameRate"`
+	DurationSeconds float64 `json:"durationSeconds"`
+	Seed            int64   `json:"seed"`
+	NativeAudio     bool    `json:"nativeAudio"`
+	AudioGainDB     float64 `json:"audioGainDb"`
 }
 
 // References retain evidence of exactly which bytes were sent to the adapter.
@@ -57,40 +75,68 @@ type GeneratedAssetInfo struct {
 	AspectRatio string                `json:"aspectRatio,omitempty"`
 	References  []GenerationReference `json:"references,omitempty"`
 	Created     string                `json:"created"`
+	Parameters  *GenerationParameters `json:"parameters,omitempty"`
+	Warnings    []string              `json:"warnings,omitempty"`
 }
 
 type generationReferenceImage struct {
 	GenerationReference
 	Data string `json:"data"`
 }
-type GenerationTarget struct{ URL, Model, Key string }
+type GenerationTarget struct {
+	URL, Model, Key string
+	AudioGainDB     float64
+}
 
 func generationTarget(kind string) (GenerationTarget, error) {
 	prefix := "VIDEO_IMAGE_GEN_"
 	if kind == "video_generation" {
 		prefix = "VIDEO_VIDEO_GEN_"
 	}
-	v := GenerationTarget{os.Getenv(prefix + "URL"), os.Getenv(prefix + "MODEL"), os.Getenv(prefix + "KEY")}
+	v := GenerationTarget{URL: os.Getenv(prefix + "URL"), Model: os.Getenv(prefix + "MODEL"), Key: os.Getenv(prefix + "KEY")}
 	u, e := url.Parse(v.URL)
-	if e != nil {
+	if e != nil || u.Hostname() == "" || u.User != nil || u.Fragment != "" || strings.TrimSpace(v.Model) == "" || len(v.Model) > 200 || len(v.Key) > 4096 || strings.ContainsAny(v.Key, "\r\n") {
 		return v, errors.New("未配置合法的生成服务 URL/MODEL/KEY")
 	}
 	// Built-in ComfyUI backend: VIDEO_VIDEO_GEN_URL=comfy://host:port
 	// (video_generation only). fetchGenerated then calls the embedded
 	// comfyh3 library directly instead of an HTTP adapter.
-	if u.Scheme == "comfy" && kind == "video_generation" && u.Host != "" {
-		if strings.TrimSpace(v.Model) == "" || len(v.Model) > 200 || len(v.Key) > 4096 || strings.ContainsAny(v.Key, "\r\n") {
-			return v, errors.New("未配置合法的生成服务 URL/MODEL/KEY")
+	if u.Scheme == "comfy" {
+		if kind != "video_generation" || u.Path != "" || u.RawPath != "" || u.RawQuery != "" || u.ForceQuery || u.Opaque != "" {
+			return v, errors.New("ComfyUI视频生成地址必须为comfy://host:port，不允许用户信息、路径、查询或片段")
+		}
+		if !comfyModelSupported(v.Model) {
+			return v, errors.New("内置ComfyUI仅支持minimax_h3_fl2va固定模型工作流")
+		}
+		v.AudioGainDB = 18
+		if raw := strings.TrimSpace(os.Getenv("VIDEO_COMFY_H3_AUDIO_GAIN_DB")); raw != "" {
+			v.AudioGainDB, e = strconv.ParseFloat(raw, 64)
+			if e != nil || !finite(v.AudioGainDB) || v.AudioGainDB < -30 || v.AudioGainDB > 30 {
+				return v, errors.New("VIDEO_COMFY_H3_AUDIO_GAIN_DB必须为-30至30之间的有限数值，0表示保留原音轨")
+			}
 		}
 		return v, nil
 	}
-	if u.Host == "" || (u.Scheme != "http" && u.Scheme != "https") || u.User != nil || u.Fragment != "" || strings.TrimSpace(v.Model) == "" || len(v.Model) > 200 || len(v.Key) > 4096 || strings.ContainsAny(v.Key, "\r\n") {
+	if u.Scheme != "http" && u.Scheme != "https" {
 		return v, errors.New("未配置合法的生成服务 URL/MODEL/KEY")
 	}
 	return v, nil
 }
+func generationProvider(target GenerationTarget) string {
+	u, _ := url.Parse(target.URL)
+	if u != nil && u.Scheme == "comfy" {
+		return "comfyui_h3"
+	}
+	return "http_binary_v1"
+}
+func generationJobProvider(j GenerationJob) string {
+	if j.Provider != "" {
+		return j.Provider
+	}
+	return "http_binary_v1" // Legacy records did not retain provider identity.
+}
 func generationView(pid string, j GenerationJob) ProductionJob {
-	v := ProductionJob{ID: "generation:" + j.ID, NativeID: j.ID, ProjectID: pid, Type: j.Type, Provider: "http_binary_v1", State: unifiedState(j.State), NativeState: j.State, Revision: j.Revision, RequestID: j.RequestID, Created: j.Created, Error: j.Error, Artifacts: []JobArtifact{}}
+	v := ProductionJob{ID: "generation:" + j.ID, NativeID: j.ID, ProjectID: pid, Type: j.Type, Provider: generationJobProvider(j), State: unifiedState(j.State), NativeState: j.State, Revision: j.Revision, RequestID: j.RequestID, Created: j.Created, Error: j.Error, Artifacts: []JobArtifact{}, GenerationParameters: j.Parameters, Warnings: j.Warnings}
 	if j.State == "completed" {
 		v.Artifacts = append(v.Artifacts, JobArtifact{Name: j.AssetID, URL: "/api/projects/" + pid + "/assets/" + j.AssetID, SHA256: j.SHA256, Size: j.Size})
 	}
@@ -141,12 +187,19 @@ func (a *App) startGeneration(w http.ResponseWriter, r *http.Request, in JobStar
 		fail(w, 400, errors.New("aspectRatio支持16:9、9:16、1:1、4:3、3:4"))
 		return
 	}
+	if generationProvider(target) == "comfyui_h3" && len(in.Options.ReferenceAssetIDs) > 0 {
+		fail(w, 400, errors.New("内置ComfyUI MiniMax-H3当前为文生视频工作流，不支持参考图；请移除referenceAssetIds或使用支持参考图的HTTP适配器"))
+		return
+	}
 	refs, e := a.generationReferences(*p, in.Options.ReferenceAssetIDs)
 	if e != nil {
 		fail(w, 400, e)
 		return
 	}
-	j := GenerationJob{ID: uid(), Type: in.Type, RequestID: in.RequestID, RequestHash: hash, Revision: p.Revision, State: "running", Created: time.Now().UTC().Format(time.RFC3339Nano), Prompt: in.Options.Prompt, Model: target.Model, Duration: in.Options.Duration, AspectRatio: in.Options.AspectRatio}
+	j := GenerationJob{ID: uid(), Type: in.Type, RequestID: in.RequestID, RequestHash: hash, Revision: p.Revision, State: "running", Created: time.Now().UTC().Format(time.RFC3339Nano), Prompt: in.Options.Prompt, Model: target.Model, Duration: in.Options.Duration, AspectRatio: in.Options.AspectRatio, Provider: generationProvider(target)}
+	if j.Provider == "comfyui_h3" {
+		_, j.Parameters, j.Warnings = comfyGenerationParams(j, target.AudioGainDB)
+	}
 	for _, ref := range refs {
 		j.References = append(j.References, ref.GenerationReference)
 	}
@@ -171,7 +224,7 @@ func (a *App) runGeneration(ctx context.Context, pid string, j GenerationJob, ta
 		ext, mime, err := validateGenerated(ctx, a, pid, j, data)
 		e = err
 		if e == nil {
-			asset = Asset{ID: j.ID, File: j.ID + ext, Name: "生成素材" + ext, MIME: mime, Size: int64(len(data)), Generated: &GeneratedAssetInfo{JobID: j.ID, RequestID: j.RequestID, Type: j.Type, Provider: "http_binary_v1", Model: j.Model, Prompt: j.Prompt, Duration: j.Duration, AspectRatio: j.AspectRatio, References: j.References, Created: j.Created}}
+			asset = Asset{ID: j.ID, File: j.ID + ext, Name: "生成素材" + ext, MIME: mime, Size: int64(len(data)), Generated: &GeneratedAssetInfo{JobID: j.ID, RequestID: j.RequestID, Type: j.Type, Provider: generationJobProvider(j), Model: j.Model, Prompt: j.Prompt, Duration: j.Duration, AspectRatio: j.AspectRatio, References: j.References, Created: j.Created, Parameters: j.Parameters, Warnings: j.Warnings}}
 			dest = filepath.Join(a.dir(pid), "workspace", "assets", asset.File)
 			e = os.WriteFile(dest, data, 0600)
 		}
@@ -222,7 +275,7 @@ func (a *App) runGeneration(ctx context.Context, pid string, j GenerationJob, ta
 	}
 }
 func fetchGenerated(ctx context.Context, j GenerationJob, target GenerationTarget, references []generationReferenceImage) ([]byte, error) {
-	if strings.HasPrefix(target.URL, "comfy://") {
+	if generationProvider(target) == "comfyui_h3" {
 		return fetchComfyGenerated(ctx, j, target, references)
 	}
 	payload := map[string]any{"schema": "video.generation-request.v1", "requestId": j.RequestID, "type": j.Type, "model": target.Model, "prompt": j.Prompt}

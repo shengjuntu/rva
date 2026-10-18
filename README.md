@@ -1,4 +1,4 @@
-# RunDesk Video App · v0.23.1
+# RunDesk Video App · v0.24.0
 
 提供正文和本地素材，开始制作，查看成片，再通过对话调整。Codex 自主完成分镜、选材、图像与视频生成、TTS、HyperFrames 动画、检查和重做；Video App 提供制作 MCP、素材/作品版本和成片展示，RunDesk 负责 Agent 运行、Skills/MCP 配置和轨迹调试。
 
@@ -29,7 +29,7 @@ Skill 中通常三轮的自动检查建议用于控制无效反复，不是程�
 | 配音 | 已配置的 IndexTTS HTTP 服务；eSpeak 机械预览；真实音频及合成片段时序，不冒充逐字强制对齐 |
 | 素材观察 | 素材元数据、图片查看、视频多时间点真实抽帧、描述与来源记录 |
 | 文字素材关联 | 精确原文引用、多对多素材关系、视频选段、选择理由和未覆盖原文；候选检索为词项基线 |
-| 图像/视频生成 | 自定义 http_binary_v1 适配器；支持的目标时长、画幅、参考图按已配置服务使用，不是任意厂商 API 直连 |
+| 图像/视频生成 | 自定义 http_binary_v1 适配器；另内置 ComfyUI MiniMax-H3 文生视频，保留原生声音及可配置增益；按提供方实际能力使用时长、画幅和参考图 |
 | HyperFrames | 保存原创 HTML/CSS/JavaScript 动画工程及时间线，校验后由统一渲染任务保存独立快照和实际视频 |
 | 审阅与定位数据 | 后台保留 review-timeline、精确文字定位和检查记录供 Codex 使用；本版不展示多轨或可视引用选择 |
 | 版本与检查 | 修订冲突检测、真实渲染抽帧、检查记录、历史输出和终稿字节复核 |
@@ -51,7 +51,7 @@ bash scripts/build.sh
 
 Go 主程序使用标准库及嵌入网页。HyperFrames 渲染另外需要 Node.js、Chromium、HyperFrames 0.8.87、GSAP 3.15.0、FFmpeg/FFprobe 和字体；IndexTTS 模型独立部署，图像/视频生成服务按需配置。native DSL 渲染无需 Node/Chromium。
 
-Docker 部署见 [DOCKER](docs/DOCKER.md)。在旧 docker/.env 显式更新 VIDEO_IMAGE=rundesk-video-app:0.23.1 后构建并启动：
+Docker 部署见 [DOCKER](docs/DOCKER.md)。在旧 docker/.env 显式更新 VIDEO_IMAGE=rundesk-video-app:0.24.0 后构建并启动：
 
 ```bash
 bash scripts/docker.sh init
@@ -63,8 +63,24 @@ bash scripts/docker.sh doctor
 
 App 渲染容器与 RunDesk Codex 工具容器分别更新。配套 RunDesk 0.49.5 的 video-build 1.4.0 提供 HyperFrames/GSAP 和独立离线渲染检查，默认不安装 video-use。HyperFrames 主流程通过 App MCP 保存和渲染工程，不要求 App 与 Codex 共享私人项目数据或生产目录。旧 video_use 继续使用原有专用共享工作目录，并显式选择带 video-use 的工具镜像。
 
+## IndexTTS 与 ComfyUI
+
+本版基于 [shengjuntu/rva](https://github.com/shengjuntu/rva) 的提交 `065e4c7`，保留 IndexTTS 接入、内置 ComfyUI MiniMax-H3 工作流及音量修复，并合入 v0.23.1 的简化界面和 HyperFrames。已有 IndexTTS 地址、音色和模型配置继续使用。
+
+ComfyUI 服务需预先安装 H3 模型和节点。在 App 启动环境或 `docker/.env` 设置：
+
+```dotenv
+VIDEO_VIDEO_GEN_URL=comfy://127.0.0.1:19897
+VIDEO_VIDEO_GEN_MODEL=minimax_h3_fl2va
+VIDEO_COMFY_H3_AUDIO_GAIN_DB=18
+```
+
+App 直接提交 ComfyUI 工作流、轮询结果并下载 MP4，无需另起生成适配器。当前内置 H3 路径仅支持文生视频，不能传参考图；帧数范围与实际生效参数见[配置与限制](docs/COMFYUI-H3.md)。通用 HTTP 图像/视频服务继续兼容。主页面仍由 Codex 自动调用这些能力，不增加手动生成面板。
+
 ## 本版文档与验证
 
+- [v0.24.0 合并与验证](docs/validation-0.24.0.json)
+- [ComfyUI MiniMax-H3 配置与限制](docs/COMFYUI-H3.md)
 - [v0.23.1 验证记录](docs/validation-0.23.1.json)：极简界面、对话草稿、回执恢复、历史导出与后台工具兼容
 - [自主导演与 HyperFrames 技术说明](docs/HYPERFRAMES-0.23.md)：保留 v0.23.0 设计与后台契约；本版界面以本页为准
 - [升级](docs/UPGRADING.md)

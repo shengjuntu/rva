@@ -19,21 +19,23 @@ type JobArtifact struct {
 	Size   int64  `json:"size,omitempty"`
 }
 type ProductionJob struct {
-	ID             string        `json:"jobId"`
-	NativeID       string        `json:"nativeId"`
-	ProjectID      string        `json:"projectId"`
-	Type           string        `json:"type"`
-	Provider       string        `json:"provider"`
-	State          string        `json:"state"`
-	NativeState    string        `json:"nativeState"`
-	Revision       int           `json:"revision"`
-	RequestID      string        `json:"requestId,omitempty"`
-	Created        string        `json:"created"`
-	CompletedUnits int           `json:"completedUnits"`
-	TotalUnits     int           `json:"totalUnits"`
-	ProgressKnown  bool          `json:"progressKnown"`
-	Error          string        `json:"error,omitempty"`
-	Artifacts      []JobArtifact `json:"artifacts"`
+	ID                   string                `json:"jobId"`
+	NativeID             string                `json:"nativeId"`
+	ProjectID            string                `json:"projectId"`
+	Type                 string                `json:"type"`
+	Provider             string                `json:"provider"`
+	State                string                `json:"state"`
+	NativeState          string                `json:"nativeState"`
+	Revision             int                   `json:"revision"`
+	RequestID            string                `json:"requestId,omitempty"`
+	Created              string                `json:"created"`
+	CompletedUnits       int                   `json:"completedUnits"`
+	TotalUnits           int                   `json:"totalUnits"`
+	ProgressKnown        bool                  `json:"progressKnown"`
+	Error                string                `json:"error,omitempty"`
+	Artifacts            []JobArtifact         `json:"artifacts"`
+	GenerationParameters *GenerationParameters `json:"generationParameters,omitempty"`
+	Warnings             []string              `json:"warnings,omitempty"`
 }
 type JobOptions struct {
 	Duration          *float64     `json:"duration,omitempty"`

@@ -1,56 +1,137 @@
-// Package comfyh3 is a Go client for generating MiniMax-H3 videos through
-// the ComfyUI HTTP API. It mirrors the proven Python workflow
-// (comfy_h3_video.py v6): UNETLoader + CLIPLoader(qwen3vl-32b) + VAELoader
-// (video+audio) + LoraLoader(4step turbo) + MiniMaxH3ImageToVideo + KSampler
-// + VAEDecode(+Audio) + VHS_VideoCombine.
+// Package comfyh3 is a Go client for the verified MiniMax-H3 ComfyUI workflow.
 package comfyh3
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"path"
+	"regexp"
+	"sort"
+	"strings"
 	"time"
 )
 
-// Client talks to the ComfyUI REST API.
+const (
+	maxJSONResponse    = 32 << 20
+	maxWorkflowRequest = 8 << 20
+	maxVideoResponse   = 128 << 20
+)
+
+var promptIDPattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$`)
+
+// Configure Client before use. All requests prohibit redirects, including when
+// a caller supplies HTTP. Credentials and remote bodies are never in errors.
 type Client struct {
-	BaseURL    string // e.g. http://127.0.0.1:19897
-	HTTP       *http.Client
-	PollEvery  time.Duration
-	PollTimeout time.Duration
+	BaseURL       string
+	HTTP          *http.Client
+	Authorization string // optional "Bearer <key>"
+	PollEvery     time.Duration
+	PollTimeout   time.Duration
 }
 
 func NewClient(baseURL string) *Client {
-	return &Client{
-		BaseURL:     baseURL,
-		HTTP:        &http.Client{Timeout: 60 * time.Second},
-		PollEvery:   15 * time.Second,
-		PollTimeout: 10 * time.Minute,
-	}
+	return &Client{BaseURL: baseURL, HTTP: &http.Client{Timeout: 60 * time.Second}, PollEvery: 15 * time.Second, PollTimeout: 10 * time.Minute}
 }
-
-func (c *Client) getJSON(ctx context.Context, path string, out any) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.BaseURL+path, nil)
-	if err != nil {
-		return err
+func (c *Client) endpoint(route string, query url.Values) (string, error) {
+	base, err := url.Parse(c.BaseURL)
+	if err != nil || base.Hostname() == "" || (base.Scheme != "http" && base.Scheme != "https") || base.User != nil || base.RawQuery != "" || base.ForceQuery || base.Fragment != "" || base.Opaque != "" || strings.TrimSpace(c.BaseURL) != c.BaseURL {
+		return "", errors.New("invalid ComfyUI base URL")
 	}
-	resp, err := c.HTTP.Do(req)
-	if err != nil {
-		return err
+	if route == "" || !strings.HasPrefix(route, "/") || strings.ContainsAny(route, "?#\\\x00\r\n") {
+		return "", errors.New("invalid ComfyUI API route")
 	}
-	defer resp.Body.Close()
+	base.Path = strings.TrimRight(base.Path, "/") + route
+	base.RawPath = ""
+	base.RawQuery = query.Encode()
+	return base.String(), nil
+}
+func (c *Client) request(ctx context.Context, method, route string, query url.Values, body []byte) (*http.Response, error) {
+	endpoint, err := c.endpoint(route, query)
+	if err != nil {
+		return nil, err
+	}
+	if c.Authorization != "" && (!strings.HasPrefix(c.Authorization, "Bearer ") || strings.TrimSpace(strings.TrimPrefix(c.Authorization, "Bearer ")) == "" || len(c.Authorization) > 4103 || strings.ContainsAny(c.Authorization, "\r\n\x00")) {
+		return nil, errors.New("invalid ComfyUI authorization")
+	}
+	req, err := http.NewRequestWithContext(ctx, method, endpoint, bytes.NewReader(body))
+	if err != nil {
+		return nil, errors.New("cannot construct ComfyUI request")
+	}
+	if len(body) > 0 {
+		req.Header.Set("Content-Type", "application/json")
+	}
+	if c.Authorization != "" {
+		req.Header.Set("Authorization", c.Authorization)
+	}
+	client := http.Client{Timeout: 60 * time.Second}
+	if c.HTTP != nil {
+		client = *c.HTTP
+		if client.Timeout <= 0 {
+			client.Timeout = 60 * time.Second
+		}
+	}
+	client.CheckRedirect = func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }
+	resp, err := client.Do(req)
+	if err != nil {
+		if ctx.Err() != nil {
+			return nil, ctx.Err()
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			return nil, fmt.Errorf("ComfyUI request timed out: %w", context.DeadlineExceeded)
+		}
+		return nil, errors.New("ComfyUI request failed")
+	}
 	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return fmt.Errorf("GET %s -> %d: %s", path, resp.StatusCode, truncate(body))
+		resp.Body.Close()
+		return nil, fmt.Errorf("ComfyUI %s request returned HTTP %d", method, resp.StatusCode)
 	}
-	return json.NewDecoder(resp.Body).Decode(out)
+	return resp, nil
+}
+func readBounded(resp *http.Response, limit int64) ([]byte, error) {
+	defer resp.Body.Close()
+	if resp.ContentLength > limit {
+		return nil, errors.New("ComfyUI response exceeds size limit")
+	}
+	raw, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
+	if err != nil {
+		if resp.Request != nil && resp.Request.Context().Err() != nil {
+			return nil, resp.Request.Context().Err()
+		}
+		return nil, errors.New("cannot read ComfyUI response")
+	}
+	if int64(len(raw)) > limit {
+		return nil, errors.New("ComfyUI response exceeds size limit")
+	}
+	return raw, nil
+}
+func decodeResponse(raw []byte, out any) error {
+	decoder := json.NewDecoder(bytes.NewReader(raw))
+	if err := decoder.Decode(out); err != nil {
+		return errors.New("invalid ComfyUI JSON response")
+	}
+	if err := decoder.Decode(new(any)); err != io.EOF {
+		return errors.New("invalid trailing ComfyUI JSON response")
+	}
+	return nil
+}
+func (c *Client) getJSON(ctx context.Context, route string, out any) error {
+	resp, err := c.request(ctx, http.MethodGet, route, nil, nil)
+	if err != nil {
+		return err
+	}
+	raw, err := readBounded(resp, maxJSONResponse)
+	if err != nil {
+		return err
+	}
+	return decodeResponse(raw, out)
 }
 
-// SystemStats returns the ComfyUI version and first-device VRAM (bytes).
 type SystemStats struct {
 	System struct {
 		ComfyUIVersion string `json:"comfyui_version"`
@@ -59,8 +140,6 @@ type SystemStats struct {
 		VRAMFree int64 `json:"vram_free"`
 	} `json:"devices"`
 }
-
-// ObjectInfo is the minimal shape of GET /object_info we need.
 type ObjectInfo map[string]struct {
 	Input struct {
 		Required map[string]any `json:"required"`
@@ -69,202 +148,265 @@ type ObjectInfo map[string]struct {
 }
 
 func (c *Client) SystemStats(ctx context.Context) (*SystemStats, error) {
-	var s SystemStats
-	if err := c.getJSON(ctx, "/system_stats", &s); err != nil {
+	var out SystemStats
+	if err := c.getJSON(ctx, "/system_stats", &out); err != nil {
 		return nil, err
 	}
-	return &s, nil
+	return &out, nil
 }
-
 func (c *Client) ObjectInfo(ctx context.Context) (ObjectInfo, error) {
-	var oi ObjectInfo
-	if err := c.getJSON(ctx, "/object_info", &oi); err != nil {
+	var out ObjectInfo
+	if err := c.getJSON(ctx, "/object_info", &out); err != nil {
 		return nil, err
 	}
-	return oi, nil
+	if len(out) == 0 {
+		return nil, errors.New("empty ComfyUI object_info response")
+	}
+	return out, nil
 }
 
-// QueueInfo is the minimal shape of GET /queue.
 type QueueInfo struct {
 	QueueRunning []any `json:"queue_running"`
 	QueuePending []any `json:"queue_pending"`
 }
 
 func (c *Client) Queue(ctx context.Context) (*QueueInfo, error) {
-	var q QueueInfo
-	if err := c.getJSON(ctx, "/queue", &q); err != nil {
+	var out QueueInfo
+	if err := c.getJSON(ctx, "/queue", &out); err != nil {
 		return nil, err
 	}
-	return &q, nil
+	return &out, nil
 }
-
-// Submit posts a workflow to /prompt and returns the prompt_id.
 func (c *Client) Submit(ctx context.Context, wf map[string]any) (string, error) {
-	payload := map[string]any{"prompt": wf}
-	body, err := json.Marshal(payload)
+	body, err := json.Marshal(map[string]any{"prompt": wf})
+	if err != nil || len(body) > maxWorkflowRequest {
+		return "", errors.New("invalid or oversized ComfyUI workflow")
+	}
+	resp, err := c.request(ctx, http.MethodPost, "/prompt", nil, body)
 	if err != nil {
 		return "", err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, c.BaseURL+"/prompt", bytes.NewReader(body))
+	raw, err := readBounded(resp, 1<<20)
 	if err != nil {
 		return "", err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	resp, err := c.HTTP.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	raw, _ := io.ReadAll(io.LimitReader(resp.Body, 65536))
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("POST /prompt -> %d: %s", resp.StatusCode, truncate(raw))
 	}
 	var out struct {
-		PromptID string `json:"prompt_id"`
+		PromptID   string                     `json:"prompt_id"`
+		NodeErrors map[string]json.RawMessage `json:"node_errors"`
 	}
-	if err := json.Unmarshal(raw, &out); err != nil {
-		return "", fmt.Errorf("bad submit response: %s", truncate(raw))
+	if err := decodeResponse(raw, &out); err != nil {
+		return "", err
 	}
-	if out.PromptID == "" {
-		return "", fmt.Errorf("no prompt_id in response: %s", truncate(raw))
+	if !promptIDPattern.MatchString(out.PromptID) || len(out.NodeErrors) > 0 {
+		return "", errors.New("ComfyUI rejected workflow or omitted a valid prompt_id")
 	}
 	return out.PromptID, nil
 }
 
-// HistoryEntry is the minimal shape of /history/{id} (status part only;
-// outputs are parsed separately via ListOutputs).
+type HistoryEntryStatus struct {
+	Completed bool              `json:"completed"`
+	StatusStr string            `json:"status_str"`
+	Messages  []json.RawMessage `json:"messages"`
+}
 type HistoryEntry struct {
-	Status struct {
-		Completed bool              `json:"completed"`
-		StatusStr string            `json:"status_str"`
-		Messages  []json.RawMessage `json:"messages"`
-	} `json:"status"`
+	Status HistoryEntryStatus `json:"status"`
 }
 
-// WaitForCompletion polls /history/{id} until completed or errored.
-// Returns nil error when completed; the caller then fetches outputs.
+// One context bounds both sleeps and in-flight HTTP. Auth, HTTP and JSON errors
+// are reported immediately; execution errors precede completed=true.
 func (c *Client) WaitForCompletion(ctx context.Context, promptID string) error {
-	deadline := time.Now().Add(c.PollTimeout)
-	ticker := time.NewTicker(c.PollEvery)
-	defer ticker.Stop()
-	path := "/history/" + url.PathEscape(promptID)
+	if !promptIDPattern.MatchString(promptID) {
+		return errors.New("invalid ComfyUI prompt_id")
+	}
+	interval, timeout := c.PollEvery, c.PollTimeout
+	if interval <= 0 {
+		interval = 15 * time.Second
+	}
+	if timeout <= 0 {
+		timeout = 10 * time.Minute
+	}
+	poll, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 	for {
-		var hist map[string]HistoryEntry
-		if err := c.getJSON(ctx, path, &hist); err == nil {
-			if e, ok := hist[promptID]; ok {
-				if e.Status.Completed {
-					return nil
-				}
-				for _, m := range e.Status.Messages {
-					var pair []json.RawMessage
-					if json.Unmarshal(m, &pair) == nil && len(pair) == 2 {
-						var kind string
-						if json.Unmarshal(pair[0], &kind) == nil && (kind == "execution_error" || kind == "execution_interrupted") {
-							var detail any
-							if json.Unmarshal(pair[1], &detail) == nil {
-								b, _ := json.Marshal(detail)
-								return fmt.Errorf("execution %s: %s", kind, truncate(b))
-							}
-							return fmt.Errorf("execution %s", kind)
-						}
-					}
-				}
+		if err := poll.Err(); err != nil {
+			return err
+		}
+		var history map[string]HistoryEntry
+		if err := c.getJSON(poll, "/history/"+promptID, &history); err != nil {
+			return err
+		}
+		if entry, ok := history[promptID]; ok {
+			if err := historyFailure(entry); err != nil {
+				return err
+			}
+			if entry.Status.Completed {
+				return nil
 			}
 		}
+		timer := time.NewTimer(interval)
 		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-ticker.C:
-			if time.Now().After(deadline) {
-				return fmt.Errorf("timeout after %v waiting for prompt %s", c.PollTimeout, promptID)
-			}
+		case <-poll.Done():
+			timer.Stop()
+			return poll.Err()
+		case <-timer.C:
 		}
 	}
 }
-
-// OutputItem is one file produced by a workflow.
-type OutputItem struct {
-	Filename  string
-	Subfolder string
-	Type      string
+func historyFailure(entry HistoryEntry) error {
+	switch strings.ToLower(entry.Status.StatusStr) {
+	case "error", "failed":
+		return errors.New("ComfyUI execution failed")
+	case "interrupted", "cancelled", "canceled":
+		return errors.New("ComfyUI execution interrupted")
+	}
+	for _, message := range entry.Status.Messages {
+		var pair []json.RawMessage
+		if json.Unmarshal(message, &pair) != nil || len(pair) == 0 {
+			continue
+		}
+		var kind string
+		if json.Unmarshal(pair[0], &kind) != nil {
+			continue
+		}
+		switch kind {
+		case "execution_error":
+			return errors.New("ComfyUI execution failed")
+		case "execution_interrupted":
+			return errors.New("ComfyUI execution interrupted")
+		}
+	}
+	return nil
 }
 
-// ListOutputs returns the produced files of a finished prompt.
-func (c *Client) ListOutputs(ctx context.Context, promptID string) ([]OutputItem, error) {
-	var hist map[string]struct {
-		Outputs map[string]any `json:"outputs"`
+// CancelQueued removes only the named pending prompt. It never uses ComfyUI's
+// global /interrupt; success does not prove an already-running prompt stopped.
+func (c *Client) CancelQueued(ctx context.Context, promptID string) error {
+	if !promptIDPattern.MatchString(promptID) {
+		return errors.New("invalid ComfyUI prompt_id")
 	}
-	if err := c.getJSON(ctx, "/history/"+url.PathEscape(promptID), &hist); err != nil {
+	body, _ := json.Marshal(map[string]any{"delete": []string{promptID}})
+	resp, err := c.request(ctx, http.MethodPost, "/queue", nil, body)
+	if err != nil {
+		return err
+	}
+	_, err = readBounded(resp, 1<<20)
+	return err
+}
+
+type OutputItem struct{ Filename, Subfolder, Type string }
+
+func validOutputItem(item OutputItem) bool {
+	if item.Filename == "" || len(item.Filename) > 255 || item.Filename == "." || item.Filename == ".." || strings.ContainsAny(item.Filename, "/\\:\x00\r\n") {
+		return false
+	}
+	if len(item.Subfolder) > 1024 || strings.ContainsAny(item.Subfolder, "\\\x00\r\n") || strings.HasPrefix(item.Subfolder, "/") {
+		return false
+	}
+	if item.Subfolder != "" {
+		if path.Clean(item.Subfolder) != item.Subfolder || item.Subfolder == "." {
+			return false
+		}
+		for _, part := range strings.Split(item.Subfolder, "/") {
+			if part == ".." || strings.Contains(part, ":") {
+				return false
+			}
+		}
+	}
+	return item.Type == "" || item.Type == "output" || item.Type == "temp"
+}
+
+// ListOutputs preserves VHS nested output fields and returns a deterministic,
+// deduplicated order. Invalid file metadata fails before /view is requested.
+func (c *Client) ListOutputs(ctx context.Context, promptID string) ([]OutputItem, error) {
+	if !promptIDPattern.MatchString(promptID) {
+		return nil, errors.New("invalid ComfyUI prompt_id")
+	}
+	var history map[string]struct {
+		Outputs map[string]any     `json:"outputs"`
+		Status  HistoryEntryStatus `json:"status"`
+	}
+	if err := c.getJSON(ctx, "/history/"+promptID, &history); err != nil {
 		return nil, err
 	}
-	e, ok := hist[promptID]
+	entry, ok := history[promptID]
 	if !ok {
-		return nil, fmt.Errorf("prompt %s not in history", promptID)
+		return nil, errors.New("ComfyUI prompt is not in history")
 	}
-	var items []OutputItem
-	var collect func(any)
-	collect = func(v any) {
-		switch t := v.(type) {
+	if err := historyFailure(HistoryEntry{Status: entry.Status}); err != nil {
+		return nil, err
+	}
+	items := []OutputItem{}
+	seen := map[OutputItem]bool{}
+	var collect func(any, int) error
+	collect = func(value any, depth int) error {
+		if depth > 64 {
+			return errors.New("ComfyUI output metadata exceeds nesting limit")
+		}
+		switch value := value.(type) {
 		case map[string]any:
-			if fn, ok := t["filename"].(string); ok {
-				items = append(items, OutputItem{
-					Filename:  fn,
-					Subfolder: str(t["subfolder"]),
-					Type:      str(t["type"]),
-				})
-				return
+			if filename, ok := value["filename"].(string); ok {
+				item := OutputItem{Filename: filename, Subfolder: str(value["subfolder"]), Type: str(value["type"])}
+				if !validOutputItem(item) {
+					return errors.New("invalid ComfyUI output file metadata")
+				}
+				if !seen[item] {
+					items = append(items, item)
+					seen[item] = true
+				}
+				if len(items) > 1000 {
+					return errors.New("ComfyUI output file count exceeds limit")
+				}
+				return nil
 			}
-			for _, it := range t {
-				collect(it)
+			for _, child := range value {
+				if err := collect(child, depth+1); err != nil {
+					return err
+				}
 			}
 		case []any:
-			for _, it := range t {
-				collect(it)
+			for _, child := range value {
+				if err := collect(child, depth+1); err != nil {
+					return err
+				}
 			}
 		}
+		return nil
 	}
-	for _, outs := range e.Outputs {
-		collect(outs)
+	if err := collect(entry.Outputs, 0); err != nil {
+		return nil, err
 	}
+	sort.Slice(items, func(i, j int) bool {
+		if items[i].Subfolder != items[j].Subfolder {
+			return items[i].Subfolder < items[j].Subfolder
+		}
+		if items[i].Filename != items[j].Filename {
+			return items[i].Filename < items[j].Filename
+		}
+		return items[i].Type < items[j].Type
+	})
 	return items, nil
 }
 
-// Download fetches the raw bytes of an output file via /view.
-func (c *Client) Download(ctx context.Context, it OutputItem) ([]byte, error) {
-	q := url.Values{}
-	q.Set("filename", it.Filename)
-	q.Set("subfolder", it.Subfolder)
-	if it.Type == "" {
-		it.Type = "output"
+// Download admits only a bounded MP4 binary from this configured server.
+func (c *Client) Download(ctx context.Context, item OutputItem) ([]byte, error) {
+	if !validOutputItem(item) || !strings.EqualFold(path.Ext(item.Filename), ".mp4") {
+		return nil, errors.New("invalid ComfyUI MP4 output metadata")
 	}
-	q.Set("type", it.Type)
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, c.BaseURL+"/view?"+q.Encode(), nil)
+	query := url.Values{"filename": {item.Filename}, "subfolder": {item.Subfolder}, "type": {item.Type}}
+	if item.Type == "" {
+		query.Set("type", "output")
+	}
+	resp, err := c.request(ctx, http.MethodGet, "/view", query, nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := c.HTTP.Do(req)
+	data, err := readBounded(resp, maxVideoResponse)
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		body, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		return nil, fmt.Errorf("GET /view -> %d: %s", resp.StatusCode, truncate(body))
+	if len(data) < 12 || string(data[4:8]) != "ftyp" {
+		return nil, errors.New("ComfyUI output is not an MP4 binary")
 	}
-	return io.ReadAll(resp.Body)
+	return data, nil
 }
-
-func str(v any) string {
-	if s, ok := v.(string); ok {
-		return s
-	}
-	return ""
-}
-
-func truncate(b []byte) string {
-	const max = 1500
-	if len(b) > max {
-		return string(b[:max]) + "..."
-	}
-	return string(b)
-}
+func str(value any) string { result, _ := value.(string); return result }

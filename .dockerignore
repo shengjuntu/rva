@@ -3,6 +3,9 @@
 !*.go
 !comfyh3/
 !comfyh3/**
+!integrations/
+!integrations/video-project/
+!integrations/video-project/**
 !web/
 !web/**
 !runtime/

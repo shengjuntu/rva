@@ -2,116 +2,163 @@ package main
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/binary"
 	"errors"
+	"fmt"
+	"io"
+	"math"
 	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"time"
 
 	"rundesk-video-app/comfyh3"
 )
 
-// fetchComfyGenerated is the built-in ComfyUI MiniMax-H3 backend.
-// It is selected by configuring:
-//
-//	VIDEO_VIDEO_GEN_URL=comfy://127.0.0.1:19897
-//	VIDEO_VIDEO_GEN_MODEL=minimax_h3_fl2va
-//
-// Instead of POSTing to an http_binary_v1 adapter, it drives ComfyUI
-// directly through the embedded comfyh3 library (submit /prompt, poll
-// /history, download /view) and returns the raw MP4 bytes, which then
-// flow through the exact same validateGenerated/asset pipeline.
-func fetchComfyGenerated(ctx context.Context, j GenerationJob, target GenerationTarget, references []generationReferenceImage) ([]byte, error) {
-	if len(references) > 0 {
-		return nil, errors.New("内置ComfyUI后端暂不支持参考图")
-	}
-	u, e := url.Parse(target.URL)
-	if e != nil || u.Host == "" {
-		return nil, errors.New("生成服务配置无效")
-	}
-	client := comfyh3.NewClient("http://" + u.Host)
-	client.PollTimeout = 10 * time.Minute
+func comfyModelSupported(model string) bool {
+	return model == "minimax_h3_fl2va" || model == comfyh3.DefaultModelSet().Diffusion
+}
 
-	params := comfyh3.GenerateParams{
-		Prompt: j.Prompt,
-		Width:  768,
-		Height: 432,
-		Length: 124,
-		Seed:   time.Now().UnixNano() % 1_000_000_000,
-		Steps:  4,
-		Cfg:    4.5,
-		Prefix: "h3_" + requestPrefix(j.RequestID),
-		Audio:  true,
-	}
-	// duration (request target in seconds) -> frames @24fps, clamped to the
-	// H3 training range; actual duration of the artifact is authoritative.
-	if j.Duration != nil && *j.Duration > 0 {
-		frames := int(*j.Duration * 24)
-		if frames < 124 {
-			frames = 124
+// Keep the user's verified H3 workflow, but expose the effective request instead
+// of silently treating a clamped frame count as the requested/actual duration.
+func comfyGenerationParams(j GenerationJob, gainDB float64) (comfyh3.GenerateParams, *GenerationParameters, []string) {
+	sum := sha256.Sum256([]byte(j.RequestID))
+	p := comfyh3.GenerateParams{Prompt: j.Prompt, Width: 768, Height: 432, Length: 124,
+		Seed: int64(binary.BigEndian.Uint64(sum[:8]) % 1_000_000_000), Steps: 4, Cfg: 4.5,
+		Prefix: "h3_" + j.RequestID, Audio: true}
+	var warnings []string
+	if j.Duration != nil {
+		p.Length = int(*j.Duration * 24)
+		if p.Length < 124 {
+			p.Length = 124
 		}
-		if frames > 362 {
-			frames = 362
+		if p.Length > 362 {
+			p.Length = 362
 		}
-		params.Length = frames
+		if math.Abs(float64(p.Length)/24-*j.Duration) > 0.000001 {
+			warnings = append(warnings, fmt.Sprintf("MiniMax-H3时长目标%.6g秒映射为%d帧@24fps（%.6g秒）；帧数范围124–362，产物实际时长仍以媒体探测为准", *j.Duration, p.Length, float64(p.Length)/24))
+		}
 	}
-	// aspectRatio -> verified resolution mapping.
 	switch j.AspectRatio {
 	case "9:16":
-		params.Width, params.Height = 432, 768
+		p.Width, p.Height = 432, 768
 	case "1:1":
-		params.Width, params.Height = 512, 512
+		p.Width, p.Height = 512, 512
 	case "4:3":
-		params.Width, params.Height = 640, 480
+		p.Width, p.Height = 640, 480
 	case "3:4":
-		params.Width, params.Height = 480, 640
+		p.Width, p.Height = 480, 640
 	}
-	res, e := client.Generate(ctx, comfyh3.DefaultModelSet(), params)
-	if e != nil {
-		return nil, e
-	}
-	// H3 native audio is very quiet (mean ~-39 dB); normalize with ffmpeg.
-	// Falls back to the raw bytes if ffmpeg is unavailable or fails.
-	if data, e := normalizeAudio(ctx, res.Bytes); e == nil {
-		return data, nil
-	}
-	return res.Bytes, nil
+	effective := &GenerationParameters{Width: p.Width, Height: p.Height, FrameCount: p.Length, FrameRate: 24,
+		DurationSeconds: float64(p.Length) / 24, Seed: p.Seed, NativeAudio: true, AudioGainDB: gainDB}
+	return p, effective, warnings
 }
 
-// normalizeAudio boosts quiet audio tracks with ffmpeg (+18 dB, copy video).
-func normalizeAudio(ctx context.Context, mp4 []byte) ([]byte, error) {
-	in, e := os.CreateTemp("", "h3-in-*.mp4")
-	if e != nil {
-		return nil, e
+func newComfyGenerationClient(target GenerationTarget) (*comfyh3.Client, error) {
+	u, err := url.Parse(target.URL)
+	if err != nil || u.Scheme != "comfy" || u.Hostname() == "" || u.User != nil || u.Path != "" || u.RawPath != "" || u.RawQuery != "" || u.ForceQuery || u.Fragment != "" || u.Opaque != "" || !comfyModelSupported(target.Model) {
+		return nil, errors.New("ComfyUI生成配置无效；地址必须为comfy://host:port，模型必须为minimax_h3_fl2va")
 	}
-	defer os.Remove(in.Name())
-	if _, e := in.Write(mp4); e != nil {
-		in.Close()
-		return nil, e
+	client := comfyh3.NewClient("http://" + u.Host)
+	if target.Key != "" {
+		client.Authorization = "Bearer " + target.Key
 	}
-	in.Close()
-	out, e := os.CreateTemp("", "h3-out-*.mp4")
-	if e != nil {
-		return nil, e
+	client.PollTimeout = 10 * time.Minute
+	return client, nil
+}
+
+// Probe only reads API/node/model metadata. It does not load or execute models.
+func probeComfyGeneration(ctx context.Context, target GenerationTarget) error {
+	client, err := newComfyGenerationClient(target)
+	if err != nil {
+		return err
 	}
-	outName := out.Name()
-	out.Close()
-	defer os.Remove(outName)
-	cmd := exec.CommandContext(ctx, "ffmpeg", "-y", "-i", in.Name(),
-		"-af", "volume=18dB", "-c:v", "copy", "-movflags", "+faststart", outName)
-	if b, e := cmd.CombinedOutput(); e != nil {
-		return nil, errors.New("ffmpeg audio normalize failed: " + string(b))
+	stats, err := client.SystemStats(ctx)
+	if err != nil || stats.System.ComfyUIVersion == "" {
+		return errors.New("ComfyUI系统信息不可读取或版本信息缺失")
 	}
-	data, e := os.ReadFile(outName)
-	if e != nil || len(data) == 0 {
-		return nil, errors.New("normalized audio output empty")
+	oi, err := client.ObjectInfo(ctx)
+	if err != nil {
+		return errors.New("ComfyUI节点和模型清单不可读取")
+	}
+	if err := comfyh3.ValidateEnvironment(oi, comfyh3.DefaultModelSet(), comfyh3.GenerateParams{Audio: true}); err != nil {
+		return fmt.Errorf("ComfyUI工作流依赖未就绪：%w", err)
+	}
+	return nil
+}
+
+// fetchComfyGenerated uses the verified text-to-video graph. Reference-image
+// requests are rejected before submission, not silently ignored.
+func fetchComfyGenerated(ctx context.Context, j GenerationJob, target GenerationTarget, references []generationReferenceImage) ([]byte, error) {
+	if j.Type != "video_generation" || len(references) > 0 {
+		return nil, errors.New("内置ComfyUI MiniMax-H3仅支持无参考图的文生视频")
+	}
+	client, err := newComfyGenerationClient(target)
+	if err != nil {
+		return nil, err
+	}
+	params, _, _ := comfyGenerationParams(j, target.AudioGainDB)
+	res, err := client.Generate(ctx, comfyh3.DefaultModelSet(), params)
+	if err != nil {
+		return nil, err
+	}
+	if err = ctx.Err(); err != nil {
+		return nil, err
+	}
+	return applyComfyAudioGain(ctx, res.Bytes, target.AudioGainDB)
+}
+
+// The user's +18dB correction remains the default; zero preserves the original
+// MP4 bytes. Gain is not loudness normalization. Limit after gain to avoid hard
+// sample clipping; failures are explicit so a canceled/failed conversion cannot
+// quietly return a different audio result.
+func applyComfyAudioGain(ctx context.Context, mp4 []byte, gainDB float64) ([]byte, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	if !finite(gainDB) || gainDB < -30 || gainDB > 30 {
+		return nil, errors.New("ComfyUI音轨增益必须在-30至30dB之间")
+	}
+	if len(mp4) < 12 || string(mp4[4:8]) != "ftyp" || len(mp4) > 128<<20 {
+		return nil, errors.New("ComfyUI生成产物必须为非空MP4且不超过128MiB")
+	}
+	if gainDB == 0 {
+		return mp4, nil
+	}
+	dir, err := os.MkdirTemp("", "h3-audio-*")
+	if err != nil {
+		return nil, errors.New("无法准备ComfyUI音轨处理")
+	}
+	defer os.RemoveAll(dir)
+	input, output := filepath.Join(dir, "input.mp4"), filepath.Join(dir, "output.mp4")
+	if err := os.WriteFile(input, mp4, 0600); err != nil {
+		return nil, errors.New("无法准备ComfyUI音轨处理")
+	}
+	step, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	args := []string{"-nostdin", "-v", "error", "-y", "-protocol_whitelist", "file,pipe"}
+	args = append(args, inspectionFormatArgs("mov")...)
+	args = append(args, "-i", input, "-map", "0:v:0", "-map", "0:a:0", "-c:v", "copy", "-c:a", "aac",
+		"-af", "volume="+decimal(gainDB)+"dB,alimiter=limit=0.95:level=false:latency=true", "-t", "600", "-fs", "134217728", "-movflags", "+faststart", output)
+	cmd := exec.CommandContext(step, "ffmpeg", args...)
+	cmd.Env = rendererEnvironment()
+	configureProcess(cmd)
+	cmd.Stdout, cmd.Stderr = io.Discard, io.Discard
+	if err := cmd.Run(); err != nil {
+		if step.Err() != nil {
+			return nil, step.Err()
+		}
+		return nil, errors.New("ComfyUI原生音轨增益处理失败（需要有效视频和音频流及FFmpeg volume/alimiter过滤器）；未回退到未处理音频")
+	}
+	info, err := os.Stat(output)
+	if err != nil || info.Size() <= 0 || info.Size() > 128<<20 {
+		return nil, errors.New("ComfyUI音轨处理产物为空或超过128MiB")
+	}
+	data, err := os.ReadFile(output)
+	if err != nil {
+		return nil, errors.New("无法读取ComfyUI音轨处理产物")
 	}
 	return data, nil
-}
-
-func requestPrefix(id string) string {
-	if len(id) <= 8 {
-		return id
-	}
-	return id[:8]
 }
