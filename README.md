@@ -1,4 +1,4 @@
-# RunDesk Video App · v0.25.0
+# RunDesk Video App · v0.26.0
 
 提供正文和本地素材，开始制作，查看成片，再通过对话调整。Codex 自主完成分镜、选材、图像与视频生成、TTS、HyperFrames 动画、检查和重做；Video App 提供制作 MCP、素材/作品版本和成片展示，RunDesk 负责 Agent 运行、Skills/MCP 配置和轨迹调试。
 
@@ -51,7 +51,7 @@ bash scripts/build.sh
 
 Go 主程序使用标准库及嵌入网页。HyperFrames 渲染另外需要 Node.js、Chromium、HyperFrames 0.8.87、GSAP 3.15.0、FFmpeg/FFprobe 和字体；IndexTTS 模型独立部署，图像/视频生成服务按需配置。native DSL 渲染无需 Node/Chromium。
 
-Docker 部署见 [DOCKER](docs/DOCKER.md)。在旧 docker/.env 显式更新 VIDEO_IMAGE=rundesk-video-app:0.25.0 后构建并启动：
+Docker 部署见 [DOCKER](docs/DOCKER.md)。在旧 docker/.env 显式更新 VIDEO_IMAGE=rundesk-video-app:0.26.0 后构建并启动：
 
 ```bash
 bash scripts/docker.sh init
@@ -107,3 +107,7 @@ App 直接提交 ComfyUI 工作流、轮询结果并下载 MP4，无需另起生
 设计同时参考 [OpenMontage](https://github.com/calesthio/OpenMontage) 的阶段产物、素材组织和检查思路，以及 [video-use](https://github.com/browser-use/video-use) 的文字驱动剪辑、定位和预览自检方法。HyperFrames 主路径的自有代码、Skill 和数据契约独立编写，没有引入 OpenMontage 的代码、Schema 或 Skill；既有可选 video_use 适配保留，使用上游资源时继续遵循原 MIT 许可及依赖各自条款。设计参考不等于直接引入实现，详见 [THIRD_PARTY](THIRD_PARTY.md)。
 
 自动测试和本地渲染只能验证对应接口与环境。真实 Codex 的自主创作、模型视觉、远端生成质量、IndexTTS 音质及部署环境仍需实测；工具调用成功和 PNG 传输不代表已经理解画面，抽帧不等于看过全片或听过声音。Windows 二进制仅交叉编译，未实机验收。旧版本文档保留历史边界，不代表所有后端能力一致。
+
+## 作为独立上游环境的生成服务
+
+0.26.0 支持 `video_job_start(type="tts", options={"source":"text","text":"独立配音文字"})`，配音归档到指定项目但不改原稿或剪辑。RunDesk 0.51.0 的独立 HyperFrames、video-use、OpenMontage 实例可调用这些生成工具并下载媒体，继续使用各自原生工程。App 一键制作仍运行我们自己的导演流程，不自动切换成上游流程。

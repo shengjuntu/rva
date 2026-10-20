@@ -1,4 +1,4 @@
-rundesk-video-app (RVA) · v0.25.0
+rundesk-video-app (RVA) · v0.26.0
 视频制作工作台 / Video Production Workbench for RunDesk/Codex
 
 【中文版】 English follows below.
@@ -60,7 +60,7 @@ IndexTTS 和 ComfyUI 模型在独立服务运行，App 镜像不加载 GPU 模�
 Linux Docker Engine + Compose v2：
   bash scripts/docker.sh init
   # 编辑 docker/.env：保留已有数据路径、地址、令牌和服务设置。
-  # 旧安装显式更新 VIDEO_IMAGE=rundesk-video-app:0.25.0。
+  # 旧安装显式更新 VIDEO_IMAGE=rundesk-video-app:0.26.0。
   bash scripts/docker.sh build
   bash scripts/docker.sh up
   bash scripts/docker.sh token
@@ -197,7 +197,7 @@ IndexTTS and ComfyUI model weights run in separate services.
 For Linux Docker Engine and Compose v2:
   bash scripts/docker.sh init
   # Edit docker/.env; retain existing data paths, endpoints and credentials.
-  # Set VIDEO_IMAGE=rundesk-video-app:0.25.0 for an existing installation.
+  # Set VIDEO_IMAGE=rundesk-video-app:0.26.0 for an existing installation.
   bash scripts/docker.sh build
   bash scripts/docker.sh up
   bash scripts/docker.sh token
@@ -261,7 +261,7 @@ UI instructions are not current navigation. Retain projects, assets, sessions
 and configuration on upgrade; restore a complete pre-upgrade backup to downgrade.
 
 
-多制作环境 / Multiple production environments (0.25.0)
+多制作环境 / Multiple production environments (0.26.0)
 
 RunDesk 0.50.0 可为同一应用登记独立 Docker 实例/工作区的命名预设。
 App 启动设置 VIDEO_PRODUCTION_PROFILE=hyperframes 或 --production-profile hyperframes，
@@ -277,3 +277,14 @@ defaults change. The optional project-creation productionProfile overrides the
 default; an explicit empty string uses the legacy binding. Configure images,
 credentials and Skills/MCP in RunDesk. Selecting a preset does not install
 OpenMontage/video-use or convert an editing backend. See docs/PRODUCTION-PROFILES.md.
+
+独立生成服务（0.26.0） / Independent generation service
+
+新增任意文本 TTS：video_job_start(type=tts, options={source:text,text:...})。
+任务独立归档，不改项目原稿、镜头或剪辑。三套上游配置从 RunDesk 独立实例发起，
+继续各自原生制作流程；App 自研导演按钮保持原流程。当前验证见 docs/validation-0.26.0.json。
+
+Independent upstream containers can request literal-text TTS through the existing
+MCP job API. Jobs retain their own snapshot without rewriting project narration
+or edits. Native upstream production starts in a dedicated RunDesk instance.
+The App director workflow remains unchanged. See docs/validation-0.26.0.json.

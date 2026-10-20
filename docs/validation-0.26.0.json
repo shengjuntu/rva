@@ -1,0 +1,105 @@
+{
+  "version": "0.26.0",
+  "checkedAt": "2026-10-20T04:22:42.670694+00:00",
+  "baseCommit": "fd6fe7b8a3cbb7ffede3df26de202903bfda55d2",
+  "goRace": {
+    "exitCode": 0,
+    "elapsedSeconds": 17.79,
+    "passed": 444,
+    "topLevelPassed": 206,
+    "skippedTests": [
+      "TestRootRuntimeProbeProgramWithActualAppMCP",
+      "TestTextRefsRealAdapterArchiveAndLocator",
+      "TestHyperFramesRealAnimationAudioRender",
+      "TestProductionExchangeRealAdapterArchiveLateResultAndFinalProof",
+      "TestProductionExchangeNewerEditAuthoritySurvivesOlderLateIngest",
+      "TestSpeechSnapshotGenerationAndAdoption"
+    ],
+    "failures": [],
+    "packageTerminals": {
+      "rundesk-video-app/comfyh3": "pass",
+      "rundesk-video-app": "pass"
+    },
+    "missingPackages": []
+  },
+  "rawGoRace": "tests-0.26.0-race.jsonl",
+  "goVet": "passed",
+  "targetedSpeechRace": {
+    "passed": 52,
+    "topLevelPassed": 26,
+    "skipped": 1,
+    "evidence": "independent-speech-targeted-race-0.26.0.jsonl"
+  },
+  "frontendNodeTests": {
+    "passed": 10,
+    "failed": 0
+  },
+  "httpDomChecks": {
+    "passed": 24,
+    "evidence": "dom-validation-0.26.0.json"
+  },
+  "actualAppBridgeIntegration": {
+    "passed": true,
+    "scope": "real Go Video App process, HTTP/MCP, durable jobs, media validation/archive and authenticated download; local deterministic inference fixtures",
+    "actualModelTested": false,
+    "realDockerTested": false,
+    "runDeskServerUsed": false,
+    "binaryVersion": "RunDesk Video App 0.26.0",
+    "checks": [
+      "literal_text_tts_real_job_wav_archive_download_and_identical_retry_one_inference_without_editor_changes",
+      "image_real_job_validated_import_provenance_and_authenticated_download",
+      "video_real_job_validated_import_provenance_and_authenticated_download",
+      "cli_rejects_non_generation_type_and_foreign_project",
+      "stdio_real_app_tool_discovery_and_generation_only_project_scoped_rejections",
+      "real_app_rejects_unauthenticated_artifact_and_wrong_bearer_token"
+    ],
+    "checkCount": 6,
+    "inferenceFixtureCalls": {
+      "/v1/audio/speech": 1,
+      "/image": 1,
+      "/video": 1
+    },
+    "fixtureErrors": [],
+    "projectId": "7d0a2cbe0319737170a2ccca",
+    "downloadedFiles": [
+      "downloaded/clip.mp4",
+      "downloaded/image.png",
+      "downloaded/narration.wav"
+    ],
+    "editorialFieldsPreserved": [
+      "narrationText",
+      "shots",
+      "editDsl",
+      "editActive",
+      "audio",
+      "subtitles",
+      "hyperframes",
+      "workflow"
+    ],
+    "appArchivePresent": true
+  },
+  "integrationEvidence": "video-app-media-http-0.26.0.json",
+  "builds": [
+    {
+      "path": "bin/video-app",
+      "target": "linux/amd64",
+      "runtimeExecuted": true,
+      "bytes": 12991631,
+      "sha256": "0a92b357c870df299364b32b40fd40f3c1492104d3f97ed06943b46b40b4bb5b"
+    },
+    {
+      "path": "bin/video-app-windows-amd64.exe",
+      "target": "windows/amd64",
+      "runtimeExecuted": false,
+      "bytes": 13132800,
+      "sha256": "8676318c38844e7e672a812adfee6f96a5f2b64438211ea5e6bd1be5b9d0eb83"
+    }
+  ],
+  "editorialScope": "Independent source=text synthesis snapshots only; existing narration/shots/audio/subtitles/DSL/HyperFrames/workflow remain unchanged. No director/UI/new backend changes.",
+  "limits": [
+    "No production Docker or live model inference. IndexTTS/image/video inference used deterministic local HTTP fixtures with real App job/media paths.",
+    "Windows cross-compilation only.",
+    "Independent upstream workflows run from RunDesk; no automatic native final.mp4 registration or App director switching.",
+    "Generation-only project restriction is in the client bridge, not a new server-side project token mechanism."
+  ]
+}

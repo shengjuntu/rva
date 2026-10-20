@@ -44,6 +44,7 @@ type SpeechJob struct {
 }
 type SpeechRequest struct {
 	Source    string  `json:"source,omitempty"`
+	Text      string  `json:"text,omitempty"`
 	Backend   string  `json:"backend,omitempty"`
 	Language  string  `json:"language,omitempty"`
 	Speed     float64 `json:"speed,omitempty"`
@@ -57,6 +58,7 @@ type SpeechShot struct {
 	Duration float64 `json:"duration"`
 }
 type SpeechManifest struct {
+	Source     string        `json:"source,omitempty"`
 	Model      string        `json:"model,omitempty"`
 	Language   string        `json:"language,omitempty"`
 	Speed      float64       `json:"speed,omitempty"`
@@ -188,7 +190,7 @@ func (a *App) startSpeech(w http.ResponseWriter, r *http.Request) {
 			matches := old.RequestHash == requestHash
 			if old.RequestHash == "" {
 				legacy := in
-				matches = legacy.normalize(defaultSpeechConfig()) == nil && legacy.Backend == "espeak-ng" && old.Revision == legacy.Revision && old.Voice == legacy.Voice && old.Rate == legacy.Rate
+				matches = legacy.Source != "text" && legacy.Text == "" && legacy.normalize(defaultSpeechConfig()) == nil && legacy.Backend == "espeak-ng" && old.Revision == legacy.Revision && old.Voice == legacy.Voice && old.Rate == legacy.Rate
 			}
 			if !matches {
 				fail(w, 409, errors.New("同一 requestId 不能用于不同配音请求"))
@@ -222,8 +224,13 @@ func (a *App) startSpeech(w http.ResponseWriter, r *http.Request) {
 	snapshot := clone(p)
 	if in.Source == "narration" {
 		snapshot.Shots = narrationShots(p.NarrationText)
+	} else if in.Source == "text" {
+		// This is a private synthesis projection. It never becomes the project's
+		// editorial narration, storyboard, audio binding or editing document.
+		snapshot.NarrationText = in.Text
+		snapshot.Shots = narrationShots(in.Text)
 	} else if in.Source != "" && in.Source != "shots" {
-		fail(w, 400, errors.New("source 必须为 narration 或 shots"))
+		fail(w, 400, errors.New("source 必须为 narration、shots 或 text"))
 		return
 	}
 	total := 0
@@ -409,7 +416,7 @@ func writeSpeechWAVHeader(f *os.File, samples int64) error {
 	return e
 }
 func (a *App) synthesizeSpeech(ctx context.Context, p Project, job SpeechJob, executable, dir string, logfile io.Writer, cfg SpeechConfig) (SpeechManifest, error) {
-	result := SpeechManifest{Schema: 1, JobID: job.ID, ScriptHash: job.ScriptHash, Backend: speechBackend(job.Backend), Model: job.Model, Language: job.Language, Speed: job.Speed, Voice: job.Voice, Rate: job.Rate, Alignment: "synthesized_sentence_durations", Cues: []SubtitleCue{}, Shots: []SpeechShot{}}
+	result := SpeechManifest{Source: job.Source, Schema: 1, JobID: job.ID, ScriptHash: job.ScriptHash, Backend: speechBackend(job.Backend), Model: job.Model, Language: job.Language, Speed: job.Speed, Voice: job.Voice, Rate: job.Rate, Alignment: "synthesized_sentence_durations", Cues: []SubtitleCue{}, Shots: []SpeechShot{}}
 	run := func(name string, args ...string) error {
 		if e := ctx.Err(); e != nil {
 			return e
@@ -640,6 +647,10 @@ func (a *App) adoptSpeech(w http.ResponseWriter, r *http.Request) {
 	job, e := findSpeech(p, r.PathValue("sid"))
 	if e != nil {
 		fail(w, 404, e)
+		return
+	}
+	if job.Source == "text" {
+		fail(w, 409, errors.New("独立文本配音仅提供归档音频，不可覆盖项目分镜或音轨"))
 		return
 	}
 	if job.Source == "narration" {

@@ -92,7 +92,7 @@ func (a *App) capabilityEnvelope(ctx context.Context, probe bool) CapabilityEnve
 		}
 	}
 	envelope.Capabilities = append(envelope.Capabilities, ProductionCapability{ID: "media", Implemented: true, Ready: true, Providers: []ProviderCapability{}, Tools: []string{"video_asset_list", "video_asset_import", "video_asset_inspect", "video_asset_video_inspect"}, Notes: []string{"图片/视频预览需要FFmpeg；inspect-video支持最多8个带时间点的真实视频帧，不包含听音或完整运动检查", "大文件通过已有multipart上传或页面目录导入，MCP导入限小文件"}, Limits: map[string]any{"uploadBytes": 256 << 20, "mcpImportBytes": 1 << 20}})
-	envelope.Capabilities = append(envelope.Capabilities, ProductionCapability{ID: "tts", Implemented: true, Ready: espeak.Ready || index.Ready, Providers: []ProviderCapability{espeak, index}, Tools: []string{"video_job_start", "video_speech_start", "video_speech_adopt"}, Notes: []string{"模型列表探测不代表真实合成、音色和音质已验收", "TTS支持独立口播 source=narration 与兼容旧镜头 source=shots"}})
+	envelope.Capabilities = append(envelope.Capabilities, ProductionCapability{ID: "tts", Implemented: true, Ready: espeak.Ready || index.Ready, Providers: []ProviderCapability{espeak, index}, Tools: []string{"video_job_start", "video_speech_start", "video_speech_adopt"}, Notes: []string{"模型列表探测不代表真实合成、音色和音质已验收", "TTS支持独立口播 source=narration、兼容旧镜头 source=shots，以及独立素材 source=text+text；text只生成归档任务，不改写项目正文/分镜/音轨"}})
 	for _, id := range []string{"image_generation", "video_generation"} {
 		target, err := generationTarget(id)
 		provider := ProviderCapability{ID: generationProvider(target), Runtime: "http_service", State: "blocked", Verified: "configuration_only", Reasons: []string{}, Supports: []string{id}, Model: target.Model}

@@ -1,3 +1,7 @@
+# 升级到 0.26.0
+
+保留原 data、项目、认证、模型服务配置与运行参数。独立上游容器需要任意文本 TTS 时升级到本版；原任务接口向后兼容。更新 App 镜像后，只有明确使用 source=text 的调用才生成独立配音，不迁移或改写现有工程。新增运行配置详见 RunDesk 0.51.0 的独立上游视频文档；现有自研 video-build 不变。
+
 # 升级到 v0.25.0
 
 备份并保留完整data、令牌、RunDesk绑定、会话、原稿、素材与历史输出。旧docker/.env中显式更新VIDEO_IMAGE=rundesk-video-app:0.25.0，再build/up；不要用示例覆盖实际服务配置。IndexTTS和ComfyUI继续使用已有服务，不重装模型。

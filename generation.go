@@ -175,7 +175,7 @@ func (a *App) startGeneration(w http.ResponseWriter, r *http.Request, in JobStar
 		fail(w, 409, errors.New("生成任务容量已满或服务正在停止"))
 		return
 	}
-	if in.Options.Range != nil || in.Options.Source != "" || in.Options.Backend != "" || in.Options.Voice != "" || in.Options.Language != "" || in.Options.Speed != 0 || in.Options.Rate != 0 || in.Options.Kind != "" || strings.TrimSpace(in.Options.Prompt) == "" || len(in.Options.Prompt) > 16000 || strings.ContainsRune(in.Options.Prompt, 0) {
+	if in.Options.Text != "" || in.Options.Range != nil || in.Options.Source != "" || in.Options.Backend != "" || in.Options.Voice != "" || in.Options.Language != "" || in.Options.Speed != 0 || in.Options.Rate != 0 || in.Options.Kind != "" || strings.TrimSpace(in.Options.Prompt) == "" || len(in.Options.Prompt) > 16000 || strings.ContainsRune(in.Options.Prompt, 0) {
 		fail(w, 400, errors.New("生成任务接受prompt、duration、aspectRatio、referenceAssetIds；prompt最多16000字节"))
 		return
 	}

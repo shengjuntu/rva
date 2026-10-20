@@ -4,6 +4,26 @@
 
 部署和首次接入见 [INDEXTTS](INDEXTTS.md)。eSpeak 默认在 PATH 查找 `espeak-ng`，也可用 `--espeak` 或启动脚本的 VIDEO_ESPEAK。IndexTTS 模式无需安装 eSpeak。
 
+## 独立文本素材配音
+
+外部 HyperFrames、video-use、OpenMontage 等制作环境可调用现有 MCP `video_job_start`：
+
+```json
+{
+  "projectId": "PROJECT_ID",
+  "revision": 1,
+  "requestId": "24_HEX_DIGITS_REQUEST_ID",
+  "type": "tts",
+  "options": {"source": "text", "text": "需要生成的独立配音文本。"}
+}
+```
+
+HTTP 等价接口为 `POST /api/projects/{id}/jobs`。`source=text` 的 `text` 必须为非空有效 UTF-8，最多 60000 字节和 300 个合成片段；不能将 `text` 与 `source=narration/shots` 混用。音色、语言、后端、语速沿用管理员默认，也可使用现有可选参数；请求不能更改服务 URL、密钥或模型部署配置。
+
+这条路径只保存私有合成快照和配音任务，不改项目正文、分镜、剪辑后端、音轨、字幕、素材或编辑 revision。原始独立文本保留在该任务的 `snapshot.json` 中，job 返回 `source=text` 与 `scriptHash`；完成后的 `manifest.json` 同时记录来源与实测合成时序。它不能通过 adopt 或 materialize 改写项目，外部制作环境直接下载完成任务的 WAV/SRT 与清单，按自己的原生流程剪辑。
+
+返回的 `tts:<id>` 与其他制作任务一样通过 `video_job_get` 查询，成功后 `artifacts` 提供认证下载 URL、SHA-256 和大小。未完成、失败或已取消的任务不发布音频；取消和重启沿用下文语义。响应丢失时保留同一 requestId 和全部原始参数重试，已保存回执优先于当前配置/revision核对；同 ID 更改 text 返回 409，不会再次合成。
+
 ## 使用流程
 
 保存分镜正文 → 配置服务 → 检查环境 → 选择本次引擎/音色/语速/语言 → 生成 → 试听 → 采用。镜头标题、项目说明不朗读；无正文镜头保留静音。生成只保存独立任务，不改写当前音轨、字幕或镜头。采用后按实际音频调整镜头时长，背景音乐、素材、标题保留。

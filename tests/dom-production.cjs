@@ -26,7 +26,7 @@ const removed = ['advanced-workspace','speech-section','speech-start','speech-ad
       proc.on('exit', code => { clearTimeout(timer); reject(Error('server exited ' + code)); });
     });
     const health = await (await realFetch('/api/health')).json();
-    assert.equal(health.version, '0.25.0', 'run this regression against the newly built release binary');
+    assert.equal(health.version, '0.26.0', 'run this regression against the newly built release binary');
 
     const transport = {connected: new Set(), messages: [], events: new Map(), orders: [], loseNext: true, connectCount: 0, uploadGate: null};
     async function uiFetch(route, options = {}) {
@@ -42,7 +42,7 @@ const removed = ['advanced-workspace','speech-section','speech-start','speech-ad
         if (tail === '/connect') {
           transport.connected.add(pid); transport.connectCount++;
           const saved = await (await realFetch('/api/projects/' + pid)).json();
-          return json({...saved, sessionId: 'test-session-' + pid, workspaceId: 'test-workspace', toolsVersion: '0.25.0'});
+          return json({...saved, sessionId: 'test-session-' + pid, workspaceId: 'test-workspace', toolsVersion: '0.26.0'});
         }
         if (tail === '/agent') return json({status: 'idle', appRunId: 'fixture-run'});
         if (tail === '/events') return json((transport.events.get(pid) || []).filter(event => event.id > Number(url.searchParams.get('after') || 0)));
@@ -60,7 +60,7 @@ const removed = ['advanced-workspace','speech-section','speech-start','speech-ad
         }
         if (tail === '' && method === 'GET' && transport.connected.has(pid)) {
           const saved = await (await realFetch(route, options)).json();
-          return json({...saved, sessionId: 'test-session-' + pid, workspaceId: 'test-workspace', toolsVersion: '0.25.0'});
+          return json({...saved, sessionId: 'test-session-' + pid, workspaceId: 'test-workspace', toolsVersion: '0.26.0'});
         }
       }
       return realFetch(route, options);
@@ -225,7 +225,7 @@ const removed = ['advanced-workspace','speech-section','speech-start','speech-ad
     assert.equal(ui.run('pendingMessage(project.id)'), null);
     checks.push('failure to persist a request receipt prevents dispatch rather than creating an unrecoverable submission');
 
-    const staleProject = {...await project(pid), sessionId: 'test-session-' + pid, toolsVersion: '0.25.0'};
+    const staleProject = {...await project(pid), sessionId: 'test-session-' + pid, toolsVersion: '0.26.0'};
     let releaseOldGet, oldGetStarted;
     const getStarted = new Promise(resolve => { oldGetStarted = resolve; });
     const oldGet = new Promise(resolve => { releaseOldGet = resolve; });
@@ -326,7 +326,7 @@ const removed = ['advanced-workspace','speech-section','speech-start','speech-ad
 
     checks.push(...await backendCompatibility(realFetch, root));
     const report = {passed: true, version: health.version, environment: 'JSDOM + actual Go HTTP API; RunDesk connection, message receipts and replay use explicit fixtures', checkCount: checks.length, checks, limitations: ['No graphical-browser appearance check.', 'No live Codex/Kun execution or new video rendering in this DOM test.', 'Render-history playback/export selection uses completed metadata fixtures; media integrity is covered by Go tests.']};
-    fs.writeFileSync(path.join(root, 'docs/dom-validation-0.25.0.json'), JSON.stringify(report, null, 2) + '\n');
+    fs.writeFileSync(path.join(root, 'docs/dom-validation-0.26.0.json'), JSON.stringify(report, null, 2) + '\n');
     console.log('Minimal workbench DOM + HTTP passed (' + checks.length + ' checks)');
   } finally {
     ui?.dom.window.close(); proc.kill('SIGTERM');

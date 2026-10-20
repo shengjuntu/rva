@@ -1,3 +1,10 @@
+# v0.26.0
+
+- 增加 source=text 的独立文本 TTS，供 HyperFrames、video-use、OpenMontage 等独立上游环境经 MCP 调用。
+- 使用已有持久任务、快照、音频归档和幂等回执，不改项目正文、分镜、音轨与编辑工程；禁止将独立任务 adopt/materialize 覆盖主项目。
+- 生成任务和 MCP 能力说明标明独立配音来源及内容哈希，拒绝跨任务类型误传 text。
+- 主界面、自研导演、原有 IndexTTS/ComfyUI 服务设置及历史项目继续沿用。
+
 # v0.25.0
 
 - 接入 RunDesk 0.50.0 的管理员批准运行预设，启动默认和创建项目可选择 productionProfile。

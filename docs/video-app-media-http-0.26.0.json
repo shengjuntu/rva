@@ -1,0 +1,40 @@
+{
+  "passed": true,
+  "scope": "real Go Video App process, HTTP/MCP, durable jobs, media validation/archive and authenticated download; local deterministic inference fixtures",
+  "actualModelTested": false,
+  "realDockerTested": false,
+  "runDeskServerUsed": false,
+  "binaryVersion": "RunDesk Video App 0.26.0",
+  "checks": [
+    "literal_text_tts_real_job_wav_archive_download_and_identical_retry_one_inference_without_editor_changes",
+    "image_real_job_validated_import_provenance_and_authenticated_download",
+    "video_real_job_validated_import_provenance_and_authenticated_download",
+    "cli_rejects_non_generation_type_and_foreign_project",
+    "stdio_real_app_tool_discovery_and_generation_only_project_scoped_rejections",
+    "real_app_rejects_unauthenticated_artifact_and_wrong_bearer_token"
+  ],
+  "checkCount": 6,
+  "inferenceFixtureCalls": {
+    "/v1/audio/speech": 1,
+    "/image": 1,
+    "/video": 1
+  },
+  "fixtureErrors": [],
+  "projectId": "7d0a2cbe0319737170a2ccca",
+  "downloadedFiles": [
+    "downloaded/clip.mp4",
+    "downloaded/image.png",
+    "downloaded/narration.wav"
+  ],
+  "editorialFieldsPreserved": [
+    "narrationText",
+    "shots",
+    "editDsl",
+    "editActive",
+    "audio",
+    "subtitles",
+    "hyperframes",
+    "workflow"
+  ],
+  "appArchivePresent": true
+}

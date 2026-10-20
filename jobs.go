@@ -19,6 +19,8 @@ type JobArtifact struct {
 	Size   int64  `json:"size,omitempty"`
 }
 type ProductionJob struct {
+	Source               string                `json:"source,omitempty"`
+	ScriptHash           string                `json:"scriptHash,omitempty"`
 	ID                   string                `json:"jobId"`
 	NativeID             string                `json:"nativeId"`
 	ProjectID            string                `json:"projectId"`
@@ -38,6 +40,7 @@ type ProductionJob struct {
 	Warnings             []string              `json:"warnings,omitempty"`
 }
 type JobOptions struct {
+	Text              string       `json:"text,omitempty"`
 	Duration          *float64     `json:"duration,omitempty"`
 	AspectRatio       string       `json:"aspectRatio,omitempty"`
 	ReferenceAssetIDs []string     `json:"referenceAssetIds,omitempty"`
@@ -89,6 +92,7 @@ func unifiedState(s string) string {
 }
 func speechJobView(pid string, j SpeechJob) ProductionJob {
 	v := ProductionJob{ID: "tts:" + j.ID, NativeID: j.ID, ProjectID: pid, Type: "tts", Provider: speechBackend(j.Backend), State: unifiedState(j.State), NativeState: j.State, Revision: j.Revision, RequestID: j.RequestID, Created: j.Created, CompletedUnits: j.Progress, TotalUnits: j.Total, ProgressKnown: j.Total > 0, Error: j.Error, Artifacts: []JobArtifact{}}
+	v.Source, v.ScriptHash = j.Source, j.ScriptHash
 	if j.State == "completed" {
 		for name, f := range j.Files {
 			v.Artifacts = append(v.Artifacts, JobArtifact{Name: name, URL: "/api/projects/" + pid + "/speech/" + j.ID + "/files/" + name, SHA256: f.SHA256, Size: f.Size})
@@ -205,9 +209,9 @@ func (a *App) jobStart(w http.ResponseWriter, r *http.Request) {
 			fail(w, 400, errors.New("TTS不接受渲染kind"))
 			return
 		}
-		native = SpeechRequest{Source: in.Options.Source, Revision: in.Revision, RequestID: in.RequestID, Backend: in.Options.Backend, Voice: in.Options.Voice, Language: in.Options.Language, Speed: in.Options.Speed, Rate: in.Options.Rate}
+		native = SpeechRequest{Source: in.Options.Source, Text: in.Options.Text, Revision: in.Revision, RequestID: in.RequestID, Backend: in.Options.Backend, Voice: in.Options.Voice, Language: in.Options.Language, Speed: in.Options.Speed, Rate: in.Options.Rate}
 	case "render":
-		if in.Options.Prompt != "" || in.Options.Source != "" || in.Options.Backend != "" || in.Options.Voice != "" || in.Options.Language != "" || in.Options.Speed != 0 || in.Options.Rate != 0 || in.Options.Duration != nil || in.Options.AspectRatio != "" || len(in.Options.ReferenceAssetIDs) != 0 {
+		if in.Options.Text != "" || in.Options.Prompt != "" || in.Options.Source != "" || in.Options.Backend != "" || in.Options.Voice != "" || in.Options.Language != "" || in.Options.Speed != 0 || in.Options.Rate != 0 || in.Options.Duration != nil || in.Options.AspectRatio != "" || len(in.Options.ReferenceAssetIDs) != 0 {
 			fail(w, 400, errors.New("渲染仅接受kind"))
 			return
 		}

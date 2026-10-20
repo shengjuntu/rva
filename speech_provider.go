@@ -16,6 +16,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
 // Settings are local administrator configuration. Requests/MCP cannot supply a
@@ -282,6 +283,18 @@ func speechBackend(s string) string {
 	return s
 }
 func (in *SpeechRequest) normalize(c SpeechConfig) error {
+	switch in.Source {
+	case "text":
+		if !utf8.ValidString(in.Text) || strings.ContainsRune(in.Text, 0) || strings.TrimSpace(in.Text) == "" || len(in.Text) > 60000 || len(narrationShots(in.Text)) > 300 {
+			return errors.New("独立配音text须为有效非空UTF-8，最多60000字节和300个合成片段")
+		}
+	case "", "narration", "shots":
+		if in.Text != "" {
+			return errors.New("text仅用于source=text的独立配音，不可替代保存的正文")
+		}
+	default:
+		return errors.New("source 必须为 narration、shots 或 text")
+	}
 	if in.Backend == "" {
 		in.Backend = c.Backend
 	}
