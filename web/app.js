@@ -20,7 +20,7 @@ function rememberMessage(pid,body){const key="video-message:"+pid;if(body)localS
 function clearMessage(pid,requestId){const pending=pendingMessage(pid);if(!pending||pending.requestId!==requestId)return false;rememberMessage(pid,null);return true;}
 
 function persistDraft(){
- if(!project)return;
+ if(!project){try{rememberUnboundDraft();}catch(error){draftStorageError="浏览器未能保存本机草稿："+error.message;}return;}
  try{const draft={prompt:$("#prompt").value};if(narrationDirty)draft.narration={text:$("#narration-text").value,baseRevision:narrationBase};if(workflowDirty)draft.workflow={instructions:$("#workflow-instructions").value,baseRevision:workflowBase};const key="video-draft-v1:"+project.id;if(draft.prompt||draft.narration||draft.workflow)localStorage.setItem(key,JSON.stringify(draft));else localStorage.removeItem(key);draftStorageError="";}
  catch(error){draftStorageError="浏览器未能保存本机草稿："+error.message;$("#save-state").textContent=draftStorageError;}
 }
@@ -48,18 +48,129 @@ function reconcileMessage(submission){
 }
 function showApp(){$("#login").hidden=true;$("#app").hidden=false;}
 async function listProjects(){const list=await api("/api/projects"),select=$("#projects");select.replaceChildren();for(const item of list){const option=el("option",item.name);option.value=item.id;select.append(option);}if(project)select.value=project.id;return list;}
-async function createDefaultProject(){const key="video-default-project-v1";let request=JSON.parse(localStorage.getItem(key)||"null");if(!request){request={name:"新视频",requestId:id()};localStorage.setItem(key,JSON.stringify(request));}const created=await api("/api/projects",request);localStorage.removeItem(key);return created;}
-let ensuringProject=null;
-async function ensureProject(){if(project)return project;if(ensuringProject)return ensuringProject;ensuringProject=(async()=>{const created=await createDefaultProject();await openProject(created.id);await listProjects();return project;})();try{return await ensuringProject;}finally{ensuringProject=null;}}
+const projectCreateKey="video-project-create-v2", legacyProjectCreateKey="video-default-project-v1";
+let runtimeCatalog=null, runtimeCatalogReady=false, runtimeCatalogSerial=0, newDialogSerial=0,projectRuntimeCatalog=null,unboundDraftLoaded=false;
+let selectedRuntimeProfile, newProjectReceipt=null, newProjectReceiptError="", creatingProject=false;
+const runtimeStateLabels={running:"运行中",stopped:"已停止",not_started:"未启动",local:"本机环境",pending_update:"等待更新",disabled:"已停用",unknown:"状态未知",unavailable:"暂不可用",missing:"尚未配置"};
+function rememberUnboundDraft(){
+ if(project)return;
+ const draft={narration:$("#narration-text").value,instructions:$("#workflow-instructions").value,prompt:$("#prompt").value};
+ if(Object.values(draft).some(Boolean)){localStorage.setItem("video-unbound-draft-v1",JSON.stringify(draft));unboundDraftLoaded=true;}else if(unboundDraftLoaded||narrationDirty||workflowDirty)localStorage.removeItem("video-unbound-draft-v1");
+}
+function restoreUnboundDraft(){
+ let draft;try{draft=JSON.parse(localStorage.getItem("video-unbound-draft-v1")||"null");}catch{return;}
+ if(!draft)return;unboundDraftLoaded=true;
+ for(const [field,selector] of [["narration","#narration-text"],["instructions","#workflow-instructions"],["prompt","#prompt"]])if(typeof draft[field]==="string")$(selector).value=draft[field];
+ if(project){narrationDirty=!!draft.narration;workflowDirty=!!draft.instructions;narrationBase=workflowBase=project.revision;persistDraft();localStorage.removeItem("video-unbound-draft-v1");drawProject();}
+}
+function readProjectCreationReceipt(){
+ const saved=localStorage.getItem(projectCreateKey),legacy=localStorage.getItem(legacyProjectCreateKey);
+ if(saved&&legacy)throw Error("发现两份待确认的创建记录，请先核对原项目，未发起新建。");
+ const raw=saved||legacy;if(!raw)return null;
+ let body;try{body=JSON.parse(raw);}catch{throw Error("本机项目创建记录无法读取，未发起新的创建请求。");}
+ if(!body||typeof body.name!=="string"||typeof body.requestId!=="string"||!/^[a-f0-9]{24}$/.test(body.requestId)||Object.keys(body).some(key=>!["name","requestId","productionProfile"].includes(key))||Object.hasOwn(body,"productionProfile")&&typeof body.productionProfile!=="string")throw Error("本机项目创建记录不完整，未发起新的创建请求。");
+ return{key:saved?projectCreateKey:legacyProjectCreateKey,body};
+}
+function setRuntimeConfigLink(){
+ const link=$("#new-profile-rundesk");link.hidden=true;
+ try{const address=new URL(runtimeCatalog?.rundeskURL||rundeskURL);if(!["http:","https:"].includes(address.protocol)||address.username||address.password)return;address.search="";address.hash="application/rundesk-video-app";link.href=address.href;link.hidden=false;}catch{}
+}
+function updateNewProjectControls(){
+ const item=runtimeCatalog?.items.find(row=>row.id===selectedRuntimeProfile),locked=creatingProject||!!newProjectReceipt||!!newProjectReceiptError;
+ $("#new-name").disabled=locked;$("#new-profile-search").disabled=locked||!runtimeCatalogReady;$("#new-profile").disabled=locked||!runtimeCatalogReady;
+ $("#new-submit").disabled=creatingProject||!!newProjectReceiptError||!newProjectReceipt&&(!runtimeCatalogReady||!item?.selectable||!item.enabled);
+ $("#new-submit").textContent=creatingProject?"正在创建…":newProjectReceipt?"确认原创建":"创建项目";
+ $("#new-profile-receipt").hidden=!newProjectReceipt;
+ $("#new-profile-receipt").textContent=newProjectReceipt?"已保存原创建请求。名称和环境保持不变，重试只核对或打开同一个项目。":"";
+ setRuntimeConfigLink();
+}
+function renderRuntimeChoices(){
+ const select=$("#new-profile"),query=$("#new-profile-search").value.trim().toLocaleLowerCase(),items=runtimeCatalog?.items||[];
+ const matches=items.filter(item=>(item.name+" "+(item.description||"")).toLocaleLowerCase().includes(query));
+ const selected=items.find(item=>item.id===selectedRuntimeProfile),visible=[...matches];
+ if(selected&&!visible.includes(selected))visible.unshift(selected);
+ select.replaceChildren();
+ for(const item of visible){const option=el("option",item.name+" · "+(runtimeStateLabels[item.state]||"状态未知")+(item.isDefault?" · 默认":""));option.value=item.id;option.disabled=!item.selectable||!item.enabled;select.append(option);}
+ if(selected){select.value=selected.id;}else{select.selectedIndex=-1;}
+ const detail=$("#new-profile-detail");
+ if(newProjectReceipt&&!Object.hasOwn(newProjectReceipt.body,"productionProfile"))detail.textContent="原请求未显式指定环境，重试保留原始内容，不改用当前默认值。";
+ else if(selected)detail.textContent=selected.name+(selected.description?" · "+selected.description:"")+(selected.message?" · "+selected.message:"");
+ else if(selectedRuntimeProfile!==undefined)detail.textContent="原选环境暂不可用，请刷新或选择其他环境。";
+ else detail.textContent="选择 RunDesk 中已为此应用配置的制作环境。";
+ $("#new-profile-empty").hidden=matches.length>0;
+ $("#new-profile-empty").textContent=query?"没有匹配的环境；已有选择保持不变。":"没有可选制作环境，请在 RunDesk 中配置后刷新。";
+ updateNewProjectControls();
+}
+async function loadRuntimeProfiles(){
+ const serial=++runtimeCatalogSerial,dialogSerial=newDialogSerial;runtimeCatalogReady=false;updateNewProjectControls();
+ $("#new-profile-status").classList.remove("error");$("#new-profile-status").textContent="正在读取 RunDesk 制作环境…";
+ try{
+  const catalog=await api("/api/runtime-profiles");
+  if(serial!==runtimeCatalogSerial||dialogSerial!==newDialogSerial||!$("#new-dialog").open)return;
+  if(!catalog||!Array.isArray(catalog.items)||typeof catalog.defaultProfile!=="string"||catalog.items.some(item=>!item||typeof item.id!=="string"||typeof item.name!=="string"||typeof item.enabled!=="boolean"||typeof item.selectable!=="boolean")||new Set(catalog.items.map(item=>item.id)).size!==catalog.items.length)throw Error("RunDesk 制作环境列表格式无效，未更换原选择。");
+  runtimeCatalog=catalog;runtimeCatalogReady=true;
+  if(newProjectReceipt){selectedRuntimeProfile=Object.hasOwn(newProjectReceipt.body,"productionProfile")?newProjectReceipt.body.productionProfile:undefined;}
+  else if(selectedRuntimeProfile===undefined)selectedRuntimeProfile=catalog.defaultProfile;
+  $("#new-profile-status").textContent=(catalog.warnings||[]).filter(item=>typeof item==="string").join(" ")||"已读取环境。未启动的环境会在开始制作时按原流程准备。";
+  renderRuntimeChoices();
+ }catch(error){
+  if(serial!==runtimeCatalogSerial||dialogSerial!==newDialogSerial||!$("#new-dialog").open)return;
+  runtimeCatalogReady=false;$("#new-profile-status").classList.add("error");$("#new-profile-status").textContent=error.message+" 请刷新重试，或打开 RunDesk 配置。";updateNewProjectControls();
+ }
+}
+async function openNewProject(){
+ persistDraft();++newDialogSerial;newProjectReceiptError="";
+ try{newProjectReceipt=readProjectCreationReceipt();}catch(error){newProjectReceipt=null;newProjectReceiptError=error.message;}
+ if(newProjectReceipt){$("#new-name").value=newProjectReceipt.body.name;selectedRuntimeProfile=Object.hasOwn(newProjectReceipt.body,"productionProfile")?newProjectReceipt.body.productionProfile:undefined;}
+ else if(!$("#new-name").value)$("#new-name").value="新视频";
+ $("#new-project-error").textContent=newProjectReceiptError;$("#new-profile-search").value="";
+ if(!$("#new-dialog").open)$("#new-dialog").showModal();
+ renderRuntimeChoices();await loadRuntimeProfiles();
+}
+function closeNewProject(){++newDialogSerial;++runtimeCatalogSerial;$("#new-dialog").close();}
+async function createSelectedProject(event){
+ event.preventDefault();if(creatingProject||newProjectReceiptError)return;
+ persistDraft();const gen=epoch,carryUnbound=!project;
+ if(!newProjectReceipt){
+  const selected=runtimeCatalog?.items.find(item=>item.id===selectedRuntimeProfile);
+  if(!runtimeCatalogReady||!selected?.selectable||!selected.enabled)throw Error("请先从已读取的列表选择可用制作环境。");
+  const name=$("#new-name").value.trim();if(!name)throw Error("请填写项目名称。");
+  const body={name,productionProfile:selectedRuntimeProfile,requestId:id()};localStorage.setItem(projectCreateKey,JSON.stringify(body));newProjectReceipt={key:projectCreateKey,body};
+ }
+ creatingProject=true;let acknowledged=false;$("#new-project-error").textContent="";updateNewProjectControls();
+ try{
+  const receipt=newProjectReceipt,created=await api("/api/projects",receipt.body);
+  if(!created||!/^[a-f0-9]{24}$/.test(created.id)||Object.hasOwn(receipt.body,"productionProfile")&&created.productionProfile!==receipt.body.productionProfile)throw Error("项目创建回执与所选环境不一致，原请求已保留，请重试核对。");
+  acknowledged=true;
+  if(gen===epoch){await openProject(created.id);if(carryUnbound)restoreUnboundDraft();}
+  await listProjects();
+  let saved;try{saved=JSON.parse(localStorage.getItem(receipt.key)||"null");}catch{}
+  if(saved?.requestId===receipt.body.requestId)localStorage.removeItem(receipt.key);
+  newProjectReceipt=null;selectedRuntimeProfile=undefined;$("#new-name").value="";closeNewProject();
+ }catch(error){const message=error.message+(acknowledged?" 项目已创建，重试会打开同一个项目。":" 原创建请求已保留，可重试核对。");$("#new-project-error").textContent=message;throw Error(message);}
+ finally{creatingProject=false;updateNewProjectControls();}
+}
+function drawProjectRuntime(catalog){
+ const label=$("#project-runtime");if(!project){label.textContent="";return;}
+ const profile=project.runtimeBinding?(project.runtimeBinding.presetId||""):project.productionProfile;
+ const source=catalog||projectRuntimeCatalog||runtimeCatalog,item=Array.isArray(source?.items)?source.items.find(row=>row.id===(profile||"")):undefined;
+ const name=item?.name||(profile?"已保存的制作环境":"原默认环境");
+ label.textContent="制作环境："+name+" · 随项目保存"+(item?.state==="disabled"?" · 已停用":"");
+}
+async function loadProjectRuntimeLabel(){
+ if(!project)return;const pid=project.id,gen=epoch;
+ try{const catalog=await api("/api/runtime-profiles");if(gen===epoch&&project?.id===pid){projectRuntimeCatalog=catalog;drawProjectRuntime();}}catch{if(gen===epoch&&project?.id===pid)drawProjectRuntime();}
+}
+async function ensureProject(){if(project)return project;await openNewProject();throw Error("请先选择制作环境并创建项目，已输入的正文与要求会保留。");}
 async function openProject(pid){
  persistDraft();const gen=++epoch;let current;try{current=await api("/api/projects/"+pid);}catch(error){if(gen===epoch){$("#projects").value=project?.id||"";sending=false;startingDraft=false;uploading=false;drawWorkflow();}throw error;}if(gen!==epoch)return null;
- project=current;session=null;after=0;rows=new Map();approvalKey="";boardKey="";boardLoading=false;serviceJobsKey="";serviceJobsLoading=false;activeProductionJobs=[];narrationDirty=false;workflowDirty=false;narrationBase=current.revision;workflowBase=current.revision;sending=false;startingDraft=false;uploading=false;
+ project=current;projectRuntimeCatalog=null;session=null;after=0;rows=new Map();approvalKey="";boardKey="";boardLoading=false;serviceJobsKey="";serviceJobsLoading=false;activeProductionJobs=[];narrationDirty=false;workflowDirty=false;narrationBase=current.revision;workflowBase=current.revision;sending=false;startingDraft=false;uploading=false;
  $("#prompt").value="";$("#narration-text").value=current.narrationText||"";$("#workflow-instructions").value=current.workflow?.instructions||"";$("#conflict").hidden=true;$("#send-state").textContent="";$("#workflow-status").textContent="";$("#narration-status").textContent="";$("#approvals").replaceChildren();$("#conversation").replaceChildren(el("p",current.sessionId?"载入已有对话…":"开始制作后，在这里继续调整。","chat-empty"));
- resetOutputs();restoreDraft();drawProject();reconcileMessage(current.agentSubmission);await poll();return gen===epoch?project:null;
+ resetOutputs();restoreDraft();drawProject();reconcileMessage(current.agentSubmission);loadProjectRuntimeLabel();await poll();return gen===epoch?project:null;
 }
 function drawProject(){
  if(!project)return;
- $("#project-name").textContent=project.name;
+ $("#project-name").textContent=project.name;drawProjectRuntime();
  if(!narrationDirty){$("#narration-text").value=project.narrationText||"";narrationBase=project.revision;}
  if(!workflowDirty){$("#workflow-instructions").value=project.workflow?.instructions||"";workflowBase=project.revision;}
  $("#save-state").textContent=draftStorageError||((narrationDirty||workflowDirty)?"本机草稿已保留，开始制作或发送调整时自动保存":"已保存 · 修订 "+project.revision);
@@ -215,8 +326,11 @@ async function confirmOutput(){
 }
 $("#login-form").onsubmit=action(async event=>{event.preventDefault();await api("/login",{token:$("#token").value});$("#token").value="";await boot();});
 $("#logout").onclick=action(async()=>{persistDraft();await api("/logout",{});location.reload();});
-$("#new-project").onclick=()=>$("#new-dialog").showModal();$("#cancel-new").onclick=()=>$("#new-dialog").close();
-$("#new-form").onsubmit=action(async event=>{event.preventDefault();persistDraft();const gen=epoch;const created=await api("/api/projects",{name:$("#new-name").value,requestId:id()});$("#new-dialog").close();if(gen===epoch)await openProject(created.id);await listProjects();});
+$("#new-project").onclick=action(openNewProject);$("#cancel-new").onclick=closeNewProject;
+$("#new-dialog").addEventListener("cancel",()=>{++newDialogSerial;++runtimeCatalogSerial;});
+$("#new-form").onsubmit=action(createSelectedProject);
+$("#new-profile-search").oninput=renderRuntimeChoices;$("#new-profile").onchange=()=>{selectedRuntimeProfile=$("#new-profile").value;renderRuntimeChoices();};
+$("#new-profile-refresh").onclick=action(loadRuntimeProfiles);
 $("#projects").onchange=action(async event=>{await openProject(event.target.value);});
 $("#rename-project").onclick=action(async()=>{if(!project)return;const name=prompt("项目名称",project.name);if(name===null||name===project.name)return;const pid=project.id,gen=epoch,previous=project.revision;const updated=await api("/api/projects/"+pid,{revision:project.revision,name,brief:project.brief,shots:project.shots,audio:project.audio},"PUT");if(gen!==epoch)return;if(updated.revision>=project.revision){advanceIndependentBases(previous,updated.revision);project=updated;}persistDraft();drawProject();await listProjects();});
 $("#reload-project").onclick=action(async()=>{if(!project||!confirm("载入服务器正文与要求将替换这两项本机草稿，保留对话草稿。继续？"))return;narrationDirty=false;workflowDirty=false;persistDraft();await openProject(project.id);});
@@ -233,5 +347,5 @@ $("#prompt").onkeydown=event=>{if(event.key==="Enter"&&!event.shiftKey&&!event.i
 $("#refresh-board").onclick=action(async()=>{await poll();await loadProductionBoard(true);});$("#output-version").onchange=()=>{$("#output-final-status").textContent="";showOutput();};$("#output-final").onclick=action(confirmOutput);
 for(const [button,panel,cls]of [["#toggle-assets","#library","no-assets"],["#toggle-chat","#chat","no-chat"]])$(button).onclick=()=>{$(panel).hidden=!$(panel).hidden;$(".layout").classList.toggle(cls,$(panel).hidden);};
 window.addEventListener("beforeunload",persistDraft);document.addEventListener("visibilitychange",()=>{if(document.hidden)persistDraft();});
-async function boot(){const list=await listProjects();showApp();const selected=project?.id||list[0]?.id;if(selected)await openProject(selected);else await ensureProject();api("/api/environment").then(environment=>{rundeskURL=environment.rundeskURL;updateRunDeskLink();}).catch(()=>{});}
+async function boot(){const list=await listProjects();showApp();const selected=project?.id||list[0]?.id;if(selected)await openProject(selected);else{restoreUnboundDraft();await openNewProject();}if(selected&&(localStorage.getItem(projectCreateKey)||localStorage.getItem(legacyProjectCreateKey)))await openNewProject();api("/api/environment").then(environment=>{rundeskURL=environment.rundeskURL;updateRunDeskLink();setRuntimeConfigLink();}).catch(()=>{});}
 boot().catch((e) => { if(e.status!==401){$("#login-error").textContent=e.message;if(!$("#app").hidden)toast(e.message);} });setInterval(poll,1400);

@@ -1,3 +1,14 @@
+# 0.27.0 验证记录
+
+本轮新增 RunDesk 制作环境查询与可搜索选择器。完整 Go **-race** 回归 472 项通过（213 项顶层），0 失败，6 项依赖实际媒体/外部运行环境的 opt-in 测试跳过；Go vet、Linux 构建与版本启动、Windows amd64 交叉编译通过。Windows 未实机运行。
+
+已发布 JavaScript 的 JSDOM 测试 21 项通过（新选择器 11 项、旧工作台/回执/生成设置 10 项）。最终 Go HTTP 服务与实际网页脚本联测 24 项通过；RunDesk 目录及 Agent 交互使用明确 fixture，App 项目创建、素材、回执和历史接口实际执行。目录后端另有 7 组 HTTP 测试覆盖当前凭据可见列表、默认/停用/缺失、状态、脱敏、边界与取消；全程只读，不启动容器或模型。
+
+没有实际 Docker 生命周期、Codex/Kun 模型任务、IndexTTS/ComfyUI 推理、新闻成片质量或图形浏览器布局验收。普通新建和首访创建使用选择器；新闻包导入保留原创建路径。完整范围、跳过项和原始证据见 [validation-0.27.0.json](validation-0.27.0.json)。
+
+---
+以下保留历史验证。
+
 # v0.2.0 验证记录
 
 验证日期：2026-09-29。环境：Linux amd64、Go 1.27.1、Node.js 24.19.0、FFmpeg 6.1.1、HyperFrames 0.8.87、GSAP 3.15.0、Chrome Headless Shell、Playwright。

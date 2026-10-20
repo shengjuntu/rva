@@ -8,11 +8,11 @@
 <body>
   <div id="login"><form id="login-form"><div class="eyebrow">RUNDESK VIDEO APP</div><h1>视频工作台</h1><p>输入本机服务的访问令牌。</p><input id="token" type="password" autocomplete="current-password" placeholder="访问令牌" required><button class="primary">进入工作台</button><p id="login-error" role="status"></p></form></div>
   <div id="app" hidden>
-    <header><a class="brand" href="/">视频工作台 <span>v0.23.1</span></a><nav><a id="settings-link" href="/settings.html">设置</a><button id="toggle-assets">素材栏</button><button id="toggle-chat">对话栏</button><button id="logout">退出</button></nav></header>
+    <header><a class="brand" href="/">视频工作台 <span>v0.27.0</span></a><nav><a id="settings-link" href="/settings.html">设置</a><button id="toggle-assets">素材栏</button><button id="toggle-chat">对话栏</button><button id="logout">退出</button></nav></header>
     <div class="layout">
       <aside id="library"><div class="section-head"><h2>项目</h2><button id="new-project" aria-label="新建项目">＋</button></div><select id="projects" aria-label="选择项目"></select><button id="rename-project">重命名项目</button><button id="import-news">导入新闻制作包</button><input id="news-package" type="file" accept=".zip,application/zip" hidden><div class="section-head"><h2>项目素材</h2></div><div id="assets"></div><p class="library-footer">正文驱动制作<br>执行与调试由 RunDesk 提供</p></aside>
       <main>
-        <div class="project-head"><div class="eyebrow">VIDEO PROJECT</div><h1 id="project-name">开始一个视频项目</h1><p id="save-state" class="muted small">导入正文与素材，开始制作。</p></div>
+        <div class="project-head"><div class="eyebrow">VIDEO PROJECT</div><h1 id="project-name">开始一个视频项目</h1><p id="save-state" class="muted small">导入正文与素材，开始制作。</p><p id="project-runtime" class="muted small"></p></div>
         <div id="conflict" class="notice" hidden>项目已有新修订，本机草稿仍保留。请核对后再提交。<button id="reload-project">载入服务器版本</button></div>
         <section id="production-input" class="production-input">
           <div class="section-head"><h2>正文</h2><div class="row"><button id="narration-use-existing" hidden>使用已有正文</button><button id="narration-import">导入文本</button></div><input id="narration-file" type="file" accept=".txt,.md,text/plain" hidden></div>
@@ -27,6 +27,12 @@
       <aside id="chat"><div class="section-head"><h2>创作助手</h2><span id="agent-status" class="badge">未开始</span></div><p class="muted small">例如：“第二节不够直观，请重新制作，其他部分保留。”</p><a id="open-rundesk" class="small" target="_blank" rel="noopener">在 RunDesk 查看执行详情</a><div id="conversation"><p class="chat-empty">先开始制作，随后在这里继续调整。</p></div><div id="approvals"></div><form id="composer"><textarea id="prompt" rows="4" placeholder="指出需要改进的文字、镜头或声音。"></textarea><div class="row"><button id="agent-stop" type="button" hidden>停止制作</button><button id="send" class="primary">发送</button></div></form><p id="send-state" class="muted small" role="status"></p><p class="muted small">Enter 发送 · Shift + Enter 换行<br>对话草稿按项目自动保留</p></aside>
     </div><div id="toast" role="status" hidden></div>
   </div>
-  <dialog id="new-dialog"><form id="new-form"><h2>新建视频项目</h2><label>项目名称<input id="new-name" required maxlength="80" placeholder="例如：今日科技新闻"></label><div class="row"><button id="cancel-new" type="button">取消</button><button class="primary">创建项目</button></div></form></dialog>
+  <dialog id="new-dialog"><form id="new-form"><h2>新建视频项目</h2><label>项目名称<input id="new-name" required maxlength="80" placeholder="例如：今日科技新闻"></label>
+    <div class="section-head runtime-picker-head"><label for="new-profile-search">制作环境</label><button id="new-profile-refresh" type="button">刷新列表</button></div>
+    <input id="new-profile-search" type="search" aria-label="搜索制作环境" placeholder="搜索环境名称或用途" autocomplete="off">
+    <select id="new-profile" size="4" aria-label="选择制作环境" aria-describedby="new-profile-detail new-profile-status"></select>
+    <p id="new-profile-empty" class="muted small" hidden></p><p id="new-profile-detail" class="muted small"></p><p id="new-profile-status" class="muted small" role="status"></p>
+    <p class="small"><a id="new-profile-rundesk" target="_blank" rel="noopener" hidden>打开 RunDesk 配置</a></p><p id="new-profile-receipt" class="notice small" hidden></p><p id="new-project-error" class="error small" role="status"></p>
+    <div class="row"><button id="cancel-new" type="button">取消</button><button id="new-submit" class="primary">创建项目</button></div></form></dialog>
 </body>
 </html>

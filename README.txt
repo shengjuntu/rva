@@ -1,4 +1,4 @@
-rundesk-video-app (RVA) · v0.26.0
+rundesk-video-app (RVA) · v0.27.0
 视频制作工作台 / Video Production Workbench for RunDesk/Codex
 
 【中文版】 English follows below.
@@ -60,7 +60,7 @@ IndexTTS 和 ComfyUI 模型在独立服务运行，App 镜像不加载 GPU 模�
 Linux Docker Engine + Compose v2：
   bash scripts/docker.sh init
   # 编辑 docker/.env：保留已有数据路径、地址、令牌和服务设置。
-  # 旧安装显式更新 VIDEO_IMAGE=rundesk-video-app:0.26.0。
+  # 旧安装显式更新 VIDEO_IMAGE=rundesk-video-app:0.27.0。
   bash scripts/docker.sh build
   bash scripts/docker.sh up
   bash scripts/docker.sh token
@@ -197,7 +197,7 @@ IndexTTS and ComfyUI model weights run in separate services.
 For Linux Docker Engine and Compose v2:
   bash scripts/docker.sh init
   # Edit docker/.env; retain existing data paths, endpoints and credentials.
-  # Set VIDEO_IMAGE=rundesk-video-app:0.26.0 for an existing installation.
+  # Set VIDEO_IMAGE=rundesk-video-app:0.27.0 for an existing installation.
   bash scripts/docker.sh build
   bash scripts/docker.sh up
   bash scripts/docker.sh token
@@ -288,3 +288,7 @@ Independent upstream containers can request literal-text TTS through the existin
 MCP job API. Jobs retain their own snapshot without rewriting project narration
 or edits. Native upstream production starts in a dedicated RunDesk instance.
 The App director workflow remains unchanged. See docs/validation-0.26.0.json.
+
+制作环境列表 / Runtime picker (0.27.0)
+新建项目会查询 RunDesk 中当前应用获授权的运行环境，支持按名称/说明搜索、刷新与状态展示，无需手填预设 ID。首次无项目时也先选择再创建。选择随项目保存；旧项目和未确认请求不自动迁移。运行状态查询不会启动容器或模型。API/MCP 保留原 productionProfile 语义。
+New projects choose an authorized RunDesk runtime from a searchable list. Existing projects and uncertain creation requests retain their original binding and request body. No container or model is started by browsing the catalog. See docs/PRODUCTION-PROFILES.md and docs/validation-0.27.0.json.

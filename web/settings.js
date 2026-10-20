@@ -1,12 +1,22 @@
 "use strict";
 const $=selector=>document.querySelector(selector),el=(tag,text,cls)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;if(cls)node.className=cls;return node;};
-let ttsSettings=null,settingsDirty=false,savingTTS=false,settingsSerial=0,servicesSerial=0;
+let ttsSettings=null,settingsDirty=false,savingTTS=false,settingsSerial=0,servicesSerial=0,environmentSerial=0;
 async function api(path,body,method){const options={method:method||(body===undefined?"GET":"POST")};if(body!==undefined){options.headers={"Content-Type":"application/json"};options.body=JSON.stringify(body);}const response=await fetch(path,options),data=await response.json();if(!response.ok){const error=new Error(data.error||response.statusText);error.status=response.status;throw error;}return data;}
 function toast(message){$("#toast").textContent=message;$("#toast").hidden=false;clearTimeout(toast.timer);toast.timer=setTimeout(()=>$("#toast").hidden=true,6000);}
 function action(fn){return async event=>{try{return await fn(event);}catch(error){toast(error.message);}};}
 function applyTTSSettings(settings){ttsSettings=settings;for(const [id,key]of [["backend","backend"],["url","url"],["model","model"],["voice","voice"],["language","language"],["timeout","timeoutSeconds"]])$("#tts-"+id).value=settings[key]??"";$("#tts-key").value="";$("#tts-clear-key").checked=false;$("#tts-key").placeholder=settings.hasApiKey?"已保存；留空保持":"服务无认证时可留空";for(const node of $("#tts-form").querySelectorAll("input,select,button"))node.disabled=!!settings.managedByEnvironment;$("#tts-settings-state").textContent=settings.managedByEnvironment?"由环境变量管理，请修改启动配置后重启。":"可在这里保存默认服务，之后制作自动使用。";settingsDirty=false;}
 function ttsDraft(){return{backend:$("#tts-backend").value,url:$("#tts-url").value.trim(),model:$("#tts-model").value.trim(),voice:$("#tts-voice").value.trim(),language:$("#tts-language").value,timeoutSeconds:Number($("#tts-timeout").value),apiKey:$("#tts-key").value,clearApiKey:$("#tts-clear-key").checked};}
-async function loadEnvironment(){const environment=await api("/api/environment"),box=$("#environment-summary");box.replaceChildren();$("#environment-status").textContent=environment.rundeskReady?"RunDesk 连接正常。":"RunDesk 连接尚未就绪。";const link=$("#settings-rundesk");try{const url=new URL(environment.rundeskURL,location.origin);if(["http:","https:"].includes(url.protocol)){link.href=url.href;link.hidden=false;}}catch{}const rows=[["RunDesk",environment.rundeskReady?"已连接":environment.rundeskError||"待配置"]];if(typeof environment.productionProfile==="string")rows.push(["新项目默认制作环境",environment.productionProfile||"原默认环境"]);const checks=environment.checks||{};for(const [key,name]of [["hyperframes","HyperFrames"],["ffmpeg","FFmpeg"],["font","字体"],["gsap","动画依赖"]])if(checks[key])rows.push([name,checks[key].ready?"已找到依赖":"待配置依赖"]);for(const [name,status]of rows){const row=el("div",undefined,"setting-status");row.append(el("strong",name),el("p",status));box.append(row);}}
+async function loadEnvironment(){
+ const serial=++environmentSerial,results=await Promise.allSettled([api("/api/environment"),api("/api/runtime-profiles")]);if(serial!==environmentSerial)return;
+ if(results[0].status!=="fulfilled")throw results[0].reason;
+ const environment=results[0].value,catalog=results[1].status==="fulfilled"?results[1].value:null,box=$("#environment-summary");box.replaceChildren();
+ $("#environment-status").textContent=environment.rundeskReady?"RunDesk 连接正常。":"RunDesk 连接尚未就绪。";
+ const link=$("#settings-rundesk");link.hidden=true;try{const url=new URL(catalog?.rundeskURL||environment.rundeskURL,location.origin);if(["http:","https:"].includes(url.protocol)&&!url.username&&!url.password){link.href=url.href;link.hidden=false;}}catch{}
+ const rows=[["RunDesk",environment.rundeskReady?"已连接":environment.rundeskError||"待配置"]];
+ if(typeof environment.productionProfile==="string"){const entry=catalog?.items?.find(item=>item.id===environment.productionProfile);rows.push(["新项目默认制作环境",entry?.name||(environment.productionProfile?"已配置的制作环境（名称暂不可读取）":"原默认环境")]);}
+ const checks=environment.checks||{};for(const [key,name]of [["hyperframes","HyperFrames"],["ffmpeg","FFmpeg"],["font","字体"],["gsap","动画依赖"]])if(checks[key])rows.push([name,checks[key].ready?"已找到依赖":"待配置依赖"]);
+ for(const [name,status]of rows){const row=el("div",undefined,"setting-status");row.append(el("strong",name),el("p",status));box.append(row);}
+}
 async function loadServices(probe=false){
   const serial=++servicesSerial,response=await api("/api/capabilities"+(probe?"?probe=1":""));
   if(serial!==servicesSerial)return;

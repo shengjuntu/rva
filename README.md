@@ -1,4 +1,4 @@
-# RunDesk Video App · v0.26.0
+# RunDesk Video App · v0.27.0
 
 提供正文和本地素材，开始制作，查看成片，再通过对话调整。Codex 自主完成分镜、选材、图像与视频生成、TTS、HyperFrames 动画、检查和重做；Video App 提供制作 MCP、素材/作品版本和成片展示，RunDesk 负责 Agent 运行、Skills/MCP 配置和轨迹调试。
 
@@ -51,7 +51,7 @@ bash scripts/build.sh
 
 Go 主程序使用标准库及嵌入网页。HyperFrames 渲染另外需要 Node.js、Chromium、HyperFrames 0.8.87、GSAP 3.15.0、FFmpeg/FFprobe 和字体；IndexTTS 模型独立部署，图像/视频生成服务按需配置。native DSL 渲染无需 Node/Chromium。
 
-Docker 部署见 [DOCKER](docs/DOCKER.md)。在旧 docker/.env 显式更新 VIDEO_IMAGE=rundesk-video-app:0.26.0 后构建并启动：
+Docker 部署见 [DOCKER](docs/DOCKER.md)。在旧 docker/.env 显式更新 VIDEO_IMAGE=rundesk-video-app:0.27.0 后构建并启动：
 
 ```bash
 bash scripts/docker.sh init
@@ -65,15 +65,13 @@ App 渲染容器与 RunDesk Codex 工具容器分别更新。配套 RunDesk 0.49
 
 ## 选择制作工具环境
 
-配套 RunDesk 0.50.0 可为同一视频应用登记多个运行预设，例如 hyperframes、openmontage、video-use；每个绑定独立 Codex Docker 实例和工作区。在 RunDesk 应用配置中准备实际镜像、认证与 Skills/MCP，然后指定新项目默认：
+在“新建项目”弹窗里搜索并选择 RunDesk 中已授权的制作环境，列表显示名称、说明和只读运行状态，支持刷新。首次没有项目时也从同一弹窗开始；用户不必输入预设 ID。停用、不可访问或绑定异常的环境不可新选；无法查询时显示错误并保留选择，不自动换环境。
 
-```bash
-bin/video-app --production-profile hyperframes --data ./data --font /absolute/path/to/NotoSansCJK-Regular.ttc
-```
+管理员在 RunDesk 为视频应用登记运行预设，准备对应镜像、专用 Codex Docker 实例、工作区、认证和 Skills/MCP。环境列表不将构建配方或已构建镜像当作可执行实例。可用 `--production-profile hyperframes` 或 `VIDEO_PRODUCTION_PROFILE=hyperframes` 指定预选值，日常创建仍可从列表选择。
 
-也可设置 VIDEO_PRODUCTION_PROFILE=hyperframes；Docker 已透传。项目创建时保存选择，首次连接后保存具体环境绑定。改变启动默认不会迁移旧项目或旧会话。日常页面仍沿用一键制作，不新增镜像或容器操作面板。创建项目 API/MCP 的可选 productionProfile 可覆盖默认，显式空字符串选择原默认环境。
+项目创建时保存选择，首次连接后保存具体实例/工作区绑定。改变启动默认或刷新列表不会迁移旧项目、旧会话或未确认请求。HTTP/MCP 创建项目的 `productionProfile` 字段继续兼容；省略使用启动默认，显式空字符串选择原默认环境。
 
-不设置预设时兼容旧 RunDesk；设置预设但服务未声明 application-runtime-presets 会明确拒绝，不悄悄换环境。预设名称不自动安装 OpenMontage/video-use，也不改变 App 当前剪辑后端；本版完成选择、隔离与会话绑定机制。App 渲染、IndexTTS 和 ComfyUI 仍独立。详见 [多制作环境](docs/PRODUCTION-PROFILES.md)。
+旧 RunDesk 未提供多环境列表时，原默认绑定仍可在明确提示下使用；配置非空预设而服务不支持时明确拒绝。环境名称不自动安装 OpenMontage/video-use，不改变 App 当前导演入口和渲染工程格式。App 渲染、IndexTTS 和 ComfyUI 继续独立，详见 [多制作环境](docs/PRODUCTION-PROFILES.md)。
 
 ## IndexTTS 与 ComfyUI
 
@@ -91,6 +89,7 @@ App 直接提交 ComfyUI 工作流、轮询结果并下载 MP4，无需另起生
 
 ## 本版文档与验证
 
+- [v0.27.0 验证记录](docs/validation-0.27.0.json)
 - [v0.25.0 验证记录](docs/validation-0.25.0.json)
 - [多制作环境与旧项目兼容](docs/PRODUCTION-PROFILES.md)
 - [v0.24.0 合并与验证](docs/validation-0.24.0.json)

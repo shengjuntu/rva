@@ -1,0 +1,1 @@
+Minimal workbench DOM + HTTP passed (24 checks)

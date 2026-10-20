@@ -1,0 +1,29 @@
+✔ generation settings probes only on explicit refresh and distinguishes a probe from generation (142.659238ms)
+✔ late configuration response cannot overwrite the newer ComfyUI probe result (29.489204ms)
+✔ assistant stream starts without a false error and reveals text while genuine errors remain visible (149.355776ms)
+✔ malformed durable receipt blocks fresh dispatch while completed videos remain viewable (53.685925ms)
+✔ server pending recovery retains original skills and expected turn identity (29.794775ms)
+✔ late acknowledgement of request A cannot erase a newer request B receipt (24.655838ms)
+✔ authentication failures retain uncertain receipts; only an explicit rejection clears the matching request (69.832575ms)
+✔ local stop blocks new submissions and cancels only jobs captured before stopping (26.546861ms)
+✔ main workbench removes manual production and detailed editing controls from the DOM (141.757507ms)
+✔ configuration has a separate settings page and is absent from the main workbench (48.346039ms)
+✔ empty first launch opens an explicit environment picker without creating a project (190.758925ms)
+✔ search uses names and descriptions, preserves the chosen identity and treats names as text (47.787601ms)
+✔ catalog failures and unavailable defaults never select a different environment (39.378124ms)
+✔ late refresh and closed-dialog responses cannot replace a newer catalog or choice (33.810474ms)
+✔ explicit legacy default is sent as an empty profile and double submission creates once (51.846796ms)
+✔ lost creation response retains exact name, environment and request ID across dialog reopen (35.052087ms)
+✔ a confirmed creation followed by failed loading is retried with the same receipt (34.767634ms)
+✔ legacy pending requests without a profile keep their original body even when listing fails (21.405143ms)
+✔ unbound text survives choosing an environment and clearing text never revives an old draft (47.327708ms)
+✔ existing project bindings remain fixed and friendly names survive subsequent redraws (22.805457ms)
+✔ friendly saved labels remain stable on redraw and an old project response cannot overwrite the current project (22.006591ms)
+ℹ tests 21
+ℹ suites 0
+ℹ pass 21
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 2104.522178

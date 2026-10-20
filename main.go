@@ -28,7 +28,7 @@ import (
 	"time"
 )
 
-const version = "0.26.0"
+const version = "0.27.0"
 
 //go:embed web/*
 var ui embed.FS
@@ -547,6 +547,7 @@ func (a *App) routes() http.Handler {
 	m.HandleFunc("POST /api/projects/{id}/renders/{rid}/stop", a.stopRender)
 	m.HandleFunc("GET /api/projects/{id}/renders/{rid}/{file}", a.renderFile)
 	m.HandleFunc("GET /api/environment", a.environment)
+	m.HandleFunc("GET /api/runtime-profiles", a.runtimeProfiles)
 	m.HandleFunc("POST /api/projects/{id}/connect", a.connect)
 	m.HandleFunc("POST /api/projects/{id}/messages", a.message)
 	m.HandleFunc("PUT /api/projects/{id}/assets/{aid}/description", a.assetDescribe)

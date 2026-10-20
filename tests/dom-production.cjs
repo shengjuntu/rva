@@ -26,13 +26,14 @@ const removed = ['advanced-workspace','speech-section','speech-start','speech-ad
       proc.on('exit', code => { clearTimeout(timer); reject(Error('server exited ' + code)); });
     });
     const health = await (await realFetch('/api/health')).json();
-    assert.equal(health.version, '0.26.0', 'run this regression against the newly built release binary');
+    assert.equal(health.version, '0.27.0', 'run this regression against the newly built release binary');
 
     const transport = {connected: new Set(), messages: [], events: new Map(), orders: [], loseNext: true, connectCount: 0, uploadGate: null};
     async function uiFetch(route, options = {}) {
       const url = new URL(route, base), method = options.method || 'GET';
       transport.orders.push(method + ' ' + url.pathname);
       const match = url.pathname.match(/^\/api\/projects\/([a-f0-9]{24})(.*)$/);
+      if (url.pathname === '/api/runtime-profiles') return json({defaultProfile:'',rundeskURL:'http://127.0.0.1:3210',warnings:[],items:[{id:'',name:'原默认环境',description:'测试用已配置环境',enabled:true,isDefault:true,state:'not_started',selectable:true}]});
       if (match) {
         const pid = match[1], tail = match[2];
         if (tail === '/assets' && method === 'POST' && transport.uploadGate) {
@@ -90,11 +91,16 @@ const removed = ['advanced-workspace','speech-section','speech-start','speech-ad
     async function project(pid) { return (await realFetch('/api/projects/' + pid)).json(); }
 
     ui = await loadUI();
+    assert.equal(ui.run('project'), null);
+    assert.equal((await (await realFetch('/api/projects')).json()).length, 0);
+    assert.equal(ui.$('#new-dialog').open, true);
+    assert.equal(ui.$('#new-profile').value, '');
+    await ui.$('#new-form').onsubmit({preventDefault(){}});
     const pid = ui.run('project.id');
     assert.match(pid, /^[a-f0-9]{24}$/);
     assert.equal((await (await realFetch('/api/projects')).json()).length, 1);
     assert.equal(ui.$('#new-dialog').open, false);
-    checks.push('first launch automatically creates one usable empty project without a configuration dialog');
+    checks.push('first launch chooses the listed default environment before explicitly creating one empty project');
     for (const id of removed) assert.equal(ui.w.document.getElementById(id), null, id + ' must be removed, not folded or hidden');
     assert.equal(ui.w.document.querySelector('script[src="/review.js"]'), null);
     assert.equal(ui.w.document.querySelectorAll('#app input[type=range]').length, 0);
@@ -325,8 +331,8 @@ const removed = ['advanced-workspace','speech-section','speech-start','speech-ad
     checks.push('the independent settings page persists IndexTTS defaults through HTTP, masks saved keys and keeps connection/generation configuration readonly');
 
     checks.push(...await backendCompatibility(realFetch, root));
-    const report = {passed: true, version: health.version, environment: 'JSDOM + actual Go HTTP API; RunDesk connection, message receipts and replay use explicit fixtures', checkCount: checks.length, checks, limitations: ['No graphical-browser appearance check.', 'No live Codex/Kun execution or new video rendering in this DOM test.', 'Render-history playback/export selection uses completed metadata fixtures; media integrity is covered by Go tests.']};
-    fs.writeFileSync(path.join(root, 'docs/dom-validation-0.26.0.json'), JSON.stringify(report, null, 2) + '\n');
+    const report = {passed: true, version: health.version, environment: 'JSDOM + actual Go HTTP API; RunDesk runtime catalog, connection, message receipts and replay use explicit fixtures', checkCount: checks.length, checks, limitations: ['No graphical-browser appearance check.', 'No live Codex/Kun execution or new video rendering in this DOM test.', 'Render-history playback/export selection uses completed metadata fixtures; media integrity is covered by Go tests.']};
+    fs.writeFileSync(path.join(root, 'docs/dom-validation-0.27.0.json'), JSON.stringify(report, null, 2) + '\n');
     console.log('Minimal workbench DOM + HTTP passed (' + checks.length + ' checks)');
   } finally {
     ui?.dom.window.close(); proc.kill('SIGTERM');

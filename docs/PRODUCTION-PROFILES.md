@@ -1,12 +1,12 @@
 # 项目绑定 RunDesk 制作环境
 
-Video App 0.25.0 接入 RunDesk 0.50.0 的 application-runtime-presets 能力。管理员在RunDesk为视频应用建立多个命名预设，每个预设绑定专用Codex Docker实例和工作区；App只选择批准的名称，不接收任意Docker镜像或Docker socket。
+Video App 0.27.0 通过可搜索列表使用 RunDesk 的 application-runtime-presets 能力（0.50.0 起提供，当前配套 0.52.0）。管理员在RunDesk为视频应用建立多个命名预设，每个预设绑定专用Codex Docker实例和工作区；App只选择批准的名称，不接收任意Docker镜像或Docker socket。
 
 ## 部署与选择
 
 1. 在RunDesk应用配置中登记预设，准备实际镜像、模型认证、Skills/MCP与工作区。
-2. App启动时设置 --production-profile hyperframes，或 VIDEO_PRODUCTION_PROFILE=hyperframes。名字须与RunDesk登记值一致。
-3. 新建项目并按原流程导入、开始制作。项目保存创建时的选择，首次连接记录RunDesk返回的preset/instance/workspace，后续对话复用该绑定。
+2. 打开 App“新建项目”，列表从 RunDesk 查询当前凭据获授权的环境，搜索名称/说明后选择。界面显示名称和真实可查询状态；系统保存 ID。可选 --production-profile / VIDEO_PRODUCTION_PROFILE 仅作为新项目预选值。
+3. 点击创建，按原流程导入和开始制作。项目保存创建时的选择，首次连接记录 RunDesk 返回的 preset/instance/workspace，后续对话复用该绑定。
 
 Docker Compose透传VIDEO_PRODUCTION_PROFILE。不设置或空值使用原默认绑定；旧RunDesk仍可用于该兼容路径。设置非空预设而服务不支持时明确拒绝，不静默切回默认环境。
 
@@ -49,4 +49,14 @@ services:
 
 不要把RunDesk整个data、Codex HOME或Docker socket挂入App。管理员显式选择目录；App在导出前另做所选绑定的共享挑战，核对实际容器和目录，再冻结run绑定与根指纹。缺失映射、共享检查失败或映射改变时拒绝继续读写共享run，不把B项目材料导出到A目录。已私有归档的历史成片仍保留。
 
-本轮验证以validation-0.25.0.json为准；模拟HTTP/容器协议证明接口与归属边界，不代替用户Docker、实际Codex和GPU模型验收。
+本轮验证以 [validation-0.27.0.json](validation-0.27.0.json) 为准；HTTP/界面与协议测试不代替用户 Docker、实际 Codex 和 GPU 模型验收。
+
+本次列表选择用于普通“新建项目”和首访创建。“导入新闻制作包”保留独立导入入口及原环境/部署默认规则，未更改新闻包格式或 API 创建契约。
+
+## 列表与状态 API
+
+`GET /api/runtime-profiles` 是 App 服务端代理，使用已有 RunDesk 凭据读取本应用的运行预设，并单独查询原默认绑定；浏览器不会收到 RunDesk Token、Codex HOME 或原始运行配置。返回 `{items, defaultProfile, warnings}`。各项包含 ID、名称、说明、enabled、isDefault、state、selectable 和可选说明。`selectable` 表示可以为新项目保存该环境意图，不证明模型认证或制作质量已验证。
+
+查询仅使用只读 GET，不会启动容器、初始化连接、安装模型或创建 Agent 会话。全新安装若尚未在 RunDesk 登记视频应用及其默认/预设绑定，列表会明确提示先到 RunDesk 配置；查询不会通过旧自动连接流程替用户创建环境。主列表的连接/权限错误明确失败；个别环境状态不可查询时标记不可选并保留具体状态。配置的默认预设缺失或无权限时显示不可选占位，不自动选择列表中的第一个环境。停用预设留在列表与既有项目历史中，不能作为新项目选择。
+
+新建请求在浏览器保存完整名称、环境选择与 requestId。响应丢失或关闭重开继续核对原请求，不能给同一请求替换环境；原有不带 productionProfile 的待确认请求保持原始请求体。刷新目录不修改已有项目，切换制作环境应新建项目。状态是读取时的快照，执行前 RunDesk 仍会核对权限和绑定。

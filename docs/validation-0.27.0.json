@@ -1,0 +1,103 @@
+{
+  "version": "0.27.0",
+  "date": "2026-10-20",
+  "goVersion": "1.25.12",
+  "nodeVersion": "24.19.0",
+  "baseCommit": "001e6cf9deb9b16830a01f8c714e49fea363276b",
+  "change": "Searchable RunDesk application runtime selection for ordinary New Project and first-use creation; existing project bindings remain unchanged.",
+  "api": {
+    "path": "GET /api/runtime-profiles",
+    "upstream": [
+      "GET /api/v1/meta",
+      "GET /api/v1/applications/rundesk-video-app/runtime-presets",
+      "GET /api/v1/applications/rundesk-video-app/runtime?presetId=<optional>"
+    ],
+    "scope": "Current App credential only, bounded projection; no global image/instance listing, runtime preparation or model call.",
+    "legacy": "A server without presets may explicitly expose its existing original default binding when no named default is configured. Named-default incompatibility is an error."
+  },
+  "fullRace": {
+    "command": "go test -race -json ./... -count=1 -timeout=300s",
+    "passed": true,
+    "testsPassed": 472,
+    "topLevelPassed": 213,
+    "testSkips": [
+      "TestRootRuntimeProbeProgramWithActualAppMCP",
+      "TestTextRefsRealAdapterArchiveAndLocator",
+      "TestHyperFramesRealAnimationAudioRender",
+      "TestProductionExchangeRealAdapterArchiveLateResultAndFinalProof",
+      "TestProductionExchangeNewerEditAuthoritySurvivesOlderLateIngest",
+      "TestSpeechSnapshotGenerationAndAdoption"
+    ],
+    "raw": "validation-0.27.0/go-race.jsonl",
+    "summary": "validation-0.27.0/go-race-summary.json"
+  },
+  "runtimeCatalogTests": {
+    "groups": 7,
+    "passed": true,
+    "scope": [
+      "Application-key-filtered catalog and administrator view",
+      "Default binding queried separately",
+      "Disabled/missing/default permission and explicit errors",
+      "Saved state is not model or Docker readiness",
+      "No raw secrets, HOME, paths or configuration",
+      "Opaque binding validation",
+      "Bounded concurrency and cancellation"
+    ]
+  },
+  "web": {
+    "passed": true,
+    "command": "NODE_PATH=<jsdom> node --test tests/*.test.cjs",
+    "testsPassed": 21,
+    "newPickerTests": 11,
+    "existingTests": 10,
+    "source": "validation-0.27.0/web-tests.tap",
+    "checks": [
+      "First use chooses a listed environment before creation",
+      "Search by name and description; unavailable choices disabled",
+      "Refresh and stale responses preserve selected identity",
+      "Unknown or missing default is never auto-replaced",
+      "Exact creation body survives response loss and dialog reopen",
+      "Legacy pending requests keep original omitted field",
+      "Project read/list failure reopens the same acknowledged project",
+      "Unbound draft preservation and explicit clearing",
+      "Old project bindings and friendly labels survive redraw and late replies"
+    ]
+  },
+  "httpDom": {
+    "passed": true,
+    "checks": 24,
+    "source": "dom-validation-0.27.0.json",
+    "stdout": "validation-0.27.0/dom-production.stdout.txt",
+    "scope": "Final release Go HTTP server and shipped JavaScript in JSDOM. Runtime catalog and RunDesk execution are fixtures; actual App project creation/assets/receipts/history endpoints are used."
+  },
+  "otherChecks": {
+    "goVet": true,
+    "javascriptSyntax": {
+      "files": 2,
+      "passed": true
+    },
+    "bashSyntax": [
+      "scripts/build.sh",
+      "scripts/docker.sh"
+    ],
+    "linuxBuild": true,
+    "linuxVersion": "RunDesk Video App 0.27.0",
+    "windowsAmd64CrossCompile": true,
+    "windowsRuntimeTested": false
+  },
+  "compatibility": {
+    "existingBindingsRetained": true,
+    "projectCreateHTTPAndMCPFieldSemanticsUnchanged": true,
+    "newsPackageImportRetainsExistingBehavior": true,
+    "rundeskCoreModified": false,
+    "videoBuildModified": false,
+    "businessSkillVersionUnchanged": "0.23.1"
+  },
+  "limitations": [
+    "No graphical-browser layout acceptance in this run.",
+    "No real Docker Engine lifecycle, live Codex/Kun/model task, IndexTTS synthesis or ComfyUI/GPU/video-quality acceptance.",
+    "Six opt-in environment-dependent media/protocol tests skipped; prior media validation remains historical.",
+    "Picker applies to ordinary New Project and first-use creation. News-package import keeps its separate existing import/default-binding behavior.",
+    "A fresh RunDesk installation must register the video application and its runtime binding before its catalog is usable."
+  ]
+}
