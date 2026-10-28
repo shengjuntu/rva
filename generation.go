@@ -21,6 +21,7 @@ import (
 )
 
 type GenerationJob struct {
+	ProductionRequestID string `json:"productionRequestId,omitempty"`
 	ID          string                `json:"id"`
 	Type        string                `json:"type"`
 	RequestID   string                `json:"requestId"`
@@ -136,7 +137,7 @@ func generationJobProvider(j GenerationJob) string {
 	return "http_binary_v1" // Legacy records did not retain provider identity.
 }
 func generationView(pid string, j GenerationJob) ProductionJob {
-	v := ProductionJob{ID: "generation:" + j.ID, NativeID: j.ID, ProjectID: pid, Type: j.Type, Provider: generationJobProvider(j), State: unifiedState(j.State), NativeState: j.State, Revision: j.Revision, RequestID: j.RequestID, Created: j.Created, Error: j.Error, Artifacts: []JobArtifact{}, GenerationParameters: j.Parameters, Warnings: j.Warnings}
+	v := ProductionJob{ProductionRequestID: j.ProductionRequestID, ID: "generation:" + j.ID, NativeID: j.ID, ProjectID: pid, Type: j.Type, Provider: generationJobProvider(j), State: unifiedState(j.State), NativeState: j.State, Revision: j.Revision, RequestID: j.RequestID, Created: j.Created, Error: j.Error, Artifacts: []JobArtifact{}, GenerationParameters: j.Parameters, Warnings: j.Warnings}
 	if j.State == "completed" {
 		v.Artifacts = append(v.Artifacts, JobArtifact{Name: j.AssetID, URL: "/api/projects/" + pid + "/assets/" + j.AssetID, SHA256: j.SHA256, Size: j.Size})
 	}
@@ -161,6 +162,10 @@ func (a *App) startGeneration(w http.ResponseWriter, r *http.Request, in JobStar
 			writeJSON(w, 200, generationView(p.ID, j))
 			return
 		}
+	}
+	if e := validateProductionOwner(*p, in.Options.ProductionRequestID); e != nil {
+		fail(w, 409, e)
+		return
 	}
 	target, e := generationTarget(in.Type)
 	if e != nil {
@@ -196,7 +201,7 @@ func (a *App) startGeneration(w http.ResponseWriter, r *http.Request, in JobStar
 		fail(w, 400, e)
 		return
 	}
-	j := GenerationJob{ID: uid(), Type: in.Type, RequestID: in.RequestID, RequestHash: hash, Revision: p.Revision, State: "running", Created: time.Now().UTC().Format(time.RFC3339Nano), Prompt: in.Options.Prompt, Model: target.Model, Duration: in.Options.Duration, AspectRatio: in.Options.AspectRatio, Provider: generationProvider(target)}
+	j := GenerationJob{ProductionRequestID: in.Options.ProductionRequestID, ID: uid(), Type: in.Type, RequestID: in.RequestID, RequestHash: hash, Revision: p.Revision, State: "running", Created: time.Now().UTC().Format(time.RFC3339Nano), Prompt: in.Options.Prompt, Model: target.Model, Duration: in.Options.Duration, AspectRatio: in.Options.AspectRatio, Provider: generationProvider(target)}
 	if j.Provider == "comfyui_h3" {
 		_, j.Parameters, j.Warnings = comfyGenerationParams(j, target.AudioGainDB)
 	}

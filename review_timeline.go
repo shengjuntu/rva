@@ -33,6 +33,7 @@ type ReviewTrack struct {
 	Clips []ReviewClip `json:"clips"`
 }
 type ReviewTimeline struct {
+	FPS        int           `json:"fps,omitempty"`
 	ProjectID  string        `json:"projectId"`
 	Revision   int           `json:"revision"`
 	Backend    string        `json:"backend"`
@@ -228,6 +229,16 @@ func (a *App) reviewTimeline(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	v := reviewTimelineFor(p)
+	if found != nil {
+		switch {
+		case found.Engine == authoredHyperFramesEngine && p.HyperFrames != nil:
+			v.FPS = p.HyperFrames.Canvas.FPS
+		case found.Engine != "video_use" && p.EditDSL != nil && p.EditActive:
+			v.FPS = p.EditDSL.Canvas.FPS
+		case found.Engine != "video_use" && !usesEditDSL(p):
+			v.FPS = 30 // Legacy shot renderer produces fixed 30 fps.
+		}
+	}
 	if rid != "" {
 		v.RenderID = rid
 		v.Current = renderCurrent(original, *found)

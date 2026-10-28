@@ -22,6 +22,7 @@ import (
 const speechSampleRate = 24000
 
 type SpeechJob struct {
+	ProductionRequestID string `json:"productionRequestId,omitempty"`
 	Source      string              `json:"source,omitempty"`
 	Backend     string              `json:"backend,omitempty"`
 	Model       string              `json:"model,omitempty"`
@@ -43,6 +44,7 @@ type SpeechJob struct {
 	Files       map[string]NewsFile `json:"files,omitempty"`
 }
 type SpeechRequest struct {
+	ProductionRequestID string `json:"productionRequestId,omitempty"`
 	Source    string  `json:"source,omitempty"`
 	Text      string  `json:"text,omitempty"`
 	Backend   string  `json:"backend,omitempty"`
@@ -190,7 +192,7 @@ func (a *App) startSpeech(w http.ResponseWriter, r *http.Request) {
 			matches := old.RequestHash == requestHash
 			if old.RequestHash == "" {
 				legacy := in
-				matches = legacy.Source != "text" && legacy.Text == "" && legacy.normalize(defaultSpeechConfig()) == nil && legacy.Backend == "espeak-ng" && old.Revision == legacy.Revision && old.Voice == legacy.Voice && old.Rate == legacy.Rate
+				matches = legacy.ProductionRequestID == "" && legacy.Source != "text" && legacy.Text == "" && legacy.normalize(defaultSpeechConfig()) == nil && legacy.Backend == "espeak-ng" && old.Revision == legacy.Revision && old.Voice == legacy.Voice && old.Rate == legacy.Rate
 			}
 			if !matches {
 				fail(w, 409, errors.New("同一 requestId 不能用于不同配音请求"))
@@ -199,6 +201,10 @@ func (a *App) startSpeech(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, 200, old)
 			return
 		}
+	}
+	if e := validateProductionOwner(*p, in.ProductionRequestID); e != nil {
+		fail(w, 409, e)
+		return
 	}
 	cfg := a.tts
 	if e := in.normalize(cfg); e != nil {
@@ -262,7 +268,7 @@ func (a *App) startSpeech(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	job := SpeechJob{Source: in.Source, Backend: in.Backend, Language: in.Language, Speed: in.Speed, RequestHash: requestHash, ID: uid(), RequestID: in.RequestID, Revision: p.Revision, State: "running", Created: time.Now().UTC().Format(time.RFC3339Nano), Voice: in.Voice, Rate: in.Rate, ScriptHash: speechScriptHash(snapshot), Total: total}
+	job := SpeechJob{ProductionRequestID: in.ProductionRequestID, Source: in.Source, Backend: in.Backend, Language: in.Language, Speed: in.Speed, RequestHash: requestHash, ID: uid(), RequestID: in.RequestID, Revision: p.Revision, State: "running", Created: time.Now().UTC().Format(time.RFC3339Nano), Voice: in.Voice, Rate: in.Rate, ScriptHash: speechScriptHash(snapshot), Total: total}
 	if in.Backend == "indextts" {
 		job.Model = cfg.Model
 	}

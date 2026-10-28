@@ -23,6 +23,7 @@ import (
 // ProductionRun is a frozen exchange receipt, not the RunDesk agent task itself.
 // Paths are relative to the configured workspace; no host paths or secrets are exported.
 type ProductionRun struct {
+	ProductionRequestID string `json:"productionRequestId,omitempty"`
 	PresetID                string         `json:"presetId,omitempty"`
 	WorkspaceID             string         `json:"workspaceId,omitempty"`
 	ExchangeRootFingerprint string         `json:"exchangeRootFingerprint,omitempty"`
@@ -387,6 +388,7 @@ func (a *App) productionRunGet(w http.ResponseWriter, r *http.Request) {
 }
 func (a *App) productionRunPrepare(w http.ResponseWriter, r *http.Request) {
 	var in struct {
+		ProductionRequestID string `json:"productionRequestId,omitempty"`
 		Revision  int    `json:"revision"`
 		RequestID string `json:"requestId"`
 	}
@@ -426,6 +428,10 @@ func (a *App) productionRunPrepare(w http.ResponseWriter, r *http.Request) {
 			writeJSON(w, 200, productionRunResponse(*p, run))
 			return
 		}
+	}
+	if e := validateProductionOwner(*p, in.ProductionRequestID); e != nil {
+		fail(w, 409, e)
+		return
 	}
 	if p.Revision != in.Revision {
 		fail(w, 409, errors.New("项目版本冲突"))
@@ -483,7 +489,7 @@ func (a *App) productionRunPrepare(w http.ResponseWriter, r *http.Request) {
 		p = latest
 	}
 	presetID, workspaceID := exchangeRunBinding(*p, selected)
-	run := ProductionRun{PresetID: presetID, WorkspaceID: workspaceID, ExchangeRootFingerprint: selected.Fingerprint, ID: uid(), RequestID: in.RequestID, RequestHash: requestHash, Revision: p.Revision, SessionID: p.SessionID, State: "prepared", SourceHash: narrationSourceHash(*p), InputBasisHash: externalProductionBasis(*p), Created: time.Now().UTC().Format(time.RFC3339Nano), SpeechID: j.ID, Duration: j.Duration, Files: []ExchangeFile{}}
+	run := ProductionRun{ProductionRequestID: in.ProductionRequestID, PresetID: presetID, WorkspaceID: workspaceID, ExchangeRootFingerprint: selected.Fingerprint, ID: uid(), RequestID: in.RequestID, RequestHash: requestHash, Revision: p.Revision, SessionID: p.SessionID, State: "prepared", SourceHash: narrationSourceHash(*p), InputBasisHash: externalProductionBasis(*p), Created: time.Now().UTC().Format(time.RFC3339Nano), SpeechID: j.ID, Duration: j.Duration, Files: []ExchangeFile{}}
 	run.RelativeRunRoot = "outputs/" + p.SessionID + "/runs/" + run.ID
 	run.ManifestPath = run.RelativeRunRoot + "/input/manifest.json"
 	if e = root.MkdirAll(path.Dir(run.RelativeRunRoot), 0700); e != nil {
@@ -964,7 +970,7 @@ func (a *App) productionRunIngest(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	job := Render{ID: rid, Engine: "video_use", SourceHash: run.SourceHash, ContentHash: run.InputBasisHash, Kind: "draft", Revision: run.Revision, State: "completed", Created: time.Now().UTC().Format(time.RFC3339Nano), Duration: duration, HasAudio: true, HasSubtitles: true, CacheKey: run.InputHash}
+	job := Render{ProductionRequestID: run.ProductionRequestID, ID: rid, Engine: "video_use", SourceHash: run.SourceHash, ContentHash: run.InputBasisHash, Kind: "draft", Revision: run.Revision, State: "completed", Created: time.Now().UTC().Format(time.RFC3339Nano), Duration: duration, HasAudio: true, HasSubtitles: true, CacheKey: run.InputHash}
 	run.State = "completed"
 	run.RenderID = rid
 	run.OutputHash = outputHash

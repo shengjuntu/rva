@@ -238,6 +238,10 @@ func (a *App) rdOperation(ctx context.Context, scope, path string, body any, out
 }
 
 type AgentSubmission struct {
+	Purpose             string `json:"purpose,omitempty"`
+	Created             string `json:"created,omitempty"`
+	ExecutionState      string `json:"executionState,omitempty"`
+	ExecutionObservedAt string `json:"executionObservedAt,omitempty"`
 	SessionID       string                 `json:"sessionId,omitempty"`
 	RuntimeBinding  *ProjectRuntimeBinding `json:"runtimeBinding,omitempty"`
 	Skills          []string               `json:"skills,omitempty"`
@@ -283,7 +287,11 @@ func (a *App) recoverAgent(ctx context.Context, p Project, allowSend bool) (any,
 	case "video_use":
 		productionRoute = "当前后端 video_use：需要冻结已准备的配音和文字素材关联时调用 video_production_run_prepare，按返回的相对路径读取共享目录快照，在 work/edl.json 编排，运行适配器并调用 video_production_run_ingest 归档。以该 EDL 为剪辑依据；不要另写原生 DSL 或调用 video_render_start。"
 	}
-	body := map[string]any{"text": fmt.Sprintf("[Video App projectId=%s requestId=%s] 先读取项目当前 revision、已有工程和产物；自主选择必要工具与执行顺序。素材准备和对齐、剪辑、精修是产物记录和审阅视图，可以交错、重复或局部返回，不是固定步骤或审批。执行后检查实际结果；发现可修复问题就修订并重做，不把工具成功当作质量合格，真实阻塞和未执行的检查须说明。局部修改只处理受影响部分，保留无关且已满意的内容，不要求重走全部流程。通过业务工具保存真实产物与检查记录。%s\n用户要求：\n%s", p.ID, pending.ID, productionRoute, pending.Text), "files": []string{}, "skills": []any{}}
+	attribution := ""
+	if pending.Purpose != "" {
+		attribution = fmt.Sprintf("本次制作归属 productionRequestId=%s。新建 video_job_start 的 options、video_render_start、video_speech_start、video_production_run_prepare 和 video_production_checkpoint 均传 productionRequestId=%q（此编号是用户制作请求，不是工具调用的 requestId；每个工具调用仍用自己的新 requestId）。旧工具调用或旧请求不得改挂当前编号；缺少归属的产物只会保留在历史中，不会显示为本次新片。\n", pending.ID, pending.ID)
+	}
+	body := map[string]any{"text": attribution + fmt.Sprintf("[Video App projectId=%s requestId=%s] 先读取项目当前 revision、已有工程和产物；自主选择必要工具与执行顺序。素材准备和对齐、剪辑、精修是产物记录和审阅视图，可以交错、重复或局部返回，不是固定步骤或审批。执行后检查实际结果；发现可修复问题就修订并重做，不把工具成功当作质量合格，真实阻塞和未执行的检查须说明。局部修改只处理受影响部分，保留无关且已满意的内容，不要求重走全部流程。通过业务工具保存真实产物与检查记录。%s\n用户要求：\n%s", p.ID, pending.ID, productionRoute, pending.Text), "files": []string{}, "skills": []any{}}
 	if !binding.ManagedByRunDesk && binding.SkillPath != "" {
 		body["skills"] = []map[string]string{{"name": "video-project", "path": binding.SkillPath}}
 	}

@@ -8,23 +8,69 @@
 <body>
   <div id="login"><form id="login-form"><div class="eyebrow">RUNDESK VIDEO APP</div><h1>视频工作台</h1><p>输入本机服务的访问令牌。</p><input id="token" type="password" autocomplete="current-password" placeholder="访问令牌" required><button class="primary">进入工作台</button><p id="login-error" role="status"></p></form></div>
   <div id="app" hidden>
-    <header><a class="brand" href="/">视频工作台 <span>v0.27.0</span></a><nav><a id="settings-link" href="/settings.html">设置</a><button id="toggle-assets">素材栏</button><button id="toggle-chat">对话栏</button><button id="logout">退出</button></nav></header>
+    <header>
+      <a class="brand" href="/">视频工作台 <span>v0.28.0</span></a>
+      <nav aria-label="页面导航"><div class="page-navigation"><a id="page-make-link" href="/?page=make" aria-current="page">制作</a><a id="page-refine-link" href="/?page=refine">精修</a></div><a id="settings-link" href="/settings.html">设置</a><button id="logout">退出</button></nav>
+    </header>
     <div class="layout">
-      <aside id="library"><div class="section-head"><h2>项目</h2><button id="new-project" aria-label="新建项目">＋</button></div><select id="projects" aria-label="选择项目"></select><button id="rename-project">重命名项目</button><button id="import-news">导入新闻制作包</button><input id="news-package" type="file" accept=".zip,application/zip" hidden><div class="section-head"><h2>项目素材</h2></div><div id="assets"></div><p class="library-footer">正文驱动制作<br>执行与调试由 RunDesk 提供</p></aside>
+      <aside id="library" aria-label="项目快速切换">
+        <div class="section-head"><h2>项目</h2><button id="new-project" aria-label="新建项目" title="新建项目">＋</button></div>
+        <label class="visually-hidden" for="project-search">搜索项目名称</label><input id="project-search" type="search" placeholder="搜索项目名称" autocomplete="off">
+        <p id="project-recent-label" class="list-caption">最近打开</p><div id="projects" class="project-list" aria-label="最近项目"></div><p id="project-list-empty" class="muted small" hidden>还没有项目，创建一个开始吧。</p>
+        <div class="project-disclosures"><details id="project-all"><summary>查看全部</summary><div id="project-all-list" class="project-list"></div></details><details id="project-archive"><summary>归档项目</summary><div id="project-archive-list" class="project-list"></div></details></div>
+        <div class="library-actions"><button id="import-news">导入新闻制作包</button><input id="news-package" type="file" accept=".zip,application/zip" hidden><a href="/settings.html#project-management">管理项目</a></div>
+        <p class="library-footer">以文字为起点<br>让画面表达你的内容</p>
+      </aside>
       <main>
-        <div class="project-head"><div class="eyebrow">VIDEO PROJECT</div><h1 id="project-name">开始一个视频项目</h1><p id="save-state" class="muted small">导入正文与素材，开始制作。</p><p id="project-runtime" class="muted small"></p></div>
-        <div id="conflict" class="notice" hidden>项目已有新修订，本机草稿仍保留。请核对后再提交。<button id="reload-project">载入服务器版本</button></div>
-        <section id="production-input" class="production-input">
-          <div class="section-head"><h2>正文</h2><div class="row"><button id="narration-use-existing" hidden>使用已有正文</button><button id="narration-import">导入文本</button></div><input id="narration-file" type="file" accept=".txt,.md,text/plain" hidden></div>
-          <p class="muted small">给出要表达的文字和已有素材，制作过程交给创作助手。</p><textarea id="narration-text" rows="8" placeholder="粘贴新闻正文，或导入 TXT / Markdown。"></textarea><p id="narration-status" class="muted small" role="status"></p>
-          <details id="production-requirements"><summary>制作要求（可选）</summary><textarea id="workflow-instructions" rows="3" placeholder="例如：保持原文，优先已有素材，画面简洁，配音平稳。"></textarea></details>
-          <div class="production-materials"><div><strong>素材</strong><p id="primary-material-summary" class="muted small">可添加图片、视频和音频，也可先从正文开始。</p></div><div class="row"><button id="upload-folder">导入素材目录</button><input id="folder-files" type="file" webkitdirectory multiple hidden><button id="upload-button">添加文件</button><input id="upload" type="file" multiple accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,audio/wav,audio/mpeg,audio/mp4,audio/flac,audio/ogg,.m4a,.flac,.ogg,.txt,.md,.pdf" hidden></div></div>
-          <div class="production-launch"><button id="draft-start" class="primary">开始制作</button><span class="muted small">自动保存正文和要求，完成后在下方查看。</span></div><p id="workflow-status" class="muted small" role="status"></p>
-        </section>
-        <section id="production-results"><div class="section-head"><h2>制作状态</h2><button id="refresh-board">刷新</button></div><p id="production-board-status" class="muted small" role="status"></p><div id="production-board"></div><div id="production-jobs" aria-live="polite"></div></section>
-        <section id="outputs" aria-labelledby="outputs-title"><div class="section-head"><h2 id="outputs-title">视频与版本</h2><span id="production-version-status" class="version-status">初稿</span></div><label>查看版本<select id="output-version" aria-label="选择已完成的视频版本"><option value="">制作完成后显示视频</option></select></label><p id="output-status" class="muted small" role="status">视频完成后会出现在这里。</p><video id="output-player" controls playsinline preload="metadata" hidden></video><div class="output-actions"><a id="output-download" hidden>下载 MP4</a><button id="output-final" hidden>已看过，确认为终稿</button></div><p id="output-final-status" class="muted small" role="status"></p></section>
+        <div class="workspace-content">
+          <div class="project-head"><div class="eyebrow">VIDEO PROJECT</div><h1 id="project-name">开始一个视频项目</h1><p id="save-state" class="muted small">导入正文与素材，开始制作。</p><p id="project-runtime" class="muted small"></p></div>
+          <p id="page-status" class="page-status" role="status" aria-live="polite"></p>
+          <div id="conflict" class="notice" hidden>项目已有新修订，本机草稿仍保留。请核对后再提交。<button id="reload-project">载入服务器版本</button></div>
+          <section id="page-make" aria-label="制作页">
+            <section id="production-input" class="production-input">
+              <div class="section-head"><h2>视频正文</h2><div class="row"><button id="narration-use-existing" hidden>使用已有正文</button><button id="narration-import">导入文本</button></div><input id="narration-file" type="file" accept=".txt,.md,text/plain" hidden></div>
+              <p class="muted input-intro">写下要讲的内容，添加素材，即可开始制作。</p><label class="visually-hidden" for="narration-text">视频正文</label><textarea id="narration-text" rows="9" placeholder="粘贴新闻正文，或导入 TXT / Markdown。"></textarea><p id="narration-status" class="muted small" role="status"></p>
+              <details id="production-requirements"><summary>制作要求（可选）</summary><label class="visually-hidden" for="workflow-instructions">制作要求</label><textarea id="workflow-instructions" rows="3" placeholder="例如：保持原文，优先已有素材，画面简洁，配音平稳。"></textarea></details>
+              <div class="production-materials"><div><strong>素材</strong><p id="primary-material-summary" class="muted small">可添加图片、视频和音频，也可先从正文开始。</p></div><div class="row"><button id="upload-folder">导入素材目录</button><input id="folder-files" type="file" webkitdirectory multiple hidden><button id="upload-button">添加文件</button><input id="upload" type="file" multiple accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,audio/wav,audio/mpeg,audio/mp4,audio/flac,audio/ogg,.m4a,.flac,.ogg,.txt,.md,.pdf" hidden></div></div>
+              <details id="material-details" class="material-details"><summary>查看已添加素材</summary><div id="assets"></div></details>
+              <div class="production-launch"><button id="draft-start" class="primary">开始制作</button><span class="muted small">自动保存并开始制作，无需另外发送指令。</span></div><p id="workflow-status" class="muted small" role="status"></p>
+            </section>
+            <div id="make-progress-slot"><section id="production-results" class="production-progress-card" aria-labelledby="progress-title" hidden>
+              <div class="section-head"><div><p class="eyebrow">VIDEO IN PROGRESS</p><h2 id="progress-title">正在制作</h2></div><button id="refresh-board" class="quiet-button">刷新状态</button></div>
+              <p id="production-phase" class="production-phase">正在准备制作…</p><progress id="production-progress" max="100" aria-label="制作进度"></progress>
+              <p id="production-board-status" class="muted small" role="status"></p><div id="production-board" class="muted small"></div>
+              <div class="production-preview-wrap"><img id="production-preview" alt="本次制作的画面预览" hidden><p id="production-preview-status" class="muted small">有本次画面预览时会显示在这里。</p></div>
+              <div id="production-jobs" aria-live="polite"></div><ul id="production-logs" class="production-logs" role="log" aria-live="polite" aria-relevant="additions"></ul>
+              <div class="progress-actions"><button id="production-retry" hidden>重试制作</button><button id="production-edit-input" hidden>返回修改正文</button><a id="open-refine-during" href="/?page=refine">进入精修 / 停止制作</a></div>
+            </section></div>
+            <div id="make-output-slot">
+              <section id="outputs" aria-labelledby="outputs-title" hidden>
+                <div class="section-head"><h2 id="outputs-title">本次成片</h2><span id="production-version-status" class="version-status">初稿</span></div>
+                <label id="output-version-field" hidden>查看版本<select id="output-version" aria-label="选择已完成的视频版本"><option value="">制作完成后显示视频</option></select></label>
+                <p id="output-status" class="muted small" role="status">视频完成后会出现在这里。</p><video id="output-player" controls playsinline preload="metadata" hidden></video>
+                <div class="output-actions"><a id="output-download" class="download-link" hidden>下载 MP4</a><button id="output-final" hidden>已看过，确认为终稿</button></div><p id="output-final-status" class="muted small" role="status"></p>
+                <div class="output-next"><button id="go-refine" class="primary" hidden>不满意？去精修页调整</button><button id="make-another" hidden>重新制作</button></div>
+              </section>
+            </div>
+          </section>
+          <section id="page-refine" aria-label="精修页" hidden>
+            <div class="page-intro"><h2>精修与审阅</h2><p class="muted">查看成片，定位想改的地方，用文字说明调整要求。</p></div>
+            <div id="refine-progress-slot"></div><div id="refine-output-slot"></div>
+            <section id="precision-controls" class="review-card" aria-labelledby="precision-title" hidden>
+              <div class="section-head"><h2 id="precision-title">定位画面</h2><span class="muted small">定位后将位置加入调整要求</span></div>
+              <div class="precision-grid"><label>镜头 / 片段<select id="review-clips" aria-label="选择镜头或片段"><option value="">载入当前版本镜头…</option></select></label><div><label for="seek-time">视频位置（秒）</label><div class="seek-controls"><input id="seek-time" type="number" min="0" step="0.001" value="0"><button id="seek-apply">跳转</button></div></div></div>
+              <div class="precision-actions"><div class="row"><button id="frame-prev" aria-label="前一帧">← 前一帧</button><button id="frame-next" aria-label="后一帧">后一帧 →</button></div><button id="mark-location">将此位置加入调整要求</button></div><p id="review-location-status" class="muted small" role="status"></p>
+            </section>
+            <details id="compare-panel" class="review-card" hidden><summary>对比其他版本</summary><label for="compare-version">对比版本</label><select id="compare-version" aria-label="选择对比版本"><option value="">选择一个历史版本</option></select><p id="compare-status" class="muted small" role="status"></p><video id="compare-player" controls playsinline preload="metadata" hidden></video></details>
+            <section id="chat" aria-labelledby="chat-title">
+              <div class="section-head"><h2 id="chat-title">调整要求</h2><span id="agent-status" class="badge">未开始</span></div><p class="muted small">例如：“第二节不够直观，请重新制作，其他部分保留。”</p>
+              <div id="conversation"><p class="chat-empty">在这里说明想改进的地方。</p></div><div id="approvals"></div>
+              <form id="composer"><label class="visually-hidden" for="prompt">输入调整要求</label><textarea id="prompt" rows="4" placeholder="指出需要改进的文字、镜头或声音。"></textarea><div class="row"><button id="agent-stop" type="button" hidden>停止制作</button><button id="send" class="primary">发送调整</button></div></form><p id="send-state" class="muted small" role="status"></p>
+              <div class="chat-footer"><span class="muted small">Enter 发送 · Shift + Enter 换行 · 草稿自动保留</span><a id="open-rundesk" class="small" target="_blank" rel="noopener">在 RunDesk 查看执行详情</a></div>
+            </section>
+          </section>
+        </div>
       </main>
-      <aside id="chat"><div class="section-head"><h2>创作助手</h2><span id="agent-status" class="badge">未开始</span></div><p class="muted small">例如：“第二节不够直观，请重新制作，其他部分保留。”</p><a id="open-rundesk" class="small" target="_blank" rel="noopener">在 RunDesk 查看执行详情</a><div id="conversation"><p class="chat-empty">先开始制作，随后在这里继续调整。</p></div><div id="approvals"></div><form id="composer"><textarea id="prompt" rows="4" placeholder="指出需要改进的文字、镜头或声音。"></textarea><div class="row"><button id="agent-stop" type="button" hidden>停止制作</button><button id="send" class="primary">发送</button></div></form><p id="send-state" class="muted small" role="status"></p><p class="muted small">Enter 发送 · Shift + Enter 换行<br>对话草稿按项目自动保留</p></aside>
     </div><div id="toast" role="status" hidden></div>
   </div>
   <dialog id="new-dialog"><form id="new-form"><h2>新建视频项目</h2><label>项目名称<input id="new-name" required maxlength="80" placeholder="例如：今日科技新闻"></label>

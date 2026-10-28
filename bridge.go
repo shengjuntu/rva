@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 )
 
 //go:embed integrations/video-project
@@ -317,6 +318,7 @@ func (a *App) message(w http.ResponseWriter, r *http.Request) {
 	defer a.bridgeMu.Unlock()
 	var in struct {
 		Skills         []string `json:"skills,omitempty"`
+		Purpose        string   `json:"purpose,omitempty"`
 		Text           string   `json:"text"`
 		RequestID      string   `json:"requestId"`
 		ExpectedTurnID string   `json:"expectedTurnId"`
@@ -326,6 +328,10 @@ func (a *App) message(w http.ResponseWriter, r *http.Request) {
 	}
 	if strings.TrimSpace(in.Text) == "" || len(in.Text) > 128<<10 || !requestIdentifier.MatchString(in.RequestID) {
 		fail(w, 400, errors.New("需要消息内容和 8–128 位 requestId"))
+		return
+	}
+	if in.Purpose != "" && in.Purpose != "draft" && in.Purpose != "adjustment" {
+		fail(w, 400, errors.New("purpose 必须为 draft、adjustment 或省略"))
 		return
 	}
 	if len(in.Skills) > 0 {
@@ -344,7 +350,7 @@ func (a *App) message(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if pending := p.AgentSubmission; pending != nil && pending.ID == in.RequestID {
-		if pending.Text != in.Text || pending.TurnID != in.ExpectedTurnID || strings.Join(pending.Skills, "\n") != strings.Join(in.Skills, "\n") {
+		if pending.Purpose != in.Purpose || pending.Text != in.Text || pending.TurnID != in.ExpectedTurnID || strings.Join(pending.Skills, "\n") != strings.Join(in.Skills, "\n") {
 			fail(w, 409, &RunDeskError{Status: 409, Code: "idempotency_conflict", Message: "同一 requestId 不能用于不同消息"})
 			return
 		}
@@ -395,7 +401,11 @@ func (a *App) message(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if e = a.saveAgent(p.ID, func(q *Project) {
-			q.AgentSubmission = &AgentSubmission{SessionID: q.SessionID, RuntimeBinding: cloneRuntimeBinding(q.RuntimeBinding), Skills: in.Skills, ID: in.RequestID, Text: in.Text, TurnID: in.ExpectedTurnID, RunID: q.AgentRunID, State: "pending"}
+			runID := ""
+			if in.ExpectedTurnID != "" {
+				runID = q.AgentRunID
+			}
+			q.AgentSubmission = &AgentSubmission{Purpose: in.Purpose, Created: time.Now().UTC().Format(time.RFC3339Nano), SessionID: q.SessionID, RuntimeBinding: cloneRuntimeBinding(q.RuntimeBinding), Skills: in.Skills, ID: in.RequestID, Text: in.Text, TurnID: in.ExpectedTurnID, RunID: runID, State: "pending"}
 		}); e != nil {
 			fail(w, 500, e)
 			return
@@ -440,6 +450,9 @@ func (a *App) agentState(w http.ResponseWriter, r *http.Request) {
 	if e = a.rdCall(r.Context(), "GET", "/sessions/"+p.SessionID, nil, &out); e != nil {
 		fail(w, 502, e)
 		return
+	}
+	if next, observeErr := a.observeProductionRemote(p, out); observeErr == nil {
+		p = next
 	}
 	out["appSubmission"] = p.AgentSubmission
 	out["appRunId"] = p.AgentRunID

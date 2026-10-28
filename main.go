@@ -21,14 +21,13 @@ import (
 	"os/signal"
 	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 )
 
-const version = "0.27.0"
+const version = "0.28.0"
 
 //go:embed web/*
 var ui embed.FS
@@ -65,25 +64,28 @@ type Asset struct {
 	MIME            string              `json:"mime"`
 }
 type Render struct {
-	SourceHash   string       `json:"sourceHash,omitempty"`
-	CacheKey     string       `json:"cacheKey,omitempty"`
-	ReusedFrom   string       `json:"reusedFrom,omitempty"`
-	Range        *RenderRange `json:"range,omitempty"`
-	Engine       string       `json:"engine,omitempty"`
-	RequestID    string       `json:"requestId,omitempty"`
-	RequestHash  string       `json:"requestHash,omitempty"`
-	ContentHash  string       `json:"contentHash,omitempty"`
-	Kind         string       `json:"kind,omitempty"`
-	HasSubtitles bool         `json:"hasSubtitles,omitempty"`
-	ID           string       `json:"id"`
-	Revision     int          `json:"revision"`
-	State        string       `json:"state"`
-	Created      string       `json:"created"`
-	Error        string       `json:"error,omitempty"`
-	Duration     float64      `json:"duration"`
-	HasAudio     bool         `json:"hasAudio"`
+	ProductionRequestID string       `json:"productionRequestId,omitempty"`
+	SourceHash          string       `json:"sourceHash,omitempty"`
+	CacheKey            string       `json:"cacheKey,omitempty"`
+	ReusedFrom          string       `json:"reusedFrom,omitempty"`
+	Range               *RenderRange `json:"range,omitempty"`
+	Engine              string       `json:"engine,omitempty"`
+	RequestID           string       `json:"requestId,omitempty"`
+	RequestHash         string       `json:"requestHash,omitempty"`
+	ContentHash         string       `json:"contentHash,omitempty"`
+	Kind                string       `json:"kind,omitempty"`
+	HasSubtitles        bool         `json:"hasSubtitles,omitempty"`
+	ID                  string       `json:"id"`
+	Revision            int          `json:"revision"`
+	State               string       `json:"state"`
+	Created             string       `json:"created"`
+	Error               string       `json:"error,omitempty"`
+	Duration            float64      `json:"duration"`
+	HasAudio            bool         `json:"hasAudio"`
 }
 type Project struct {
+	LastOpened          string                  `json:"lastOpened,omitempty"`
+	Archived            bool                    `json:"archived,omitempty"`
 	HyperFrames         *HyperFramesDocument    `json:"hyperframes,omitempty"`
 	MediaAlignment      *MediaAlignmentDocument `json:"mediaAlignment,omitempty"`
 	ProductionRuns      []ProductionRun         `json:"productionRuns,omitempty"`
@@ -315,6 +317,9 @@ func (a *App) createRequestedProfile(name, requestID string, requestedProfile *s
 			}
 		}
 	}
+	if e := a.checkDeletedCreation(requestID, requestHash); e != nil {
+		return Project{}, e
+	}
 	wf := newProjectWorkflow()
 	profile := a.productionProfile
 	if requestedProfile != nil {
@@ -486,16 +491,11 @@ func (a *App) routes() http.Handler {
 		http.SetCookie(w, &http.Cookie{Name: "video_session", Value: "", Path: "/", MaxAge: -1, HttpOnly: true})
 		writeJSON(w, 200, map[string]bool{"ok": true})
 	})
-	m.HandleFunc("GET /api/projects", func(w http.ResponseWriter, r *http.Request) {
-		a.mu.Lock()
-		list := []Project{}
-		for _, p := range a.projects {
-			list = append(list, clone(p))
-		}
-		a.mu.Unlock()
-		sort.Slice(list, func(i, j int) bool { return list[i].Updated > list[j].Updated })
-		writeJSON(w, 200, list)
-	})
+	m.HandleFunc("GET /api/projects", a.projectsList)
+	m.HandleFunc("POST /api/projects/{id}/opened", a.projectOpened)
+	m.HandleFunc("PATCH /api/projects/{id}/management", a.projectManagement)
+	m.HandleFunc("DELETE /api/projects/{id}", a.projectDelete)
+	m.HandleFunc("GET /api/projects/{id}/production-state", a.productionState)
 	m.HandleFunc("POST /api/projects", func(w http.ResponseWriter, r *http.Request) {
 		var in struct {
 			Name              string  `json:"name"`
@@ -507,7 +507,7 @@ func (a *App) routes() http.Handler {
 		}
 		p, e := a.createRequestedProfile(in.Name, in.RequestID, in.ProductionProfile)
 		if e != nil {
-			if errors.Is(e, errCreateRequestConflict) {
+			if errors.Is(e, errCreateRequestConflict) || errors.Is(e, errProjectDeleted) {
 				fail(w, 409, e)
 				return
 			}

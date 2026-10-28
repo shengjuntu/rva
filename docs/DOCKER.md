@@ -1,6 +1,6 @@
-# Video App v0.27.0：Docker 部署与服务接入
+# Video App v0.28.0：Docker 部署与服务接入
 
-当前配套为 Video App 0.27.0、RunDesk 0.52.0 / video-build 1.4.0。已有适配环境继续沿用；本次合并不要求清空项目、重建 RunDesk 安装身份或重新部署已有 IndexTTS/ComfyUI 模型。
+当前配套为 Video App 0.28.0、RunDesk 0.52.0 / video-build 1.4.0。已有适配环境继续沿用；本次合并不要求清空项目、重建 RunDesk 安装身份或重新部署已有 IndexTTS/ComfyUI 模型。
 
 新建项目时从 RunDesk 查询并搜索选择制作环境，项目创建时保存选择。`VIDEO_PRODUCTION_PROFILE` 仍可指定新项目预选值。管理员在 RunDesk 配置每个预设的镜像、专用实例与工作区；App 不接收任意镜像或 Docker socket。多环境与 `VIDEO_EXCHANGE_ROOTS` 精确共享映射见 [PRODUCTION-PROFILES](PRODUCTION-PROFILES.md)。
 
@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | RunDesk | Agent 生命周期、模型认证、Skills/MCP、会话、审批和轨迹 | 原 RunDesk data、账户与工作区 |
 | RunDesk 托管的 `video-build` 工具容器 | Codex 与其制作工具环境 | RunDesk 管理的工作区和 Codex home |
-| `rundesk-video-app:0.27.0` | 极简 WebUI、制作 HTTP/MCP、HyperFrames/FFmpeg 渲染、素材和成片归档 | 原宿主目录挂载到 `/data` |
+| `rundesk-video-app:0.28.0` | 极简 WebUI、制作 HTTP/MCP、HyperFrames/FFmpeg 渲染、素材和成片归档 | 原宿主目录挂载到 `/data` |
 | 已部署的 IndexTTS / ComfyUI | 各自的 GPU 推理服务 | 各服务自己的模型、音色、节点和输出目录 |
 
 App 镜像包含 HyperFrames 0.8.87、GSAP 3.15.0、Node.js、Chromium、FFmpeg/FFprobe、Noto CJK 和 eSpeak NG。App 与 Codex 工具容器分别更新；模型服务不放进 App 镜像，不向 App 挂载 Docker socket。
@@ -31,7 +31,7 @@ bash scripts/docker.sh doctor
 ```
 
 1. 新安装的 `init` 生成配置并写入当前 UID/GID 与绝对数据路径；已有 `docker/.env` 不会被覆盖。填入实际 `RUNDESK_URL`、`RUNDESK_TOKEN`，核对浏览器入口、MCP 回调与数据目录。
-2. 升级先等待活动任务结束、停止旧 App 并备份完整数据，继续将原目录挂到 `/data`。保留 access-token、config.json、speech-config.json、RunDesk 请求回执、projects、素材和历史输出。旧配置显式更新 `VIDEO_IMAGE=rundesk-video-app:0.27.0`，不要用示例文件覆盖已有配置。
+2. 升级先等待活动任务结束、停止旧 App 并备份完整数据，继续将原目录挂到 `/data`。保留 access-token、config.json、speech-config.json、RunDesk 请求回执、projects、素材和历史输出。旧配置显式更新 `VIDEO_IMAGE=rundesk-video-app:0.28.0`，不要用示例文件覆盖已有配置。
 3. `build` 显式构建 App 镜像；`up` 使用现有镜像启动，不自动安装 npm/apt 或下载浏览器。仅替换源码或镜像标签不会更新已经运行的容器，需执行相应重建与启动流程。
 4. 用 `token` 输出登录令牌，打开浏览器入口。主页面首次打开新建项目弹窗，选择环境并创建空项目；日常操作是导入正文/素材、开始制作、查看视频版本、对话修改和下载。
 5. 首次配置模型认证、Agent 环境与 Skills/MCP 时，在 RunDesk 的视频应用和运行环境页核对已选镜像、账户与工作区。App 开始制作会按现有流程建立连接、配置制作工具并检查运行环境；遇到认证或环境错误，按页面提示转到 RunDesk 处理，再确认原提交。不要为排错删除旧会话或清空配置。

@@ -1,3 +1,14 @@
+# 升级到 0.28.0
+
+保留原 `data`、项目、素材、会话、访问令牌和服务配置。源码重新构建，或将既有 `docker/.env` 中显式设置的 `VIDEO_IMAGE` 更新为 `rundesk-video-app:0.28.0` 后重建容器并刷新浏览器。新 UI 将制作与精修分为两个独立视图；原有输出在精修页保留，制作页只有明确关联当前制作请求的完整新片才作为本次结果展示。
+
+项目增加最近打开时间、归档及设置页管理；删除会先移入服务器 `data/project-trash` 并记录请求墓碑，以免旧创建回执在删除后意外恢复。制作状态读取 RunDesk 当前运行结果；暂时无法读取时显示未知状态，不推断进度或结果。后台 MCP 增加可选的 `productionRequestId` 用于关联产物，旧调用仍可用，但未标记的产物只在历史中查看。旧项目无需迁移或重新创建；建议给制作环境更新 Video App MCP 工具说明以便 Codex 使用新参数。RunDesk 核心接口与自研 video-build 均无需更改。
+
+详见 [UI 需求](UI-REQUIREMENTS.md)及 [验证记录](validation-0.28.0.md)。
+
+---
+以下保留历史版本说明。
+
 # 升级到 0.27.0
 
 保留原 data、项目、令牌、RunDesk 地址/凭据、模型服务配置和运行参数。源码构建或在旧 docker/.env 显式更新 `VIDEO_IMAGE=rundesk-video-app:0.27.0` 后 build/up，刷新浏览器。无需更改 RunDesk 核心接口或自研 video-build；当前目录能力可与 RunDesk 0.52.0 配套使用。

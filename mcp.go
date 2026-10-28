@@ -72,6 +72,7 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 					required = append(required, "assetId", "times")
 				}
 				if t.Name == "video_production_run_prepare" {
+					props["productionRequestId"] = map[string]string{"type": "string"}
 					props["revision"] = map[string]string{"type": "integer"}
 					props["requestId"] = map[string]string{"type": "string"}
 					required = append(required, "revision", "requestId")
@@ -85,6 +86,7 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 					}
 				}
 				if t.Name == "video_production_checkpoint" {
+					props["productionRequestId"] = map[string]string{"type": "string"}
 					for _, field := range []string{"sourceHash", "summary", "document"} {
 						props[field] = map[string]string{"type": "string"}
 					}
@@ -131,7 +133,7 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 					props["type"] = map[string]any{"type": "string", "enum": []string{"tts", "render", "image_generation", "video_generation"}}
 					props["revision"] = map[string]string{"type": "integer"}
 					props["requestId"] = map[string]string{"type": "string"}
-					props["options"] = map[string]any{"type": "object", "properties": map[string]any{"range": map[string]any{"type": "object", "properties": map[string]any{"start": map[string]string{"type": "number"}, "end": map[string]string{"type": "number"}}, "required": []string{"start", "end"}, "additionalProperties": false}, "prompt": map[string]string{"type": "string"}, "duration": map[string]any{"type": "number", "exclusiveMinimum": 0, "maximum": 60}, "aspectRatio": map[string]any{"type": "string", "enum": []string{"16:9", "9:16", "1:1", "4:3", "3:4"}}, "referenceAssetIds": map[string]any{"type": "array", "maxItems": 4, "items": map[string]string{"type": "string"}}, "source": map[string]any{"type": "string", "enum": []string{"narration", "shots", "text"}}, "text": map[string]any{"type": "string", "maxLength": 60000, "description": "Only for source=text: independent synthesis input; does not change project narration, shots or audio bindings."}, "backend": map[string]any{"type": "string", "enum": []string{"indextts", "espeak-ng"}}, "voice": map[string]string{"type": "string"}, "language": map[string]string{"type": "string"}, "speed": map[string]string{"type": "number"}, "rate": map[string]string{"type": "integer"}, "kind": map[string]any{"type": "string", "enum": []string{"draft"}}}, "additionalProperties": false}
+					props["options"] = map[string]any{"type": "object", "properties": map[string]any{"productionRequestId": map[string]string{"type": "string"}, "range": map[string]any{"type": "object", "properties": map[string]any{"start": map[string]string{"type": "number"}, "end": map[string]string{"type": "number"}}, "required": []string{"start", "end"}, "additionalProperties": false}, "prompt": map[string]string{"type": "string"}, "duration": map[string]any{"type": "number", "exclusiveMinimum": 0, "maximum": 60}, "aspectRatio": map[string]any{"type": "string", "enum": []string{"16:9", "9:16", "1:1", "4:3", "3:4"}}, "referenceAssetIds": map[string]any{"type": "array", "maxItems": 4, "items": map[string]string{"type": "string"}}, "source": map[string]any{"type": "string", "enum": []string{"narration", "shots", "text"}}, "text": map[string]any{"type": "string", "maxLength": 60000, "description": "Only for source=text: independent synthesis input; does not change project narration, shots or audio bindings."}, "backend": map[string]any{"type": "string", "enum": []string{"indextts", "espeak-ng"}}, "voice": map[string]string{"type": "string"}, "language": map[string]string{"type": "string"}, "speed": map[string]string{"type": "number"}, "rate": map[string]string{"type": "integer"}, "kind": map[string]any{"type": "string", "enum": []string{"draft"}}}, "additionalProperties": false}
 					required = append(required, "type", "revision", "requestId")
 				}
 				if t.Name == "video_job_get" || t.Name == "video_job_cancel" {
@@ -194,6 +196,7 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 					required = append(required, "revision", "renderId", "reviewed")
 				}
 				if t.Name == "video_render_start" {
+					props["productionRequestId"] = map[string]string{"type": "string"}
 					props["range"] = map[string]any{"type": "object", "properties": map[string]any{"start": map[string]string{"type": "number"}, "end": map[string]string{"type": "number"}}, "required": []string{"start", "end"}, "additionalProperties": false}
 					props["revision"] = map[string]string{"type": "integer"}
 					props["requestId"] = map[string]string{"type": "string"}
@@ -214,6 +217,7 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 					required = append(required, "srt", "enabled", "reviewed")
 				}
 				if t.Name == "video_speech_start" {
+					props["productionRequestId"] = map[string]string{"type": "string"}
 					props["text"] = map[string]any{"type": "string", "maxLength": 60000, "description": "Required only with source=text for independent synthesis; never replaces project narration or shots."}
 					props["source"] = map[string]any{"type": "string", "enum": []string{"narration", "shots", "text"}}
 					props["requestId"] = map[string]string{"type": "string"}
@@ -248,51 +252,52 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 			var p struct {
 				Name      string `json:"name"`
 				Arguments struct {
-					Nonce             string           `json:"nonce"`
-					Quote             string           `json:"quote"`
-					Occurrence        int              `json:"occurrence"`
-					TextSourceHash    *string          `json:"textSourceHash"`
-					SourceHash        string           `json:"sourceHash"`
-					Summary           string           `json:"summary"`
-					Document          string           `json:"document"`
-					Status            string           `json:"status"`
-					Time              *float64         `json:"time"`
-					Range             *RenderRange     `json:"range"`
-					Changes           []EditChange     `json:"changes"`
-					Description       AssetDescription `json:"description"`
-					Units             json.RawMessage  `json:"units"`
-					Notes             string           `json:"notes"`
-					Times             json.RawMessage  `json:"times"`
-					ProductionRunID   string           `json:"productionRunId"`
-					Limit             int              `json:"limit"`
-					Source            string           `json:"source"`
-					DSL               *EditDocument    `json:"dsl"`
-					Active            bool             `json:"active"`
-					Name              string           `json:"name"`
-					ProductionProfile *string          `json:"productionProfile"`
-					Data              string           `json:"data"`
-					Probe             bool             `json:"probe"`
-					Type              string           `json:"type"`
-					JobID             string           `json:"jobId"`
-					Options           JobOptions       `json:"options"`
-					AssetID           string           `json:"assetId"`
-					Text              string           `json:"text"`
-					Stage             string           `json:"stage"`
-					Kind              string           `json:"kind"`
-					ProjectID         string           `json:"projectId"`
-					Revision          int              `json:"revision"`
-					RequestID         string           `json:"requestId"`
-					Backend           string           `json:"backend"`
-					Language          string           `json:"language"`
-					Speed             float64          `json:"speed"`
-					Voice             string           `json:"voice"`
-					Rate              int              `json:"rate"`
-					SpeechID          string           `json:"speechId"`
-					SRT               string           `json:"srt"`
-					Enabled           bool             `json:"enabled"`
-					Reviewed          bool             `json:"reviewed"`
-					RenderID          string           `json:"renderId"`
-					Project           json.RawMessage  `json:"project"`
+					Nonce               string           `json:"nonce"`
+					Quote               string           `json:"quote"`
+					Occurrence          int              `json:"occurrence"`
+					TextSourceHash      *string          `json:"textSourceHash"`
+					SourceHash          string           `json:"sourceHash"`
+					Summary             string           `json:"summary"`
+					Document            string           `json:"document"`
+					Status              string           `json:"status"`
+					Time                *float64         `json:"time"`
+					Range               *RenderRange     `json:"range"`
+					Changes             []EditChange     `json:"changes"`
+					Description         AssetDescription `json:"description"`
+					Units               json.RawMessage  `json:"units"`
+					Notes               string           `json:"notes"`
+					Times               json.RawMessage  `json:"times"`
+					ProductionRunID     string           `json:"productionRunId"`
+					ProductionRequestID string           `json:"productionRequestId"`
+					Limit               int              `json:"limit"`
+					Source              string           `json:"source"`
+					DSL                 *EditDocument    `json:"dsl"`
+					Active              bool             `json:"active"`
+					Name                string           `json:"name"`
+					ProductionProfile   *string          `json:"productionProfile"`
+					Data                string           `json:"data"`
+					Probe               bool             `json:"probe"`
+					Type                string           `json:"type"`
+					JobID               string           `json:"jobId"`
+					Options             JobOptions       `json:"options"`
+					AssetID             string           `json:"assetId"`
+					Text                string           `json:"text"`
+					Stage               string           `json:"stage"`
+					Kind                string           `json:"kind"`
+					ProjectID           string           `json:"projectId"`
+					Revision            int              `json:"revision"`
+					RequestID           string           `json:"requestId"`
+					Backend             string           `json:"backend"`
+					Language            string           `json:"language"`
+					Speed               float64          `json:"speed"`
+					Voice               string           `json:"voice"`
+					Rate                int              `json:"rate"`
+					SpeechID            string           `json:"speechId"`
+					SRT                 string           `json:"srt"`
+					Enabled             bool             `json:"enabled"`
+					Reviewed            bool             `json:"reviewed"`
+					RenderID            string           `json:"renderId"`
+					Project             json.RawMessage  `json:"project"`
 				} `json:"arguments"`
 			}
 			e := json.Unmarshal(msg.Params, &p)
@@ -334,7 +339,7 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 			case "video_production_run_prepare":
 				method = "POST"
 				path += "/production-runs/prepare"
-				body, _ = json.Marshal(map[string]any{"revision": p.Arguments.Revision, "requestId": p.Arguments.RequestID})
+				body, _ = json.Marshal(map[string]any{"revision": p.Arguments.Revision, "requestId": p.Arguments.RequestID, "productionRequestId": p.Arguments.ProductionRequestID})
 			case "video_production_run_get", "video_production_run_ingest":
 				if !identifier.MatchString(p.Arguments.ProductionRunID) {
 					e = fmt.Errorf("invalid productionRunId")
@@ -350,7 +355,7 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 			case "video_production_checkpoint":
 				method = "POST"
 				path += "/production-checkpoints"
-				body, _ = json.Marshal(CheckpointRequest{Revision: p.Arguments.Revision, SourceHash: p.Arguments.SourceHash, Stage: p.Arguments.Stage, Status: p.Arguments.Status, Summary: p.Arguments.Summary, Document: p.Arguments.Document, RenderID: p.Arguments.RenderID})
+				body, _ = json.Marshal(CheckpointRequest{ProductionRequestID: p.Arguments.ProductionRequestID, Revision: p.Arguments.Revision, SourceHash: p.Arguments.SourceHash, Stage: p.Arguments.Stage, Status: p.Arguments.Status, Summary: p.Arguments.Summary, Document: p.Arguments.Document, RenderID: p.Arguments.RenderID})
 			case "video_render_inspect":
 				method = "POST"
 				if !identifier.MatchString(p.Arguments.RenderID) || p.Arguments.Time == nil {
@@ -476,7 +481,7 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 			case "video_speech_start":
 				method = "POST"
 				path += "/speech"
-				body, _ = json.Marshal(SpeechRequest{Source: p.Arguments.Source, Text: p.Arguments.Text, Backend: p.Arguments.Backend, Language: p.Arguments.Language, Speed: p.Arguments.Speed, Revision: p.Arguments.Revision, RequestID: p.Arguments.RequestID, Voice: p.Arguments.Voice, Rate: p.Arguments.Rate})
+				body, _ = json.Marshal(SpeechRequest{ProductionRequestID: p.Arguments.ProductionRequestID, Source: p.Arguments.Source, Text: p.Arguments.Text, Backend: p.Arguments.Backend, Language: p.Arguments.Language, Speed: p.Arguments.Speed, Revision: p.Arguments.Revision, RequestID: p.Arguments.RequestID, Voice: p.Arguments.Voice, Rate: p.Arguments.Rate})
 			case "video_speech_stop", "video_speech_adopt":
 				method = "POST"
 				if !identifier.MatchString(p.Arguments.SpeechID) {
@@ -491,7 +496,7 @@ func runMCP(input io.Reader, output io.Writer, base, token string, client *http.
 			case "video_render_start":
 				method = "POST"
 				path += "/render"
-				body, _ = json.Marshal(RenderRequest{Range: p.Arguments.Range, Kind: p.Arguments.Kind, Revision: p.Arguments.Revision, RequestID: p.Arguments.RequestID})
+				body, _ = json.Marshal(RenderRequest{ProductionRequestID: p.Arguments.ProductionRequestID, Range: p.Arguments.Range, Kind: p.Arguments.Kind, Revision: p.Arguments.Revision, RequestID: p.Arguments.RequestID})
 			case "video_render_stop":
 				method = "POST"
 				if !identifier.MatchString(p.Arguments.RenderID) {

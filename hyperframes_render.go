@@ -359,6 +359,11 @@ func (a *App) startHyperFramesRender(w http.ResponseWriter, r *http.Request, req
 			}
 		}
 	}
+	if e := validateProductionOwner(*p, request.ProductionRequestID); e != nil {
+		a.mu.Unlock()
+		fail(w, 409, e)
+		return
+	}
 	if workflowFor(*p).EditingBackend != "hyperframes" {
 		a.mu.Unlock()
 		fail(w, 409, errors.New("当前项目未选择自由 HyperFrames 后端，请重新读取制作配置"))
@@ -385,7 +390,7 @@ func (a *App) startHyperFramesRender(w http.ResponseWriter, r *http.Request, req
 		fail(w, 409, errors.New("尚未保存自由 HyperFrames 工程"))
 		return
 	}
-	job := Render{ID: uid(), Revision: q.Revision, Engine: authoredHyperFramesEngine, Kind: request.Kind, RequestID: request.RequestID, RequestHash: requestHash, State: "running", Created: time.Now().UTC().Format(time.RFC3339Nano), Duration: q.HyperFrames.Canvas.Duration, HasAudio: q.HyperFrames.HasAudio, SourceHash: q.HyperFrames.TextSourceHash, ContentHash: productionHash(q)}
+	job := Render{ProductionRequestID: request.ProductionRequestID, ID: uid(), Revision: q.Revision, Engine: authoredHyperFramesEngine, Kind: request.Kind, RequestID: request.RequestID, RequestHash: requestHash, State: "running", Created: time.Now().UTC().Format(time.RFC3339Nano), Duration: q.HyperFrames.Canvas.Duration, HasAudio: q.HyperFrames.HasAudio, SourceHash: q.HyperFrames.TextSourceHash, ContentHash: productionHash(q)}
 	dir := filepath.Join(a.dir(id), "renders", job.ID)
 	manifest, e := a.freezeAuthoredHyperFrames(q, dir)
 	if e != nil {

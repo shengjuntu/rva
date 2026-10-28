@@ -19,6 +19,7 @@ type JobArtifact struct {
 	Size   int64  `json:"size,omitempty"`
 }
 type ProductionJob struct {
+	ProductionRequestID string `json:"productionRequestId,omitempty"`
 	Source               string                `json:"source,omitempty"`
 	ScriptHash           string                `json:"scriptHash,omitempty"`
 	ID                   string                `json:"jobId"`
@@ -40,6 +41,7 @@ type ProductionJob struct {
 	Warnings             []string              `json:"warnings,omitempty"`
 }
 type JobOptions struct {
+	ProductionRequestID string `json:"productionRequestId,omitempty"`
 	Text              string       `json:"text,omitempty"`
 	Duration          *float64     `json:"duration,omitempty"`
 	AspectRatio       string       `json:"aspectRatio,omitempty"`
@@ -91,7 +93,7 @@ func unifiedState(s string) string {
 	}
 }
 func speechJobView(pid string, j SpeechJob) ProductionJob {
-	v := ProductionJob{ID: "tts:" + j.ID, NativeID: j.ID, ProjectID: pid, Type: "tts", Provider: speechBackend(j.Backend), State: unifiedState(j.State), NativeState: j.State, Revision: j.Revision, RequestID: j.RequestID, Created: j.Created, CompletedUnits: j.Progress, TotalUnits: j.Total, ProgressKnown: j.Total > 0, Error: j.Error, Artifacts: []JobArtifact{}}
+	v := ProductionJob{ProductionRequestID: j.ProductionRequestID, ID: "tts:" + j.ID, NativeID: j.ID, ProjectID: pid, Type: "tts", Provider: speechBackend(j.Backend), State: unifiedState(j.State), NativeState: j.State, Revision: j.Revision, RequestID: j.RequestID, Created: j.Created, CompletedUnits: j.Progress, TotalUnits: j.Total, ProgressKnown: j.Total > 0, Error: j.Error, Artifacts: []JobArtifact{}}
 	v.Source, v.ScriptHash = j.Source, j.ScriptHash
 	if j.State == "completed" {
 		for name, f := range j.Files {
@@ -108,7 +110,7 @@ func renderProvider(j Render) string {
 	return "hyperframes"
 }
 func renderJobView(pid string, j Render) ProductionJob {
-	v := ProductionJob{ID: "render:" + j.ID, NativeID: j.ID, ProjectID: pid, Type: "render", Provider: renderProvider(j), State: unifiedState(j.State), NativeState: j.State, Revision: j.Revision, RequestID: j.RequestID, Created: j.Created, Error: j.Error, Artifacts: []JobArtifact{}}
+	v := ProductionJob{ProductionRequestID: j.ProductionRequestID, ID: "render:" + j.ID, NativeID: j.ID, ProjectID: pid, Type: "render", Provider: renderProvider(j), State: unifiedState(j.State), NativeState: j.State, Revision: j.Revision, RequestID: j.RequestID, Created: j.Created, Error: j.Error, Artifacts: []JobArtifact{}}
 	if j.State == "completed" {
 		v.Artifacts = append(v.Artifacts, JobArtifact{Name: "final.mp4", URL: "/api/projects/" + pid + "/renders/" + j.ID + "/final.mp4"}, JobArtifact{Name: "snapshot.json", URL: "/api/projects/" + pid + "/renders/" + j.ID + "/snapshot.json"}, JobArtifact{Name: "validation.json", URL: "/api/projects/" + pid + "/renders/" + j.ID + "/validation.json"})
 	}
@@ -209,13 +211,13 @@ func (a *App) jobStart(w http.ResponseWriter, r *http.Request) {
 			fail(w, 400, errors.New("TTS不接受渲染kind"))
 			return
 		}
-		native = SpeechRequest{Source: in.Options.Source, Text: in.Options.Text, Revision: in.Revision, RequestID: in.RequestID, Backend: in.Options.Backend, Voice: in.Options.Voice, Language: in.Options.Language, Speed: in.Options.Speed, Rate: in.Options.Rate}
+		native = SpeechRequest{ProductionRequestID: in.Options.ProductionRequestID, Source: in.Options.Source, Text: in.Options.Text, Revision: in.Revision, RequestID: in.RequestID, Backend: in.Options.Backend, Voice: in.Options.Voice, Language: in.Options.Language, Speed: in.Options.Speed, Rate: in.Options.Rate}
 	case "render":
 		if in.Options.Text != "" || in.Options.Prompt != "" || in.Options.Source != "" || in.Options.Backend != "" || in.Options.Voice != "" || in.Options.Language != "" || in.Options.Speed != 0 || in.Options.Rate != 0 || in.Options.Duration != nil || in.Options.AspectRatio != "" || len(in.Options.ReferenceAssetIDs) != 0 {
 			fail(w, 400, errors.New("渲染仅接受kind"))
 			return
 		}
-		native = RenderRequest{Revision: in.Revision, RequestID: in.RequestID, Kind: in.Options.Kind, Range: in.Options.Range}
+		native = RenderRequest{ProductionRequestID: in.Options.ProductionRequestID, Revision: in.Revision, RequestID: in.RequestID, Kind: in.Options.Kind, Range: in.Options.Range}
 	default:
 		fail(w, 501, fmt.Errorf("任务能力 %q 尚未实现；当前支持tts和render", in.Type))
 		return

@@ -10,6 +10,7 @@ import (
 )
 
 type ProductionCheckpoint struct {
+	ProductionRequestID string `json:"productionRequestId,omitempty"`
 	ID         string `json:"id"`
 	Stage      string `json:"stage"`
 	Status     string `json:"status"`
@@ -22,6 +23,7 @@ type ProductionCheckpoint struct {
 	Revision   int    `json:"revision"`
 }
 type CheckpointRequest struct {
+	ProductionRequestID string `json:"productionRequestId,omitempty"`
 	Revision   int    `json:"revision"`
 	SourceHash string `json:"sourceHash"`
 	Stage      string `json:"stage"`
@@ -101,6 +103,10 @@ func (a *App) productionCheckpoint(w http.ResponseWriter, r *http.Request) {
 		fail(w, 404, fmt.Errorf("项目不存在"))
 		return
 	}
+	if e := validateProductionOwner(*p, in.ProductionRequestID); e != nil {
+		fail(w, 409, e)
+		return
+	}
 	if p.Revision != in.Revision || strings.TrimSpace(p.NarrationText) == "" || in.SourceHash != narrationSourceHash(*p) {
 		fail(w, 409, fmt.Errorf("项目修订或权威正文指纹已变化，请重新读取"))
 		return
@@ -122,7 +128,7 @@ func (a *App) productionCheckpoint(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	q := clone(p)
-	record := ProductionCheckpoint{ID: uid(), Stage: in.Stage, Status: in.Status, SourceHash: in.SourceHash, BasisHash: checkpointBasis(q, in.Stage, in.RenderID), Summary: in.Summary, Document: in.Document, RenderID: in.RenderID, Created: time.Now().UTC().Format(time.RFC3339Nano), Revision: p.Revision}
+	record := ProductionCheckpoint{ProductionRequestID: in.ProductionRequestID, ID: uid(), Stage: in.Stage, Status: in.Status, SourceHash: in.SourceHash, BasisHash: checkpointBasis(q, in.Stage, in.RenderID), Summary: in.Summary, Document: in.Document, RenderID: in.RenderID, Created: time.Now().UTC().Format(time.RFC3339Nano), Revision: p.Revision}
 	q.Checkpoints = append(q.Checkpoints, record)
 	if len(q.Checkpoints) > 30 {
 		q.Checkpoints = q.Checkpoints[len(q.Checkpoints)-30:]

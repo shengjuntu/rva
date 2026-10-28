@@ -1,4 +1,4 @@
-rundesk-video-app (RVA) · v0.27.0
+rundesk-video-app (RVA) · v0.28.0
 视频制作工作台 / Video Production Workbench for RunDesk/Codex
 
 【中文版】 English follows below.
@@ -10,20 +10,20 @@ RunDesk/Codex 决定分镜、选材、生成、配音、动画和重做；Video 
 制作 MCP、版本检查、素材与成片保存。正文是内容依据，画面服务文字。
 不要求一句话一张图，也不把正文段落固定投影为镜头模板。
 
-1. 首次打开可自动建立空项目；也可从项目列表新建、打开或重命名项目。
+1. 首次打开先选择制作环境创建项目；侧栏可搜索、打开最近项目，设置页管理归档和重命名。
 2. 粘贴或导入 TXT/Markdown 正文，导入本地素材目录或文件，补充制作要求。
    目录恰好有一份 TXT/MD 且正文为空时，会将其载入正文草稿；已有正文
    不会被自动覆盖。多份文本全部保留，由用户显式选择“作为正文”。
 3. 点击“开始制作”。程序先保存最新正文与要求，再交给 RunDesk。
    未发送的对话草稿仍保留，不会自动变成这次初稿的制作指令。
-4. 在“视频与版本”查看已完成成片或历史版本，下载选定的 MP4；
-   不满意时通过对话提出修改。完整输出须在实际观看后再确认为终稿。
+4. 制作页只看本次新片；进入精修页后定位镜头/时间点、对话调整、对比历史版本，
+   下载选定的 MP4。完整输出须实际观看后才可确认为终稿。
 
 未发送的对话、正文和要求草稿按项目保存在本机浏览器；正式对话历史由
-RunDesk 事件重放。接收情况不确定时确认原提交，沿用原 requestId 和内容，
-不要换编号重复启动。停止操作不保证远端模型已经停止或释放显存。
+RunDesk 事件重放。接收情况不确定时自动核对原提交，沿用原 requestId 和内容，
+不换编号重复启动。停止操作不保证远端模型已经停止或释放显存。
 
-主页面只有项目、输入、简要状态、成片和对话。手动 TTS、渲染、DSL、对齐、
+制作页显示输入、本次状态与成片，精修页显示对话、定位和历史版本。手动 TTS、渲染、DSL、对齐、
 多轨时间线、源码和详细工具日志不在本版 UI 中；详细执行与调试在 RunDesk。
 旧后台接口保留供 Agent 和既有集成使用，不需要恢复旧手动控制台。
 
@@ -60,7 +60,7 @@ IndexTTS 和 ComfyUI 模型在独立服务运行，App 镜像不加载 GPU 模�
 Linux Docker Engine + Compose v2：
   bash scripts/docker.sh init
   # 编辑 docker/.env：保留已有数据路径、地址、令牌和服务设置。
-  # 旧安装显式更新 VIDEO_IMAGE=rundesk-video-app:0.27.0。
+  # 旧安装显式更新 VIDEO_IMAGE=rundesk-video-app:0.28.0。
   bash scripts/docker.sh build
   bash scripts/docker.sh up
   bash scripts/docker.sh token
@@ -147,14 +147,14 @@ material, generation, voiceover, animation and revisions. Video App provides
 production MCP tools, revision checks, media storage and output history.
 Pictures follow the words; there is no mandatory sentence-to-shot template.
 
-The first launch can create an empty project. Import text and files, add optional
+The first launch asks you to choose an authorized runtime and create a project. Import text and files, add optional
 requirements, and start. A folder containing exactly one TXT/MD file adopts it
 as a narration draft only when narration is empty. Existing text is preserved;
 multiple scripts require an explicit choice. Start saves current narration and
 requirements without automatically sending an unsent conversation draft.
 
-Watch completed versions, download the selected MP4, and describe changes in
-chat. Confirm a final only after reviewing that exact complete output. Local
+The Make page shows only the current production output. The Refine page supports
+version selection, time/shot positioning, conversation changes and comparison. Confirm a final only after reviewing that exact complete output. Local
 unsent drafts are stored per project; formal conversation is replayed from
 RunDesk events. An uncertain submission reuses its original request ID and
 content. Cancellation does not guarantee remote GPU work has stopped.
@@ -197,7 +197,7 @@ IndexTTS and ComfyUI model weights run in separate services.
 For Linux Docker Engine and Compose v2:
   bash scripts/docker.sh init
   # Edit docker/.env; retain existing data paths, endpoints and credentials.
-  # Set VIDEO_IMAGE=rundesk-video-app:0.27.0 for an existing installation.
+  # Set VIDEO_IMAGE=rundesk-video-app:0.28.0 for an existing installation.
   bash scripts/docker.sh build
   bash scripts/docker.sh up
   bash scripts/docker.sh token
@@ -292,3 +292,7 @@ The App director workflow remains unchanged. See docs/validation-0.26.0.json.
 制作环境列表 / Runtime picker (0.27.0)
 新建项目会查询 RunDesk 中当前应用获授权的运行环境，支持按名称/说明搜索、刷新与状态展示，无需手填预设 ID。首次无项目时也先选择再创建。选择随项目保存；旧项目和未确认请求不自动迁移。运行状态查询不会启动容器或模型。API/MCP 保留原 productionProfile 语义。
 New projects choose an authorized RunDesk runtime from a searchable list. Existing projects and uncertain creation requests retain their original binding and request body. No container or model is started by browsing the catalog. See docs/PRODUCTION-PROFILES.md and docs/validation-0.27.0.json.
+
+制作页与精修页 / Make and refine pages (0.28.0)
+制作页一键保存并启动，只展示本次请求归属的成片；精修页提供镜头/帧定位、文字修改、版本对比和终稿确认。项目搜索、最近五项、归档和管理见设置页。旧产物保持历史可查看；没有归属证明的产物不冒充本次新片。详见 docs/validation-0.28.0.md。
+The Make page submits once and isolates the current output. Refine provides version-bound positioning, chat adjustments, comparison and final review. See docs/validation-0.28.0.md.
