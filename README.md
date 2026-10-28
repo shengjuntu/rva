@@ -89,6 +89,7 @@ App 直接提交 ComfyUI 工作流、轮询结果并下载 MP4，无需另起生
 
 ## 本版文档与验证
 
+- [下一轮 UI 优化需求](docs/UI-REQUIREMENTS.md)：制作页 / 精修页、精简项目栏及验收约束；需求记录，尚未实现或验收
 - [v0.27.0 验证记录](docs/validation-0.27.0.json)
 - [v0.25.0 验证记录](docs/validation-0.25.0.json)
 - [多制作环境与旧项目兼容](docs/PRODUCTION-PROFILES.md)
