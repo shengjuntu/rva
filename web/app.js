@@ -199,7 +199,7 @@ function drawProjectRuntime(catalog){
  const label=$("#project-runtime");if(!project){label.textContent="";return;}
  const profile=project.runtimeBinding?(project.runtimeBinding.presetId||""):project.productionProfile;
  const source=catalog||projectRuntimeCatalog||runtimeCatalog,item=Array.isArray(source?.items)?source.items.find(row=>row.id===(profile||"")):undefined;
- const name=item?.name||(profile?"已保存的制作环境":"原默认环境");
+ const name=item?.name||(profile?"已保存的制作环境":"应用默认环境");
  label.textContent="制作环境："+name+" · 随项目保存"+(item?.state==="disabled"?" · 已停用":"");
 }
 async function loadProjectRuntimeLabel(){

@@ -20,6 +20,12 @@ Project.productionProfile保存创建时解析的选择，runtimeBinding保存�
 
 绑定不一致、预设禁用或权限不足时，保留项目和历史并返回具体错误；不自动复制原生Agent线程或改另一环境。预设的镜像更新由RunDesk管理员按现有显式重建流程处理。
 
+## 多项目共用 Agent 的当前边界
+
+RunDesk 0.59.1 的额外预设是固定的 instanceId/workspaceId 绑定，并不为每个 Video App 项目分配独立工作区。Video App 保存项目所选环境及首次连接得到的精确绑定，运行请求保留原会话与幂等键；这些检查不构成跨项目文件权限隔离。尤其在 Agent 镜像的 MCP 配置中写死 `VIDEO_APP_PROJECT_ID` 时，同一 Agent 服务不同项目会错误引用固定的项目。部署者应只将这种配置用于与该项目身份匹配的专用环境；不能把同一固定项目 ID 的环境当作通用多项目 Agent。不得通过浏览器路径前缀或更改环境显示名模拟隔离。
+
+RunDesk 提供项目级执行绑定及任务级 MCP 项目上下文后，Video App 应以项目 ID 创建/恢复绑定，并让每个任务保存实际预设、工作区、任务/会话 ID 和操作幂等键。旧项目保持原绑定，新项目使用新契约；具体字段和路径须以 RunDesk 实际发布的 API 为准。当前版本不宣称支持任意多个项目在同一个 Agent 中自动隔离。
+
 ## 与渲染和生成服务的关系
 
 运行预设选择Codex工具容器。App自有HyperFrames/FFmpeg渲染服务、IndexTTS和ComfyUI仍独立；相同生成服务可供不同制作环境使用。

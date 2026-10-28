@@ -173,7 +173,7 @@ func (a *App) runtimeProfileCatalog(ctx context.Context) (RuntimeProfileCatalog,
 		out.Warnings = append(out.Warnings, "当前 RunDesk 版本只支持原默认环境；升级后可查询多个制作环境。")
 	}
 	seen := map[string]bool{"": true}
-	out.Items = append(out.Items, RuntimeProfileChoice{ID: "", Name: "原默认环境", Description: "RunDesk 中此视频应用的原默认绑定", Enabled: true, IsDefault: configuredDefault == "", State: "unknown"})
+	out.Items = append(out.Items, RuntimeProfileChoice{ID: "", Name: "应用默认环境", Description: "此应用在 RunDesk 中的默认绑定；额外预设列表为空时仍可独立选择", Enabled: true, IsDefault: configuredDefault == "", State: "unknown"})
 	for _, preset := range presets {
 		if !a.catalogOpaqueID(preset.ID) || preset.AppID != "rundesk-video-app" || !a.catalogOpaqueID(preset.InstanceID) || !a.catalogOpaqueID(preset.WorkspaceID) || seen[preset.ID] {
 			return out, &RunDeskError{Status: 502, Code: "runtime_profiles_invalid_response", Message: "RunDesk 制作环境列表包含无效或重复绑定，请刷新并核对。"}
