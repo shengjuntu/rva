@@ -110,9 +110,15 @@ function readProjectCreationReceipt(){
  if(!body||typeof body.name!=="string"||typeof body.requestId!=="string"||!/^[a-f0-9]{24}$/.test(body.requestId)||Object.keys(body).some(key=>!["name","requestId","productionProfile"].includes(key))||Object.hasOwn(body,"productionProfile")&&typeof body.productionProfile!=="string")throw Error("本机项目创建记录不完整，未发起新的创建请求。");
  return{key:saved?projectCreateKey:legacyProjectCreateKey,body};
 }
+const rundeskBrowserKey="video-rundesk-browser-url";
+function browserRunDeskURL(fallback){
+ let value="";try{value=localStorage.getItem(rundeskBrowserKey)||"";}catch{}
+ if(!value){try{const host=new URL(fallback).hostname;if(["localhost","127.0.0.1","::1","[::1]"].includes(host)&&!["localhost","127.0.0.1","::1","[::1]"].includes(location.hostname))return "";value=fallback;}catch{return "";}}
+ try{const url=new URL(value);if(!["http:","https:"].includes(url.protocol)||url.username||url.password||url.search||url.hash)return "";return url.href.replace(/\/$/,"");}catch{return "";}
+}
 function setRuntimeConfigLink(){
  const link=$("#new-profile-rundesk");link.hidden=true;
- try{const address=new URL(runtimeCatalog?.rundeskURL||rundeskURL);if(!["http:","https:"].includes(address.protocol)||address.username||address.password)return;address.search="";address.hash="application/rundesk-video-app";link.href=address.href;link.hidden=false;}catch{}
+ try{const address=new URL(browserRunDeskURL(runtimeCatalog?.rundeskURL||rundeskURL));if(!["http:","https:"].includes(address.protocol)||address.username||address.password)return;address.search="";address.hash="application/rundesk-video-app";link.href=address.href;link.hidden=false;}catch{}
 }
 function updateNewProjectControls(){
  const item=runtimeCatalog?.items.find(row=>row.id===selectedRuntimeProfile),locked=creatingProject||!!newProjectReceipt||!!newProjectReceiptError;
@@ -235,7 +241,7 @@ function drawWorkflow(){
  $("#primary-material-summary").textContent=uploading?"正在导入素材…":project.assets?.length?`${counts.image} 张图片 · ${counts.video} 段视频 · ${counts.audio} 段音频`+(counts.other?` · ${counts.other} 份文件`:""):"可添加图片、视频和音频，也可先从正文开始。";
  drawProductionView();
 }
-function updateRunDeskLink(){const link=$("#open-rundesk");if(!rundeskURL){link.hidden=true;return;}link.hidden=false;link.href=rundeskURL+(project?.sessionId?"/?session="+encodeURIComponent(project.sessionId):"/#application/rundesk-video-app");}
+function updateRunDeskLink(){const link=$("#open-rundesk");const address=browserRunDeskURL(rundeskURL);if(!address){link.hidden=true;return;}link.hidden=false;link.href=address+(project?.sessionId?"/?session="+encodeURIComponent(project.sessionId):"/#application/rundesk-video-app");}
 async function saveNarration(){
  if(!project)return false;const pid=project.id,gen=epoch,text=$("#narration-text").value,previous=project.revision;
  try{const result=await api("/api/projects/"+pid+"/narration",{revision:narrationBase,text},"PUT");if(gen!==epoch||project?.id!==pid)return false;

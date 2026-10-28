@@ -8,12 +8,19 @@ function toast(message){$("#toast").textContent=message;$("#toast").hidden=false
 function action(fn){return async event=>{try{return await fn(event);}catch(error){toast(error.message);}};}
 function applyTTSSettings(settings){ttsSettings=settings;for(const [id,key]of [["backend","backend"],["url","url"],["model","model"],["voice","voice"],["language","language"],["timeout","timeoutSeconds"]])$("#tts-"+id).value=settings[key]??"";$("#tts-key").value="";$("#tts-clear-key").checked=false;$("#tts-key").placeholder=settings.hasApiKey?"已保存；留空保持":"服务无认证时可留空";for(const node of $("#tts-form").querySelectorAll("input,select,button"))node.disabled=!!settings.managedByEnvironment;$("#tts-settings-state").textContent=settings.managedByEnvironment?"由环境变量管理，请修改启动配置后重启。":"可在这里保存默认服务，之后制作自动使用。";settingsDirty=false;}
 function ttsDraft(){return{backend:$("#tts-backend").value,url:$("#tts-url").value.trim(),model:$("#tts-model").value.trim(),voice:$("#tts-voice").value.trim(),language:$("#tts-language").value,timeoutSeconds:Number($("#tts-timeout").value),apiKey:$("#tts-key").value,clearApiKey:$("#tts-clear-key").checked};}
+const rundeskBrowserKey="video-rundesk-browser-url";
+function browserRunDeskURL(fallback){
+ let value="";try{value=localStorage.getItem(rundeskBrowserKey)||"";}catch{}
+ if(!value){try{const host=new URL(fallback).hostname;if(["localhost","127.0.0.1","::1","[::1]"].includes(host)&&!["localhost","127.0.0.1","::1","[::1]"].includes(location.hostname))return "";value=fallback;}catch{return "";}}
+ try{const url=new URL(value);if(!["http:","https:"].includes(url.protocol)||url.username||url.password||url.search||url.hash)return "";return url.href.replace(/\/$/,"");}catch{return "";}
+}
+let serverRunDeskURL="";
 async function loadEnvironment(){
  const serial=++environmentSerial,results=await Promise.allSettled([api("/api/environment"),api("/api/runtime-profiles")]);if(serial!==environmentSerial)return;
  if(results[0].status!=="fulfilled")throw results[0].reason;
  const environment=results[0].value,catalog=results[1].status==="fulfilled"?results[1].value:null,box=$("#environment-summary");box.replaceChildren();
  $("#environment-status").textContent=environment.rundeskReady?"RunDesk 连接正常。":"RunDesk 连接尚未就绪。";
- const link=$("#settings-rundesk");link.hidden=true;try{const url=new URL(catalog?.rundeskURL||environment.rundeskURL,location.origin);if(["http:","https:"].includes(url.protocol)&&!url.username&&!url.password){link.href=url.href;link.hidden=false;}}catch{}
+ serverRunDeskURL=catalog?.rundeskURL||environment.rundeskURL||"";const configured=localStorage.getItem(rundeskBrowserKey)||"";if(document.activeElement!==$("#rundesk-browser-url"))$("#rundesk-browser-url").value=configured;$("#rundesk-browser-status").textContent=!configured&&!browserRunDeskURL(serverRunDeskURL)?"当前服务端地址只对本机有效，请填写从此浏览器可访问的 RunDesk 地址。":configured?"此浏览器已设置访问地址。":"使用服务端地址。";const link=$("#settings-rundesk");link.hidden=true;try{const url=new URL(browserRunDeskURL(serverRunDeskURL));if(["http:","https:"].includes(url.protocol)&&!url.username&&!url.password){link.href=url.href;link.hidden=false;}}catch{}
  const rows=[["RunDesk",environment.rundeskReady?"已连接":environment.rundeskError||"待配置"]];
  if(typeof environment.productionProfile==="string"){const entry=catalog?.items?.find(item=>item.id===environment.productionProfile);rows.push(["新项目默认制作环境",entry?.name||(environment.productionProfile?"已配置的制作环境（名称暂不可读取）":"原默认环境")]);}
  const checks=environment.checks||{};for(const [key,name]of [["hyperframes","HyperFrames"],["ffmpeg","FFmpeg"],["font","字体"],["gsap","动画依赖"]])if(checks[key])rows.push([name,checks[key].ready?"已找到依赖":"待配置依赖"]);
@@ -110,6 +117,8 @@ $("#managed-project-restore").onclick=action(()=>applyManagedProjectAction("rest
 $("#managed-project-delete").onclick=action(openProjectDeleteDialog);$("#project-delete-cancel").onclick=closeProjectDeleteDialog;$("#project-delete-dialog").addEventListener("cancel",event=>{event.preventDefault();closeProjectDeleteDialog();});
 $("#project-delete-confirm").oninput=()=>{$("#project-delete-submit").disabled=!pendingProjectDeletion||$("#project-delete-confirm").value!==`删除 ${pendingProjectDeletion.length} 个项目`;};
 $("#project-delete-form").onsubmit=action(async event=>{event.preventDefault();if(!pendingProjectDeletion||$("#project-delete-confirm").value!==`删除 ${pendingProjectDeletion.length} 个项目`)return;const targets=pendingProjectDeletion;closeProjectDeleteDialog();await applyManagedProjectAction("delete",targets);});
+$("#rundesk-browser-form").onsubmit=action(async event=>{event.preventDefault();const value=$("#rundesk-browser-url").value.trim(),url=new URL(value);if(!["http:","https:"].includes(url.protocol)||url.username||url.password||url.search||url.hash)throw Error("请输入无账号、查询参数和片段的 HTTP(S) 地址");localStorage.setItem(rundeskBrowserKey,url.href.replace(/\/$/,""));await loadEnvironment();toast("此浏览器的 RunDesk 访问地址已保存。");});
+$("#rundesk-browser-clear").onclick=action(async()=>{localStorage.removeItem(rundeskBrowserKey);$("#rundesk-browser-url").value="";await loadEnvironment();});
 window.addEventListener("beforeunload",event=>{if(settingsDirty){event.preventDefault();event.returnValue="";}});
 async function bootSettings(){applyTTSSettings(await api("/api/speech/settings"));$("#login").hidden=true;$("#settings-app").hidden=false;const results=await Promise.allSettled([loadEnvironment(),loadServices(),loadManagedProjects()]);for(const result of results)if(result.status==="rejected")toast(result.reason.message);}
 bootSettings().catch((e)=>{if(e.status!==401)$("#login-error").textContent=e.message;});

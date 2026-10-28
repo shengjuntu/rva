@@ -14,8 +14,8 @@ function catalog(){return{defaultProfile:'news',rundeskURL:'http://127.0.0.1:321
  {id:'retired',name:'旧环境',description:'已停用',enabled:false,isDefault:false,state:'disabled',selectable:false},
  {id:'unknown',name:'未知环境',description:'需检查',enabled:true,isDefault:false,state:'unknown',selectable:false}
 ]};}
-function fixture(storage={}){
- const dom=new JSDOM(fs.readFileSync(path.join(root,'web/index.html'),'utf8'),{url:'http://127.0.0.1:3220',runScripts:'outside-only'}),w=dom.window,ctx=dom.getInternalVMContext();
+function fixture(storage={},origin="http://127.0.0.1:3220"){
+ const dom=new JSDOM(fs.readFileSync(path.join(root,'web/index.html'),'utf8'),{url:origin,runScripts:'outside-only'}),w=dom.window,ctx=dom.getInternalVMContext();
  w.HTMLMediaElement.prototype.pause=function(){};w.HTMLMediaElement.prototype.load=function(){};
  w.HTMLDialogElement.prototype.showModal=function(){this.open=true;};w.HTMLDialogElement.prototype.close=function(){this.open=false;};
  w.FormData=FormData;w.confirm=()=>true;w.setInterval=()=>0;
@@ -151,4 +151,15 @@ test('friendly saved labels remain stable on redraw and an old project response 
   const newer=catalog();newer.items.find(row=>row.id==='animation').name='当前动画环境';pending[1](json(newer));await new Promise(resolve=>setImmediate(resolve));
   pending[0](json(catalog()));await new Promise(resolve=>setImmediate(resolve));f.run('drawProject()');assert.match(f.$('#project-runtime').textContent,/当前动画环境/);assert.doesNotMatch(f.$('#project-runtime').textContent,/新闻视频/);
  }finally{await f.close();}
+});
+
+test('remote browser never receives a loopback RunDesk link and can use its configured browser URL',()=>{
+ const f=fixture({},'https://video.example.com');try{
+  f.run('rundeskURL="http://127.0.0.1:3210";updateRunDeskLink();setRuntimeConfigLink()');
+  assert.equal(f.$('#open-rundesk').hidden,true);assert.equal(f.$('#new-profile-rundesk').hidden,true);
+  f.w.localStorage.setItem('video-rundesk-browser-url','https://desk.example.com');
+  f.run('updateRunDeskLink();setRuntimeConfigLink()');
+  assert.equal(f.$('#open-rundesk').hidden,false);assert.equal(new URL(f.$('#open-rundesk').href).origin,'https://desk.example.com');
+  assert.equal(new URL(f.$('#new-profile-rundesk').href).origin,'https://desk.example.com');
+ }finally{f.dom.window.close();}
 });
